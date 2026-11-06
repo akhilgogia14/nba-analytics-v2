@@ -11,7 +11,7 @@ An advanced analytics and ML tool for researching and predicting NBA player perf
 
 It is also a portfolio piece for hiring managers (the owner's passion should show), and a playground for learning. Quality and polish matter more than speed. It does not need to answer in 30 seconds or be explainable in 5 minutes.
 
-Wording: this is a research and prediction tool. Do not use betting framing in the product, the docs or the UI. Line and odds data is parked (see section 9).
+Positioning and wording: this is a data product plus an NBA research study. The design target is player performance forecasts for points, rebounds, assists, 3-pointers, blocks and steals (the stat lines prop markets are built on). It is fine to say so in internal docs. Public-facing copy (UI, README, portfolio write-ups) stays professional: "player performance forecasts", "distributions", "calibration", "track record". No tout language ("lock", "can't miss", "free pick") and no promises of profit. Show uncertainty and the real track record honestly. Line and odds data stays parked as an optional later source (see section 9).
 
 ## 2. Lessons from v1 (repo: akhilgogia14/nba-analytics-databricks, archived)
 
@@ -40,7 +40,7 @@ Key v1 finding: in a back-test of about 2,500 games, a plain blend of last-10-ga
 |---|---|
 | v1 | Archived. Tag the final state, archive the GitHub repo read-only, stop its schedules, delete the deployed Databricks App. Leave v1 Databricks tables in place until v2 works (owner to confirm). |
 | v2 repo | https://github.com/akhilgogia14/nba-analytics-v2 |
-| Primary data source | sportsdataverse/hoopR-nba-stats-data (NBA Stats data, published as GitHub Release assets). Not yet verified for freshness (see section 5). |
+| Primary data source | sportsdataverse/sportsdataverse-data (NBA Stats data, published as GitHub Release assets, tags like `nba_stats_player_boxscores`). Checked fresh on 2026-11-05; see `docs/spike-findings.md`. |
 | Seasons | 2021-22 onward. The repo labels seasons by END year, so minimum season = 2022. Verify against real files. |
 | Landing zone | Cloudflare R2 bucket `nba-bucket` (free tier). Raw files stored untouched, with a manifest per run. |
 | Compute and ML | Databricks first (the owner knows it and it is free; it is the portfolio centerpiece for ML and MLflow). |
