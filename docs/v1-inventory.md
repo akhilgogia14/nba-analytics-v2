@@ -15,8 +15,8 @@ v1 is archived. v2 builds from the new data source (`sportsdataverse/sportsdatav
 | Thing | State | Notes |
 |---|---|---|
 | Job `ARCHIVED v1 - NBA 2026 Daily Pipeline` | Exists, cannot run by itself | No schedule, no trigger, not continuous. 14 tasks (bronze_kaggle_import, silver_layer, 11 gold tasks, publish_to_motherduck). |
-| App `nba-analytics` | Deletion requested 2026-11-06 (status DELETING) | Owner approved; was STOPPED. Confirm it disappears from the apps list. |
-| App `nba-team-explorer` | Deletion requested 2026-11-06 (status DELETING) | Owner approved; was STOPPED. Confirm it disappears from the apps list. |
+| App `nba-analytics` | Deleted 2026-11-06 | Owner approved; was STOPPED. Confirmed gone: apps list is empty. |
+| App `nba-team-explorer` | Deleted 2026-11-06 | Owner approved; was STOPPED. Confirmed gone: apps list is empty. |
 | SQL warehouse `Serverless Starter Warehouse` | Exists, STOPPED | 2X-Small. The free tier has only this one. |
 | Clusters | None | |
 | Pipelines | None | |
@@ -51,7 +51,7 @@ Total: 65
 
 Each deletion needs an explicit yes (see `CLAUDE.md`).
 
-1. Delete the two stopped apps: **yes, requested.** Both showed DELETING right after the delete command and 20 seconds later; confirm they leave the apps list.
+1. Delete the two stopped apps: **yes, done.** Both showed DELETING at first; a later `databricks apps list` returned no apps.
 2. Archived job: **leave it.** It has no schedule and cannot run by itself.
 3. Three secret scopes (`nba-github`, `nba-kaggle`, `nba-motherduck`): **leave them for now.** `nba-motherduck` looks dead; revisit later.
 4. The 65 tables in `nba_v1_archived`: **keep.** Delete them once v2 is working and the owner confirms. Not reversible unless Delta table history or a backup exists (not checked).
