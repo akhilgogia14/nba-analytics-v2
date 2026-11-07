@@ -1,0 +1,26 @@
+# Secrets: never commit these. Use .env.example for the variable names only.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data files: raw data lives in R2, not in the repo
+*.parquet
+*.csv
+*.csv.gz
+*.rds
+*.feather
+*.zip
+data/
+tmp/
+
+# macOS
+.DS_Store
