@@ -1,0 +1,70 @@
+# Daily sync: copy new or changed source files into R2 (tiers 1 and 2), then tell Slack.
+# Scheduled runs only work from the default branch (main).
+name: daily-sync
+
+on:
+  schedule:
+    - cron: "30 16 * * *"   # 16:30 UTC daily; the source finishes about 15:17 UTC
+  workflow_dispatch:         # manual "Run workflow" button
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-sync          # never two syncs at once
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      GITHUB_TOKEN: ${{ github.token }}   # only used to read the public release list
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Sync tier 1
+        shell: bash
+        run: python scripts/backfill.py --tier tier1 --execute 2>&1 | tee tier1.log
+
+      - name: Sync tier 2
+        if: ${{ !cancelled() }}   # still try tier 2 if tier 1 failed
+        shell: bash
+        run: python scripts/backfill.py --tier tier2 --execute 2>&1 | tee tier2.log
+
+      - name: Build summary
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          {
+            echo "### Daily sync"
+            for t in tier1 tier2; do
+              echo "- $t: $(grep -h '^Files:' $t.log 2>/dev/null || echo 'did not finish')"
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY" > summary.txt
+
+      - name: Tell Slack
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then echo "No SLACK_WEBHOOK_URL secret; skipping Slack."; exit 0; fi
+          if [ "$JOB_STATUS" = "success" ]; then head="NBA daily sync OK"; else head="NBA daily sync FAILED"; fi
+          HEAD="$head" python - <<'PY' > payload.json
+          import json, os
+          text = f"*{os.environ['HEAD']}*\n{open('summary.txt').read()}\n<{os.environ['RUN_URL']}|Open the run>"
+          print(json.dumps({"text": text}))
+          PY
+          curl -fsS -X POST -H 'Content-type: application/json' --data @payload.json "$SLACK_WEBHOOK_URL"
