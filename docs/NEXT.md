@@ -1,42 +1,43 @@
 # NEXT: current task list
 
-Written by the planning chat. Do these in order, one step at a time, in teaching mode (see CLAUDE.md). Stop after each step.
-First action: commit `CLAUDE.md` and `docs/` on your first branch (they are already on disk, untracked).
+Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a time, in teaching mode (see CLAUDE.md). Stop after each step.
 
-## Step 1: Finish the source spike (read-only, no R2, no repo data)
-- **Download the 2026 and 2027 parquet files for the core tables to a temp folder**
-- **List columns and row counts; find the earliest and latest game date**
-- **Check what `_2022` and `_2027` mean in real dates**
-- **Read the license text**
+## Done (details in the files named)
+- Source spike and data-quality checks: `docs/spike-findings.md`, release 001.
+- Databricks CLI installed and logged in; read-only inventory of v1; two stopped v1 apps deleted: `docs/v1-inventory.md`.
+- R2 access (token, `.env`, `.gitignore`, test upload): release 002.
+- Sync script, tests, and tiers 1 and 2 landed untouched in R2 (90 files, 164 MB, manifests complete): release 003.
 
-## Step 2: Check data quality
-- **Check each row has a unique, never-empty key**
-- **See how a "did not play" player appears in the box scores**
-- **Compare game_logs vs box scores row counts for one season to explain the size gap**
-- **Check the injury report: columns, history, how recent**
+## Waiting on the owner
+- Merge PR for release 003 (it also carries this file).
+- Python 3.12 locally (before the daily job). Release 003 question 2.
+- v1 leftovers (job, three secret scopes, 65 archived tables): keep until v2 works, then decide.
 
-## Step 3: Write it down
-- **Create a branch; in PLAN.md fix the source repo name (files are on `sportsdataverse/sportsdataverse-data` releases) and replace its "Wording" paragraph with the "Positioning and wording" rule from CLAUDE.md**
-- **Save findings to `docs/spike-findings.md`**
-- **Write release note `docs/releases/001-source-spike.md`**
-- **Open a pull request**
+## Step 7: Can Databricks read R2? (decides how data gets into bronze)
+- **Read what Databricks Free Edition says about outside network access and external storage.** Done 2026-11-07: Free Edition is serverless-only, and outbound internet is limited to an unpublished list of trusted domains that varies by region; custom storage locations are listed as unsupported, and the docs do not say whether R2 external locations work. Unity Catalog does document R2 external locations (`r2://bucket@account-id.r2.cloudflarestorage.com`, needs a storage credential and a newer runtime). The test below decides.
+- **Run one harmless network test from Databricks (no secrets): can it reach the R2 endpoint over HTTPS?**
+- **If reachable, test reading one small file with the R2 keys held in a Databricks secret scope (the owner enters the keys)**
+- **If not, pick the fallback route and write the decision down** (for example: copy files into a Unity Catalog Volume with the Databricks CLI or a job, then load bronze from there)
 
-## Step 4: Databricks login and read-only inventory
-- **Install the Databricks CLI with Homebrew (show the command first)**
-- **The owner runs the login in their own terminal (no secrets in chat)**
-- **List v1 jobs, apps, schemas, tables, warehouses and secrets; change nothing**
-- **Save the list to `docs/v1-inventory.md`**
+## Step 8: Peek at the tier 2 tables (read-only)
+- **Open one season of each tier 2 file (play-by-play, shots, possessions, lineups, game lineups, season stats, rosters, standings, officials)**
+- **List columns, row counts, candidate keys, empty keys, obvious quirks**
+- **Save findings to `docs/tier2-findings.md`**
 
-## Step 5: Propose the v1 cleanup (do not run it yet)
-- **Turn the inventory into a numbered cleanup list, in this order: stop schedules, then the app, then jobs, then anything else**
-- **Mark each item reversible or not**
-- **Ask the owner about the v1 tables (keep or delete)**
-- **Wait for a yes on each item before touching it**
+## Step 9: Bronze for the core tables
+- **Confirm schema names with the owner** (proposal: `workspace.nba_v2_bronze`, `nba_v2_silver`, `nba_v2_gold`)
+- **Create the bronze schema and load tier 1 as-is, adding only load metadata (source file, checksum, loaded_at)**
+- **Reconcile row counts against the parquet files**
+- **Row-level change capture: MERGE on keys, plus Delta Change Data Feed if Free Edition supports it (hash-compare is the fallback)**
+- **Release note and PR**
 
-## Step 6: R2 access
-- **Owner creates an R2 API token scoped to `nba-bucket` (read and write) and stores it as an environment variable**
-- **Write a tiny script that lists the bucket (read-only test)**
-- **Then upload one small file to `raw/hoopr_stats/...` plus a manifest entry, as a test**
-- **Release note and review before the full backfill**
+## Step 10: Daily GitHub Actions job
+- **Workflow that runs `scripts/backfill.py` for tiers 1 and 2 on a schedule, with R2 keys as repository secrets (the owner adds them)**
+- **Alert on failure; first real run of the "changed file" path on the 2027 files**
+- **Release note and PR**
 
-Later steps (not yet): full 2022+ backfill to R2, load bronze in Databricks, silver, simple gold, simple visuals. See PLAN.md and `docs/LEARNING.md`.
+## Step 11: Silver for the core tables
+- **Apply the rules in `docs/spike-findings.md` section 9** (ignore team_id 0 and unplayed games; "played" means minutes greater than 0; convert minutes text; dates via the schedule; player box scores are the player source; key checks on every load)
+- **Quality gates, then release note**
+
+Later (not yet): simple gold tables, simple visuals, tier 2 in silver, the research app, back-test harness, ML. See PLAN.md and `docs/LEARNING.md`. Parked ideas are at the end of PLAN.md.
