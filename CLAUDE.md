@@ -28,11 +28,12 @@ This file is loaded automatically each session. Keep it short and current.
 - Run `git fetch` before saying anything about branch or PR state.
 - Verify before claiming done: run the tests or checks and quote the real output.
 
-## Release notes and review (for Codex)
-- At each major step, write `docs/releases/NNN-short-title.md` from `docs/releases/TEMPLATE.md` and commit it in the same pull request.
+## Release notes and review (Codex on demand)
+- At each major step, write `docs/releases/NNN-short-title.md` from `docs/releases/TEMPLATE.md` and commit it in the same pull request. Numbers go in order (001, 002, ...), not tied to PR numbers.
 - Major steps include: the source spike, data landed in R2, bronze loaded, silver done, each batch of gold tables, each front-end push, Databricks cleanup.
-- Codex reviews the release note plus the diff and writes `docs/reviews/NNN-codex.md` from `docs/reviews/TEMPLATE.md` (or leaves pull request comments).
-- Read the review before starting the next step. Reply to each finding: fixed, disagree (with a reason), or deferred.
+- Codex reviews are run by the owner, when the owner decides. Do not run `codex review` or `codex exec`, and do not propose a review at each step.
+- If the owner brings a review back (`docs/reviews/NNN-codex.md` from `docs/reviews/TEMPLATE.md`, or pull request comments), read it and reply to each finding: fixed, disagree (with a reason), or deferred.
+- If the owner asks you to run a review, do it from a clean copy of the branch (for example a git worktree outside the repo folder) so `.env` is not in the folder Codex reads, and say that `codex review` has no setting that restricts what it can read.
 - Every release note ends with an "Owner walkthrough" in plain language: what changed, what it looks like, what each new file does, no jargon.
 
 ## Safety
@@ -42,9 +43,10 @@ This file is loaded automatically each session. Keep it short and current.
 
 ## Tools (check before assuming; report what is missing)
 - `gh` is installed and logged in.
-- Databricks CLI: install and login pending. The owner runs the login.
-- R2: use the S3-compatible API or wrangler with a token scoped to `nba-bucket`. The owner creates the token.
-- Codex: the desktop app exists; the CLI is not installed yet. When it is, check `codex --help` for a non-interactive mode and ask the owner before running a review.
+- Databricks CLI: installed (v1.24.0, from the `databricks/tap` Homebrew tap). Logged in as profile `DEFAULT` on the owner's workspace; the owner runs any login.
+- R2: S3-compatible API through `boto3` (pinned in `requirements.txt`, installed in a gitignored `.venv`). Credentials are in the gitignored `.env` (names in `.env.example`); the token is scoped to `nba-bucket`. Run scripts as `.venv/bin/python scripts/<name>.py` from the repo root. Never print `.env` values.
+- Codex: CLI installed (0.167.0) and logged in, but used only when the owner asks (see "Release notes and review").
+- Python on this Mac is 3.9; `boto3` warns it is out of support. Move to 3.12 before the daily job.
 
 ## Positioning and wording
 - This is a data product plus an NBA research study. The design target is player performance forecasts for points, rebounds, assists, 3-pointers, blocks and steals (the stat lines prop markets are built on). It is fine to say so in internal docs.
