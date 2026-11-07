@@ -1,6 +1,6 @@
 # NBA Analytics v2: Plan and Handoff
 
-Status: planning complete, no code yet. Written 2026-11-05. This is the first document in the repo. Read it fully before doing anything.
+Status (updated 2026-11-07): source spike done; tiers 1 and 2 of the source files are landed untouched in R2 with manifests; the sync script and tests exist; next are the daily GitHub Actions job and loading bronze in Databricks. First written 2026-11-05. Read this fully before doing anything, then `docs/NEXT.md`.
 
 ## 1. What this is
 
@@ -70,19 +70,19 @@ Key v1 finding: in a back-test of about 2,500 games, a plain blend of last-10-ga
 ## 5. Data source facts and open verification
 
 Known from reading the repo page:
-- Datasets include player_boxscores (about 188 MB total), player_game_logs (about 16 MB), team_boxscores, game_rosters, officials, schedules, rosters, standings, lineups, possessions, shots (about 1 GB), pbp (about 4.8 GB), plus derived models (RAPM, BPM, WAR, DARKO, impact). An injury_report dataset exists in the code but is not published yet.
-- Total of all releases is about 7.4 GB. With 2022+ only, estimated about 2 to 2.5 GB (a guess, verify).
-- The latest commit is a 2026-27 season update. The README table shows box scores last published 2026-10-01 and the daily workflow last run 2026-07-12, so freshness is unconfirmed.
+- Datasets include player_boxscores (about 188 MB total), player_game_logs (about 16 MB), team_boxscores, game_rosters, officials, schedules, rosters, standings, lineups, possessions, shots (about 1 GB), pbp (about 4.8 GB), plus derived models (RAPM, BPM, WAR, DARKO, impact). The injury_report dataset is published (checked 2026-11-06).
+- Sizes, measured 2026-11-06 from the release files: the figures above (and the 7.4 GB total) are far larger than the parquet files, probably because they include the csv and rds copies (not verified). In parquet, the NBA Stats datasets from 2022 on total about 0.45 GB (play-by-play about 99 MB, shots about 22 MB). Landed in R2 so far: 90 files, 164 MB.
+- Freshness, checked 2026-11-05 and 2026-11-06: games through 2026-11-04 are present and the 2027 files change daily.
 - His raw scraping runs from a cron job on his own server. Three contributors. Small bus factor.
 - LICENSE is the short R-package stub (year and copyright holder). Read LICENSE.md for the full text before copying code.
 
-Must verify in the first spike:
-1. Real per-season file list and the latest game date in the box score release.
-2. Season label convention (end-year) against actual files.
-3. Column schemas and key behavior (NULL-safe composite keys).
-4. License text.
-5. Whether Databricks Free Edition can read from R2 over its S3-compatible endpoint. If not, route data into Databricks another way.
-6. Fallback source choice if the repo is stale.
+Must verify in the first spike (status 2026-11-07; details in `docs/spike-findings.md`):
+1. Real per-season file list and the latest game date in the box score release. Done.
+2. Season label convention (end-year) against actual files. Done: end year.
+3. Column schemas and key behavior (NULL-safe composite keys). Done for the four core tables; the tier 2 tables are landed but not yet inspected.
+4. License text. Done: MIT and CC BY 4.0 (credit required).
+5. Whether Databricks Free Edition can read from R2 over its S3-compatible endpoint. If not, route data into Databricks another way. Still open.
+6. Fallback source choice if the repo is stale. Still open.
 
 ## 6. Task list
 
@@ -102,7 +102,9 @@ Must verify in the first spike:
 - Vendor his Python folder (pinned commit, license kept).
 - Go or no-go on the source; choose a fallback.
 
-R2 layout: `raw/hoopr_stats/<dataset>/<season>/<file>` plus `_manifest/<date>.json`. Raw means untouched; no transforms in the landing zone. Free tier is 10 GB; keep one current copy of each big asset and dated snapshots only for small core tables.
+R2 layout (as built): `raw/hoopr_stats/<release tag>/<season>/<file>` plus one manifest per run at `_manifest/<UTC run id>-<tier>.json`. Raw means untouched; no transforms in the landing zone. Free tier is 10 GB; 164 MB used so far.
+
+Change handling (decided 2026-11-06): keep one current copy per file. Each R2 file carries labels (checksum, source `updated_at`, source URL, fetch time). The sync script (`scripts/backfill.py`, tiers in `config/sources.json`) compares labels first and downloads only files that look changed; a file whose content changed is replaced at the same key and the manifest records the old and new checksums. Old bytes are not kept. It never deletes. Row-level change capture (MERGE plus Delta Change Data Feed, hash-compare as fallback) is for the bronze load.
 
 **Phase 3: Repo foundation**
 - Short AGENTS.md, decision log, scope doc, REVIEW.md checklist for Codex, CI (tests and lint), PR template.
@@ -144,8 +146,13 @@ R2 layout: `raw/hoopr_stats/<dataset>/<season>/<file>` plus `_manifest/<date>.js
 1. Delete the v1 Databricks tables and job, or leave until v2 works? (Default: leave.)
 2. Time budget (hours a week) and any target date.
 3. Is a roughly $5 a month VPS acceptable as the fallback scraper, or only if the maintainer stops updating?
-4. Land all 2022+ datasets at once, or core tables first? (Default: core first, then the heavy files.)
+4. Land all 2022+ datasets at once, or core tables first? Decided 2026-11-06: two batches. Tier 1 (core) and tier 2 (play-by-play, shots, possessions, lineups, season stats, rosters, standings, officials) are landed; tier 3 is parked.
 
 ## 9. Parked
 
-Shot maps and play-by-play features, an NFL or fantasy version, line and odds data, home/away shot splits, the maintainer-independent scraper, moving hosting off Databricks Free.
+Shot maps and play-by-play features (the raw files are in R2, nothing is built on them), an NFL or fantasy version, line and odds data, home/away shot splits, the maintainer-independent scraper, moving hosting off Databricks Free.
+
+Added 2026-11-06 and 2026-11-07:
+- Tier 3 source datasets (matchups, game matchups, leaguedash, synergy, hustle, rolling windows, player impact, metric curves; about 140 MB; sizes for the multi-file releases are rough).
+- The ESPN duplicates (`espn_nba_*`, about 140 MB) as a second source for cross-checks.
+- Airflow and dbt: explore one day as learning projects, not on the critical path. dbt snapshots could track changing history (rosters); an orchestrator such as Dagster or Airflow could replace the GitHub Actions schedule.
