@@ -15,8 +15,8 @@ v1 is archived. v2 builds from the new data source (`sportsdataverse/sportsdatav
 | Thing | State | Notes |
 |---|---|---|
 | Job `ARCHIVED v1 - NBA 2026 Daily Pipeline` | Exists, cannot run by itself | No schedule, no trigger, not continuous. 14 tasks (bronze_kaggle_import, silver_layer, 11 gold tasks, publish_to_motherduck). |
-| App `nba-analytics` | Exists, STOPPED | Not deleted. |
-| App `nba-team-explorer` | Exists, STOPPED | Not deleted. |
+| App `nba-analytics` | Deletion requested 2026-11-06 (status DELETING) | Owner approved; was STOPPED. Confirm it disappears from the apps list. |
+| App `nba-team-explorer` | Deletion requested 2026-11-06 (status DELETING) | Owner approved; was STOPPED. Confirm it disappears from the apps list. |
 | SQL warehouse `Serverless Starter Warehouse` | Exists, STOPPED | 2X-Small. The free tier has only this one. |
 | Clusters | None | |
 | Pipelines | None | |
@@ -47,12 +47,12 @@ Total: 65
 - Whether any workspace files, notebooks, repos or Unity Catalog volumes remain. Not listed.
 - The Genie cleanup itself: what it did is inferred from the current state, not from a log.
 
-## Open items for the owner (nothing here has been touched)
+## Owner decisions (2026-11-06)
 
-Each one needs an explicit yes before anything is deleted (see `CLAUDE.md`).
+Each deletion needs an explicit yes (see `CLAUDE.md`).
 
-1. Delete the two stopped apps (`nba-analytics`, `nba-team-explorer`)? PLAN.md said to delete the deployed app. Reversible? No, redeploying means rebuilding it from the v1 repo.
-2. Delete the archived job? Reversible? No (the v1 repo has the code, but the job definition would be lost).
-3. Delete the three secret scopes? `nba-motherduck` looks dead; `nba-github` and `nba-kaggle` may be unused too. Reversible? No, the secret values would be lost unless the owner has them elsewhere.
-4. Keep or delete the 65 tables in `nba_v1_archived`? Reversible? No, unless Delta table history or a backup exists (not checked).
-5. Name for the v2 schema. Proposal: `workspace.nba_v2` (bronze, silver and gold tables get prefixes inside it, or split into separate schemas later).
+1. Delete the two stopped apps: **yes, requested.** Both showed DELETING right after the delete command and 20 seconds later; confirm they leave the apps list.
+2. Archived job: **leave it.** It has no schedule and cannot run by itself.
+3. Three secret scopes (`nba-github`, `nba-kaggle`, `nba-motherduck`): **leave them for now.** `nba-motherduck` looks dead; revisit later.
+4. The 65 tables in `nba_v1_archived`: **keep.** Delete them once v2 is working and the owner confirms. Not reversible unless Delta table history or a backup exists (not checked).
+5. v2 schema name: **`workspace.nba_v2` is approved**, and bronze, silver and gold must stay explicit. Not created yet. Proposal for when bronze is loaded: separate schemas `nba_v2_bronze`, `nba_v2_silver`, `nba_v2_gold` (owner to confirm then).
