@@ -4,7 +4,7 @@ name: daily-sync
 
 on:
   schedule:
-    - cron: "30 16 * * *"   # 16:30 UTC daily; the source finishes about 15:17 UTC
+    - cron: "17 16 * * *"   # 16:17 UTC; the source is done by about 15:17 UTC. Off the top of the hour because GitHub delays busy slots (seen: up to 4 hours)
   workflow_dispatch:         # manual "Run workflow" button
 
 permissions:
@@ -54,6 +54,7 @@ jobs:
 
       - name: Tell Slack
         if: ${{ !cancelled() }}
+        continue-on-error: true   # a Slack problem must not turn a good sync red
         shell: bash
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
