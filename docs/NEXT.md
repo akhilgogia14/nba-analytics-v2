@@ -13,20 +13,18 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 - Python 3.12 locally (before the daily job). Release 003 question 2.
 - v1 leftovers (job, three secret scopes, 65 archived tables): keep until v2 works, then decide.
 
-## Step 7: Can Databricks read R2? (decides how data gets into bronze)
+## Step 7: Can Databricks read R2? DONE 2026-11-07 (details in `docs/tier2-findings.md` section 1)
 - **Read what Databricks Free Edition says about outside network access and external storage.** Done 2026-11-07: Free Edition is serverless-only, and outbound internet is limited to an unpublished list of trusted domains that varies by region; custom storage locations are listed as unsupported, and the docs do not say whether R2 external locations work. Unity Catalog does document R2 external locations (`r2://bucket@account-id.r2.cloudflarestorage.com`, needs a storage credential and a newer runtime). The test below decides.
-- **Run one harmless network test from Databricks (no secrets): can it reach the R2 endpoint over HTTPS?**
-- **If reachable, test reading one small file with the R2 keys held in a Databricks secret scope (the owner enters the keys)**
-- **If not, pick the fallback route and write the decision down** (for example: copy files into a Unity Catalog Volume with the Databricks CLI or a job, then load bronze from there)
+- Result: yes. Network test passed; a notebook with `boto3` and the secret scope `nba-v2-r2` read R2; and a read-only Unity Catalog external location `nba_r2_raw` (credential `nba_r2_ro`) works with SQL `read_files`. Bronze will use the external location. The `boto3` route is the fallback. Leftover to decide after bronze works: the `nba-v2-r2` secret scope.
+- Still untested: Auto Loader, `COPY INTO` and Delta Change Data Feed on this setup.
 
-## Step 8: Peek at the tier 2 tables (read-only)
-- **Open one season of each tier 2 file (play-by-play, shots, possessions, lineups, game lineups, season stats, rosters, standings, officials)**
-- **List columns, row counts, candidate keys, empty keys, obvious quirks**
-- **Save findings to `docs/tier2-findings.md`**
+## Step 8: Peek at the tier 2 tables (read-only). DONE 2026-11-07
+- Findings, keys and rules for bronze and silver are in `docs/tier2-findings.md` (2025 season only).
+- Open items from it: what `game_rosters` really lists, how to link a shot to its play-by-play row, and why 80 `game_lineups` rows disagree.
 
 ## Step 9: Bronze for the core tables
 - **Confirm schema names with the owner** (proposal: `workspace.nba_v2_bronze`, `nba_v2_silver`, `nba_v2_gold`)
-- **Create the bronze schema and load tier 1 as-is, adding only load metadata (source file, checksum, loaded_at)**
+- **Create the bronze schema and load tier 1 as-is through the `nba_r2_raw` external location, adding only load metadata (source file, checksum, loaded_at); follow the bronze rules in `docs/tier2-findings.md` section 4**
 - **Reconcile row counts against the parquet files**
 - **Row-level change capture: MERGE on keys, plus Delta Change Data Feed if Free Edition supports it (hash-compare is the fallback)**
 - **Release note and PR**
