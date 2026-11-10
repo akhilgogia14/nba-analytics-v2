@@ -40,6 +40,23 @@
           "game_id",
           "person_id"
         ]
+      },
+      "nba_stats_team_boxscores": {
+        "table": "team_boxscores",
+        "key": [
+          "game_id",
+          "team_id",
+          "side"
+        ]
+      },
+      "nba_stats_schedules": {
+        "table": "schedules",
+        "key": [
+          "game_id"
+        ]
+      },
+      "nba_stats_injury_report": {
+        "table": "injury_report"
       }
     }
   }
