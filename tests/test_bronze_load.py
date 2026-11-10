@@ -40,8 +40,11 @@ def test_file_uri_shape():
         "r2://bkt@acct.r2.cloudflarestorage.com/raw/x/y.parquet"
 
 
+COLS = ["a", "b", "_rescued_data", "_source_file", "_source_modified_at", "_loaded_at", "_sha256"]
+
+
 def test_load_sql_replaces_only_that_file():
-    sql = b.load_file_sql("s.t", "r2://b@h/raw/f.parquet", "sha1")
+    sql = b.load_file_sql("s.t", "r2://b@h/raw/f.parquet", "sha1", "replace", COLS, ["a", "b", "_rescued_data"])
     assert "REPLACE WHERE _source_file = 'r2://b@h/raw/f.parquet'" in sql
     assert "'sha1' AS _sha256" in sql
     assert "DELETE" not in sql.upper() and "DROP" not in sql.upper()
@@ -51,3 +54,73 @@ def test_key_check_covers_every_key_part():
     sql = b.key_check_sql("s.t", ["game_id", "person_id"])
     assert "count(DISTINCT game_id, person_id)" in sql
     assert "game_id IS NULL OR person_id IS NULL" in sql
+
+
+# ---- append mode (snapshot tables keep every version) ----
+
+def test_snapshot_unchanged_when_this_version_is_already_stored():
+    assert b.classify_snapshot("v2", ["v1", "v2"]) == "UNCHANGED"
+
+
+def test_snapshot_changed_when_version_not_stored_yet():
+    assert b.classify_snapshot("v3", ["v1", "v2"]) == "CHANGED"
+
+
+def test_snapshot_new_when_nothing_stored():
+    assert b.classify_snapshot("v1", []) == "NEW"
+
+
+def test_snapshot_missing_label_is_never_unchanged():
+    assert b.classify_snapshot(None, [None]) != "UNCHANGED"
+
+
+def test_append_sql_never_removes_old_rows():
+    sql = b.load_file_sql("s.t", "r2://b@h/f.parquet", "v3", "append", COLS, ["a", "b", "_rescued_data"])
+    assert sql.startswith("INSERT INTO s.t SELECT")
+    assert "REPLACE WHERE" not in sql
+
+
+def test_replace_sql_is_the_default():
+    assert "REPLACE WHERE" in b.load_file_sql("s.t", "r2://b@h/f.parquet", "v3", "replace", COLS, ["a"])
+
+
+def test_count_check_looks_at_one_version_when_given():
+    assert "_sha256 = 'v3'" in b.count_check_sql("s.t", "u", "v3")
+    assert "_sha256" not in b.count_check_sql("s.t", "u")
+
+
+def test_append_key_check_is_within_one_version():
+    sql = b.key_check_sql("s.t", ["team_id"], "append")
+    assert "count(DISTINCT team_id, _source_file, _sha256)" in sql
+    assert "_source_file" not in b.key_check_sql("s.t", ["team_id"])
+
+
+def test_mode_picks_the_right_classifier():
+    # a file seen before with a different checksum: replace mode says CHANGED either way,
+    # but append mode keeps the version it already holds as UNCHANGED
+    assert b.classifier_for("append")("v1", ["v1", "v2"]) == "UNCHANGED"
+    assert b.classifier_for("replace")("v1", ["v1", "v2"]) == "CHANGED"
+    assert b.classifier_for(None)("v1", ["v1", "v2"]) == "CHANGED"
+
+
+# ---- seasons with different columns ----
+
+def test_missing_file_column_becomes_null_in_table_order():
+    sel = b.select_list(COLS, ["b", "_rescued_data"])
+    assert sel[0] == "NULL AS `a`" and sel[1] == "`b`"
+
+
+def test_extra_file_column_stops_the_load():
+    import pytest
+    with pytest.raises(ValueError):
+        b.select_list(["a", "_source_file", "_source_modified_at", "_loaded_at", "_sha256"], ["a", "new_col"])
+
+
+def test_metadata_columns_come_from_the_file_and_the_checksum():
+    sql = b.load_file_sql("s.t", "u", "abc", "append", COLS, ["a", "b", "_rescued_data"])
+    assert "_metadata.file_path AS _source_file" in sql and "'abc' AS _sha256" in sql
+
+
+def test_table_is_created_from_all_seasons():
+    sql = b.create_empty_sql("s.t", "r2://b@h/raw/x/*/*.parquet")
+    assert "mergeSchema => true" in sql and "WHERE 1 = 0" in sql

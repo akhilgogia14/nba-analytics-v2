@@ -81,7 +81,7 @@ Must verify in the first spike (status 2026-11-07; details in `docs/spike-findin
 2. Season label convention (end-year) against actual files. Done: end year.
 3. Column schemas and key behavior (NULL-safe composite keys). Done for the four core tables; the tier 2 tables are landed but not yet inspected.
 4. License text. Done: MIT and CC BY 4.0 (credit required).
-5. Whether Databricks Free Edition can read from R2 over its S3-compatible endpoint. If not, route data into Databricks another way. Still open.
+5. Whether Databricks Free Edition can read from R2 over its S3-compatible endpoint. If not, route data into Databricks another way. Done 2026-11-07: yes, through a read-only Unity Catalog external location (`nba_r2_raw`) and also through `boto3` with a secret scope (`docs/tier2-findings.md`).
 6. Fallback source choice if the repo is stale. Still open.
 
 ## 6. Task list
