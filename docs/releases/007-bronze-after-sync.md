@@ -23,7 +23,7 @@ The owner wants new files in bronze as soon as they land, at whatever time that 
 - `docs/releases/007-bronze-after-sync.md`: this note.
 
 ## Risks and things I am unsure about
-- The daily run now needs the Databricks token (90-day lifetime). When it expires the bronze step fails with a login error and GitHub emails. Calendar a renewal around 2026-02-05 (token created 2026-11-10; check the exact date under Settings, Developer, Access tokens).
+- The daily run needs the Databricks token (the owner set it to expire in 2 years, about November 2028). When it expires the bronze step fails with a login error and GitHub emails. Put the renewal in a calendar.
 - A new source column is now added without asking. It is additive (older rows are NULL), but a renamed column would look like a new column plus an empty old one; silver has to notice.
 - A column that changes type in a way that cannot be converted still fails the load.
 - Bronze has no automatic undo for the added columns (Delta keeps the table history, but columns are not dropped).
