@@ -1,4 +1,4 @@
-# Daily sync: copy new or changed source files into R2 (tiers 1 and 2), then tell Slack.
+# Daily sync: copy new or changed source files into R2 (tiers 1 and 2), load them into Databricks bronze, then tell Slack.
 # Scheduled runs only work from the default branch (main).
 name: daily-sync
 
@@ -17,7 +17,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -33,13 +33,30 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Sync tier 1
+        id: tier1
         shell: bash
         run: python scripts/backfill.py --tier tier1 --execute 2>&1 | tee tier1.log
 
       - name: Sync tier 2
+        id: tier2
         if: ${{ !cancelled() }}   # still try tier 2 if tier 1 failed
         shell: bash
         run: python scripts/backfill.py --tier tier2 --execute 2>&1 | tee tier2.log
+
+      # Bronze only runs when both syncs succeeded, so it never loads from a half-finished sync.
+      - uses: databricks/setup-cli@v1.24.0
+        if: ${{ steps.tier1.outcome == 'success' && steps.tier2.outcome == 'success' }}
+        with:
+          version: 1.24.0
+
+      - name: Load bronze
+        id: bronze
+        if: ${{ steps.tier1.outcome == 'success' && steps.tier2.outcome == 'success' }}
+        shell: bash
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: python scripts/bronze_load.py --execute 2>&1 | tee bronze.log
 
       - name: Build summary
         if: ${{ !cancelled() }}
@@ -50,6 +67,7 @@ jobs:
             for t in tier1 tier2; do
               echo "- $t: $(grep -h '^Files:' $t.log 2>/dev/null || echo 'did not finish')"
             done
+            echo "- bronze: $(grep -h '^Files:' bronze.log 2>/dev/null || echo 'did not run')"
           } | tee -a "$GITHUB_STEP_SUMMARY" > summary.txt
 
       - name: Tell Slack
