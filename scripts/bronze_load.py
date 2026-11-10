@@ -77,8 +77,18 @@ def create_empty_sql(table, glob_uri):
             f"mergeSchema => true) WHERE 1 = 0")
 
 
+def columns_to_add(table_cols, file_cols_typed):
+    """Columns the file has and the table lacks, as (name, type). Adding them is additive: old rows get NULL."""
+    return [(n, t) for n, t in file_cols_typed if n not in table_cols]
+
+
+def add_columns_sql(table, new_cols):
+    return f"ALTER TABLE {table} ADD COLUMNS (" + ", ".join(f"`{n}` {t}" for n, t in new_cols) + ")"
+
+
 def select_list(table_cols, file_cols):
-    """Column-by-name select: file columns the table lacks are an error; table columns the file lacks are NULL."""
+    """Column-by-name select. Table columns the file lacks are NULL. File columns the table lacks are an
+    error here: the caller must add them first (columns_to_add), so nothing is dropped by accident."""
     extra = [c for c in file_cols if c not in table_cols]
     if extra:
         raise ValueError(f"file has columns bronze does not: {extra[:6]} (schema change needs a decision)")
@@ -220,7 +230,7 @@ def main():
         print("Nothing was written. Re-run with --execute to load.")
         return
 
-    results, failed = [], None
+    results, failed, schema_changes = [], None, []
     prepared = set()
     for p in plan:
         if p["status"] == "UNCHANGED":
@@ -234,7 +244,14 @@ def main():
                 prepared.add(p["table"])
             print(f"LOAD {p['key']}")
             table_cols = [r[0] for r in db.run(f"DESCRIBE TABLE {p['table']}") if not r[0].startswith("#") and r[0]]
-            file_cols = [r[0] for r in db.run(f"DESCRIBE QUERY SELECT * FROM read_files({sql_str(p['uri'])}, format => 'parquet')")]
+            typed = [(r[0], r[1]) for r in db.run(f"DESCRIBE QUERY SELECT * FROM read_files({sql_str(p['uri'])}, format => 'parquet')")]
+            file_cols = [n for n, _ in typed]
+            new_cols = columns_to_add(table_cols, typed)
+            if new_cols:
+                print(f"SCHEMA CHANGE {p['table']}: adding {[n for n, _ in new_cols]}")
+                db.run(add_columns_sql(p["table"], new_cols))
+                schema_changes.append({"table": p["table"], "added": [{"name": n, "type": t} for n, t in new_cols], "file": p["key"]})
+                table_cols = table_cols + [n for n, _ in new_cols]
             db.run(load_file_sql(p["table"], p["uri"], p["sha"], p["mode"], table_cols, file_cols))
             in_table, in_file = [int(x) for x in db.run(count_check_sql(p["table"], p["uri"], p["sha"]))[0]]
             if in_table != in_file:
@@ -258,7 +275,7 @@ def main():
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
     record = {"run_id": run_id, "kind": "bronze_load", "status": "partial" if failed else "complete",
-              "failure": failed, "summary": counts, "loaded": results, "key_checks": keychecks}
+              "failure": failed, "summary": counts, "loaded": results, "schema_changes": schema_changes, "key_checks": keychecks}
     mkey = f"_manifest/{run_id}-bronze.json"
     s3.put_object(Bucket=bucket, Key=mkey, Body=json.dumps(record, indent=2).encode(), ContentType="application/json")
     print(f"\nRun record written: {mkey} ({record['status']})")

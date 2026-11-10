@@ -124,3 +124,25 @@ def test_metadata_columns_come_from_the_file_and_the_checksum():
 def test_table_is_created_from_all_seasons():
     sql = b.create_empty_sql("s.t", "r2://b@h/raw/x/*/*.parquet")
     assert "mergeSchema => true" in sql and "WHERE 1 = 0" in sql
+
+
+# ---- new columns from the source ----
+
+def test_new_file_columns_are_found_with_their_types():
+    typed = [("a", "bigint"), ("fresh", "double"), ("flag", "boolean")]
+    assert b.columns_to_add(["a", "_source_file"], typed) == [("fresh", "double"), ("flag", "boolean")]
+
+
+def test_no_new_columns_when_table_has_them_all():
+    assert b.columns_to_add(["a", "fresh"], [("a", "bigint"), ("fresh", "double")]) == []
+
+
+def test_add_columns_sql_is_additive_only():
+    sql = b.add_columns_sql("s.t", [("fresh", "double"), ("flag", "boolean")])
+    assert sql == "ALTER TABLE s.t ADD COLUMNS (`fresh` double, `flag` boolean)"
+    assert "DROP" not in sql.upper()
+
+
+def test_after_adding_columns_the_select_includes_them():
+    sel = b.select_list(["a", "fresh", "_source_file", "_source_modified_at", "_loaded_at", "_sha256"], ["a", "fresh"])
+    assert "`fresh`" in sel and "NULL AS `fresh`" not in sel
