@@ -7,6 +7,11 @@ _source_file = ...), so a failed load leaves the old rows. Nothing is dropped or
 Compares the sha256 label on each R2 file with the _sha256 stored in bronze:
 NEW (no rows for that file) | CHANGED (different or missing checksum) | UNCHANGED.
 
+Two modes per table (config "mode"):
+  replace (default)  a changed file's old rows are swapped for the new ones (event data: games, plays, shots).
+  append             a changed file is ADDED as a new version and old versions stay, so history builds up
+                     (snapshot data: season stats, standings, rosters). Each version carries its _sha256 and _loaded_at.
+
 Dry run by default. --execute loads, then checks row counts (and keys, if configured).
 Needs: R2 settings (.env) and the Databricks CLI logged in (profile DEFAULT, or DATABRICKS_HOST/TOKEN).
 """
@@ -42,32 +47,71 @@ def classify_file(r2_sha, bronze_shas):
     return "CHANGED"
 
 
+def classify_snapshot(r2_sha, bronze_shas):
+    """Append mode: a file is UNCHANGED if bronze already holds this exact version."""
+    shas = set(bronze_shas)
+    if not shas:
+        return "NEW"
+    if r2_sha is not None and r2_sha in shas:
+        return "UNCHANGED"
+    return "CHANGED"
+
+
+def classifier_for(mode):
+    return classify_snapshot if mode == "append" else classify_file
+
+
 def file_uri(endpoint_url, bucket, key):
     host = re.sub(r"^https?://", "", endpoint_url).rstrip("/")
     return f"r2://{bucket}@{host}/{key}"
 
 
-def create_empty_sql(table, uri):
+META_COLS = ("_source_file", "_source_modified_at", "_loaded_at", "_sha256")
+
+
+def create_empty_sql(table, glob_uri):
+    """Empty table whose columns are the union of every season file (seasons can differ)."""
     return (f"CREATE TABLE IF NOT EXISTS {table} AS SELECT *, _metadata.file_path AS _source_file, "
             f"_metadata.file_modification_time AS _source_modified_at, current_timestamp() AS _loaded_at, "
-            f"CAST(NULL AS STRING) AS _sha256 FROM read_files({sql_str(uri)}, format => 'parquet') WHERE 1 = 0")
+            f"CAST(NULL AS STRING) AS _sha256 FROM read_files({sql_str(glob_uri)}, format => 'parquet', "
+            f"mergeSchema => true) WHERE 1 = 0")
 
 
-def load_file_sql(table, uri, sha):
-    return (f"INSERT INTO {table} REPLACE WHERE _source_file = {sql_str(uri)} "
-            f"SELECT *, _metadata.file_path AS _source_file, _metadata.file_modification_time AS _source_modified_at, "
-            f"current_timestamp() AS _loaded_at, {sql_str(sha)} AS _sha256 "
-            f"FROM read_files({sql_str(uri)}, format => 'parquet')")
+def select_list(table_cols, file_cols):
+    """Column-by-name select: file columns the table lacks are an error; table columns the file lacks are NULL."""
+    extra = [c for c in file_cols if c not in table_cols]
+    if extra:
+        raise ValueError(f"file has columns bronze does not: {extra[:6]} (schema change needs a decision)")
+    meta = {"_source_file": "_metadata.file_path", "_source_modified_at": "_metadata.file_modification_time",
+            "_loaded_at": "current_timestamp()", "_sha256": None}
+    out = []
+    for c in table_cols:
+        if c in meta:
+            out.append(f"{meta[c]} AS {c}" if meta[c] else "{SHA} AS _sha256")
+        elif c in file_cols:
+            out.append(f"`{c}`")
+        else:
+            out.append(f"NULL AS `{c}`")
+    return out
 
 
-def count_check_sql(table, uri):
-    return (f"SELECT (SELECT count(*) FROM {table} WHERE _source_file = {sql_str(uri)}), "
+def load_file_sql(table, uri, sha, mode, table_cols, file_cols):
+    head = f"INSERT INTO {table} " + (f"REPLACE WHERE _source_file = {sql_str(uri)} " if mode == "replace" else "")
+    cols = ", ".join(select_list(table_cols, file_cols)).replace("{SHA}", sql_str(sha))
+    return f"{head}SELECT {cols} FROM read_files({sql_str(uri)}, format => 'parquet')"
+
+
+def count_check_sql(table, uri, sha=None):
+    """Rows bronze holds for this file (this version only, if sha is given) vs rows in the file."""
+    only_version = f" AND _sha256 = {sql_str(sha)}" if sha else ""
+    return (f"SELECT (SELECT count(*) FROM {table} WHERE _source_file = {sql_str(uri)}{only_version}), "
             f"(SELECT count(*) FROM read_files({sql_str(uri)}, format => 'parquet'))")
 
 
-def key_check_sql(table, key_cols):
-    """One row: total rows, distinct keys, rows with a NULL key part."""
-    cols = ", ".join(key_cols)
+def key_check_sql(table, key_cols, mode="replace"):
+    """One row: total rows, distinct keys, rows with a NULL key part.
+    Append tables hold several versions of a file, so uniqueness is checked within one version."""
+    cols = ", ".join(key_cols + (["_source_file", "_sha256"] if mode == "append" else []))
     anynull = " OR ".join(f"{c} IS NULL" for c in key_cols)
     return (f"SELECT count(*), count(DISTINCT {cols}), sum(CASE WHEN {anynull} THEN 1 ELSE 0 END) FROM {table}")
 
@@ -158,17 +202,17 @@ def main():
         state = bronze_state(db, table)
         for key, sha, size in r2_files(s3, bucket, f"{CONFIG['r2_prefix']}/{tag}"):
             uri = file_uri(endpoint, bucket, key)
-            status = classify_file(sha, (state or {}).get(uri, []))
+            status = classifier_for(t.get("mode"))(sha, (state or {}).get(uri, []))
             if sha is None:
                 problems.append(f"{key}: no sha256 label in R2")
             plan.append({"tag": tag, "table": table, "key": key, "uri": uri, "sha": sha, "size": size,
-                         "status": status, "exists": state is not None, "keycols": t.get("key")})
+                         "status": status, "exists": state is not None, "glob": file_uri(endpoint, bucket, f"{CONFIG['r2_prefix']}/{tag}/*/*.parquet"), "mode": t.get("mode", "replace")})
 
     print(f"{'EXECUTE' if args.execute else 'DRY RUN'} | bronze\n")
     counts = {}
     for p in plan:
         counts[p["status"]] = counts.get(p["status"], 0) + 1
-        print(f"{p['status']:10s}{p['size']:>12,d}  {p['key']}")
+        print(f"{p['status']:10s}{p['size']:>12,d}  {p['key']}" + ("  (append)" if p["mode"] == "append" else ""))
     print(f"\nFiles: {len(plan)} | " + ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())))
     if problems:
         sys.exit("Stopping: " + "; ".join(problems))
@@ -183,14 +227,16 @@ def main():
             continue
         try:
             if p["table"] not in prepared:
-                db.run(create_empty_sql(p["table"], p["uri"]))
+                db.run(create_empty_sql(p["table"], p["glob"]))
                 cols = [r[0] for r in db.run(f"DESCRIBE TABLE {p['table']}")]
                 if "_sha256" not in cols:
                     db.run(f"ALTER TABLE {p['table']} ADD COLUMNS (_sha256 STRING)")
                 prepared.add(p["table"])
             print(f"LOAD {p['key']}")
-            db.run(load_file_sql(p["table"], p["uri"], p["sha"]))
-            in_table, in_file = [int(x) for x in db.run(count_check_sql(p["table"], p["uri"]))[0]]
+            table_cols = [r[0] for r in db.run(f"DESCRIBE TABLE {p['table']}") if not r[0].startswith("#") and r[0]]
+            file_cols = [r[0] for r in db.run(f"DESCRIBE QUERY SELECT * FROM read_files({sql_str(p['uri'])}, format => 'parquet')")]
+            db.run(load_file_sql(p["table"], p["uri"], p["sha"], p["mode"], table_cols, file_cols))
+            in_table, in_file = [int(x) for x in db.run(count_check_sql(p["table"], p["uri"], p["sha"]))[0]]
             if in_table != in_file:
                 raise RuntimeError(f"row count mismatch: bronze {in_table} vs file {in_file}")
             results.append({"r2_key": p["key"], "status": p["status"], "rows": in_table, "sha256": p["sha"]})
@@ -203,7 +249,7 @@ def main():
     for tag, t in bcfg["tables"].items():
         if t.get("key") and not failed:
             table = f"{bcfg['schema']}.{t['table']}"
-            total, distinct, nulls = [int(x or 0) for x in db.run(key_check_sql(table, t["key"]))[0]]
+            total, distinct, nulls = [int(x or 0) for x in db.run(key_check_sql(table, t["key"], t.get("mode", "replace")))[0]]
             ok = total == distinct and nulls == 0
             keychecks.append({"table": table, "key": t["key"], "rows": total, "distinct": distinct, "null_keys": nulls, "ok": ok})
             print(f"KEY CHECK {table} ({', '.join(t['key'])}): rows={total:,} distinct={distinct:,} null={nulls} {'OK' if ok else 'PROBLEM'}")

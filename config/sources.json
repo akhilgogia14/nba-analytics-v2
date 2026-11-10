@@ -57,6 +57,88 @@
       },
       "nba_stats_injury_report": {
         "table": "injury_report"
+      },
+      "nba_stats_pbp": {
+        "table": "pbp",
+        "key": [
+          "game_id",
+          "order_index"
+        ]
+      },
+      "nba_stats_shots": {
+        "table": "shots"
+      },
+      "nba_stats_possessions": {
+        "table": "possessions",
+        "key": [
+          "game_id",
+          "possession_number"
+        ]
+      },
+      "nba_stats_game_lineups": {
+        "table": "game_lineups"
+      },
+      "nba_stats_game_rosters": {
+        "table": "game_rosters",
+        "key": [
+          "game_id",
+          "player_id"
+        ]
+      },
+      "nba_stats_officials": {
+        "table": "officials",
+        "key": [
+          "game_id",
+          "official_id"
+        ]
+      },
+      "nba_stats_lineups": {
+        "table": "lineups",
+        "mode": "append",
+        "key": [
+          "group_id",
+          "team_id",
+          "season_type",
+          "measure_type",
+          "per_mode"
+        ]
+      },
+      "nba_stats_player_season_stats": {
+        "table": "player_season_stats",
+        "mode": "append",
+        "key": [
+          "player_id",
+          "team_id",
+          "season_type",
+          "measure_type",
+          "per_mode"
+        ]
+      },
+      "nba_stats_team_season_stats": {
+        "table": "team_season_stats",
+        "mode": "append",
+        "key": [
+          "team_id",
+          "season_type",
+          "measure_type",
+          "per_mode"
+        ]
+      },
+      "nba_stats_standings": {
+        "table": "standings",
+        "mode": "append",
+        "key": [
+          "team_id",
+          "season_type"
+        ]
+      },
+      "nba_stats_rosters": {
+        "table": "rosters",
+        "mode": "append",
+        "key": [
+          "team_id",
+          "player_id"
+        ]
       }
     }
   }
