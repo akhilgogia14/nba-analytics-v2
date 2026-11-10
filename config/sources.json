@@ -1,7 +1,14 @@
 {
   "repo": "sportsdataverse/sportsdataverse-data",
   "r2_prefix": "raw/hoopr_stats",
-  "seasons": [2022, 2023, 2024, 2025, 2026, 2027],
+  "seasons": [
+    2022,
+    2023,
+    2024,
+    2025,
+    2026,
+    2027
+  ],
   "tiers": {
     "tier1": [
       "nba_stats_player_boxscores",
@@ -22,5 +29,18 @@
       "nba_stats_rosters",
       "nba_stats_officials"
     ]
+  },
+  "bronze": {
+    "warehouse_id": "22203161b15e3ce0",
+    "schema": "workspace.nba_v2_bronze",
+    "tables": {
+      "nba_stats_player_boxscores": {
+        "table": "player_boxscores",
+        "key": [
+          "game_id",
+          "person_id"
+        ]
+      }
+    }
   }
 }
