@@ -1,7 +1,7 @@
 # Release 008: silver `player_game` (first silver table)
 
 Date: 2026-11-10
-Branch / PR: `feat/silver-player-game` (PR number added when opened)
+Branch / PR: PR #13 (`feat/silver-player-game`, merged 2026-11-11); follow-up in the update section below (`feat/silver-run-log`)
 Author: (Claude Code)
 
 ## What changed
@@ -41,8 +41,33 @@ PLAN.md step 4 (clean into silver) and the rules in `docs/spike-findings.md` sec
 The `<=>` key match and the `WHEN NOT MATCHED BY SOURCE THEN DELETE`, `_row_hash` coverage (`to_json(struct(*))`), the minutes conversion for `x:60` values, and the `started` rule.
 
 ## Open questions for the owner
-1. Keep the delete-on-vanish behaviour in `MERGE`, or leave rows in silver and only add/update?
-2. Should the one `0:00` row with a rebound stay as is (not played, stats kept)?
+Both answered 2026-11-11 (see the update section): keep delete-on-vanish, with a size guard; keep the `0:00` row and monitor it in a table.
+
+## Update 2026-11-11 (follow-up PR): run log, oddities table, delete guard
+Answering the two questions above, the owner chose: delete rows that vanish from bronze, a way to see what changed from run to run, and keep the `0:00` row but monitor it in an appending table.
+
+**What changed**
+- **Delete guard.** If a MERGE would delete more than 1% of the table's rows (about 1,770 today), the run stops and says why. `--allow-large-delete` overrides it. Smaller deletes, such as one corrected game's 27 rows, go through and are printed.
+- **`workspace.nba_v2_silver._build_log`.** One row per run: counts inserted, updated and deleted (read from the change feed), source and table row counts, the table version before and after, new oddities logged, and up to 5 examples of changed rows (which columns changed, old to new) and deleted keys. To see every change in a run: `SELECT * FROM table_changes('workspace.nba_v2_silver.player_game', <version_before + 1>, <version_after>)`.
+- **`workspace.nba_v2_silver._data_warnings`.** Oddities that are not failures. A row is appended the first time it is seen (same table, warning name and row key is never added twice). First entry: `stats_at_zero_minutes`, key `0022400942|1628396` (Tony Bradley, IND, 2025-03-11, 1 rebound at `0:00`). Warnings are defined in `sql/silver/player_game_warnings.sql`, so adding another is one SELECT.
+- The old commented-out warning query was removed from `player_game_gates.sql`.
+
+**What I checked on the `0:00` row** (read-only, before the owner's decision): player rebounds and assists add up to the team totals in all 13,518 team-games (0 mismatches), including that game (IND 38 and 38). The cause of a rebound at `0:00` is not known.
+
+**How verified**
+- Dry run (no change): `MERGE would: insert 0, update 0, delete 0`. Two `--execute` runs: both `inserted 0, updated 0, deleted 0`; the first logged 1 oddity, the second 0 (no duplicate). `_build_log` holds 2 rows (versions 2 to 3 and 3 to 4).
+- `.venv/bin/python -m pytest -q`: 53 passed.
+- Not verified on real data: the example output for changed and deleted rows. Bronze did not change between runs, so that path is tested only with a fake database.
+
+**Files**
+- `scripts/silver_build.py`, `tests/test_silver_build.py`: guard, log tables, examples.
+- `sql/silver/player_game_warnings.sql`: new. `sql/silver/player_game_gates.sql`: comment only.
+
+**Risks**
+- Each run adds a Delta version even when nothing changed (a MERGE with no changes still commits), so the version number goes up by about 1 per run. This is harmless.
+- The change feed keeps rows for as long as the table's old versions are kept; `_build_log` keeps the counts and examples permanently.
+- The 1% guard is a guess; it can be tightened or loosened.
+- A second table's warnings and gates must be added with each new silver table (a test checks the files exist).
 
 ## Owner walkthrough
 - **What this does:** it makes a clean table of every player in every game since 2022, with the date, opponent, minutes as a number, whether they played and whether they started, plus the main stats. Players who sat out are included and marked, so a missing row never means "did not play".
@@ -50,3 +75,5 @@ The `<=>` key match and the `WHEN NOT MATCHED BY SOURCE THEN DELETE`, `_row_hash
 - **The checks:** before anything is written, 8 tests run, for example "no player appears twice in a game", "every game has 5 starters per team" and "the players' points add up to the team's points". If one fails, nothing is written.
 - **Change tracking:** running the build twice changes nothing the second time, and the table keeps a log of exactly which rows changed. Later tables will read only that log.
 - **What to check yourself:** open the table and run `SELECT * FROM workspace.nba_v2_silver.player_game WHERE player_name LIKE '%Jokic%' ORDER BY game_date DESC LIMIT 10`.
+- **Added 2026-11-11, the run log:** `_build_log` is a diary of every build (how many rows were added, changed or removed, with a few examples). `_data_warnings` is a short list of odd rows worth a look; it adds a row only the first time it sees something. Check it with `SELECT * FROM workspace.nba_v2_silver._data_warnings`.
+- **The safety stop:** if a build would delete more than 1% of the table, it stops instead.

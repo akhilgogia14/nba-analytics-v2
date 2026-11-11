@@ -17,5 +17,4 @@ UNION ALL SELECT 'points_differ_from_team_total', count(*) FROM (
   JOIN workspace.nba_v2_bronze.team_boxscores t ON t.game_id = g.game_id AND t.team_id = g.team_id
   WHERE g.pts <> t.points)
 
--- WARN (not a failure): other stats on a row with no minutes. One known case: game 0022400942, person 1628396 (1 rebound at 0:00).
--- SELECT count_if(NOT played AND (coalesce(reb,0) + coalesce(ast,0) + coalesce(stl,0) + coalesce(blk,0) + coalesce(fga,0) > 0)) AS warn_other_stats_without_minutes FROM {T}
+-- Non-failing oddities live in player_game_warnings.sql.

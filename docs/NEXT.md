@@ -33,7 +33,7 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 - **10c. Databricks jobs for bronze to silver and silver to gold**, after silver exists (Step 11).
 
 ## Step 11: Silver for the core tables
-- **11a-e. `player_game`: DONE 2026-11-10** (release note 008, `sql/silver/`, `scripts/silver_build.py`). Rules from `docs/spike-findings.md` section 9 applied; 8 quality gates; MERGE with Change Data Feed.
+- **11a-e. `player_game`: DONE 2026-11-10** (release note 008, `sql/silver/`, `scripts/silver_build.py`). Rules from `docs/spike-findings.md` section 9 applied; 8 quality gates; MERGE with Change Data Feed, a run log (`_build_log`), an oddities table (`_data_warnings`) and a 1% delete guard (PR #13 and follow-up).
 - **11f. Silver `team_game` from team box scores and `game` from schedules**, same pattern (SELECT, gates, add to `TABLES` in `silver_build.py`), then a release note.
 - Then Step 10c (Databricks jobs run `silver_build.py` after bronze).
 
