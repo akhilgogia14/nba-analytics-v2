@@ -30,7 +30,7 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 ## Step 10: Daily jobs
 - **10a. Daily sync to R2: DONE** (`.github/workflows/daily-sync.yml`, release note 004). Slack alerts not set up (skipped by the owner for now).
 - **10b. Bronze after the sync: DONE 2026-11-10** (PR #12, release note 007). The daily workflow loads bronze after both syncs succeed. New source columns are added to bronze automatically and logged.
-- **10c. Databricks jobs for bronze to silver and silver to gold**, after silver exists (Step 11).
+- **10c. Silver as a Databricks job: DONE 2026-11-11** (release note 009, `databricks.yml`, `jobs/silver_build_task.py`). The daily workflow deploys the bundle and runs the job after bronze succeeds. A silver to gold job comes with the first gold tables.
 
 ## Step 11: Silver for the core tables
 - **11a-e. `player_game`: DONE 2026-11-10** (release note 008, `sql/silver/`, `scripts/silver_build.py`). Rules from `docs/spike-findings.md` section 9 applied; 8 quality gates; MERGE with Change Data Feed, a run log (`_build_log`), an oddities table (`_data_warnings`) and a 1% delete guard (PR #13 and follow-up).

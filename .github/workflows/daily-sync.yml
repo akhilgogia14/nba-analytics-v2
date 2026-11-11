@@ -1,4 +1,4 @@
-# Daily sync: copy new or changed source files into R2 (tiers 1 and 2), load them into Databricks bronze, then tell Slack.
+# Daily sync: copy new or changed source files into R2 (tiers 1 and 2), load them into Databricks bronze, build silver with a Databricks job, then tell Slack.
 # Scheduled runs only work from the default branch (main).
 name: daily-sync
 
@@ -58,6 +58,19 @@ jobs:
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: python scripts/bronze_load.py --execute 2>&1 | tee bronze.log
 
+      # Silver runs only after bronze succeeded. Deploy first so the job always runs this commit's code,
+      # then run the job and wait for it; a failed gate fails the job and so this step.
+      - name: Build silver (Databricks job)
+        id: silver
+        if: ${{ steps.bronze.outcome == 'success' }}
+        shell: bash
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks bundle deploy 2>&1 | tee silver.log
+          databricks bundle run silver_build 2>&1 | tee -a silver.log
+
       - name: Build summary
         if: ${{ !cancelled() }}
         shell: bash
@@ -68,6 +81,7 @@ jobs:
               echo "- $t: $(grep -h '^Files:' $t.log 2>/dev/null || echo 'did not finish')"
             done
             echo "- bronze: $(grep -h '^Files:' bronze.log 2>/dev/null || echo 'did not run')"
+            echo "- silver: $(grep -h '^Changed this run' silver.log 2>/dev/null || echo 'did not run')"
           } | tee -a "$GITHUB_STEP_SUMMARY" > summary.txt
 
       - name: Tell Slack

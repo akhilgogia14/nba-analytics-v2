@@ -117,3 +117,57 @@ def test_change_examples_caps_the_number_of_examples():
                  ["d", str(i), "0", "c", "delete"]]
     out = s.change_examples(FakeDb(rows), "t", 1, cols)
     assert len(out["updated"]) == s.MAX_EXAMPLES and len(out["deleted_keys"]) == s.MAX_EXAMPLES
+
+
+class FakeSpark:
+    def __init__(self, result=None, error=None):
+        self.result, self.error = result, error
+
+    def sql(self, stmt):
+        if self.error:
+            raise self.error
+        outer = self
+
+        class DF:
+            def collect(self):
+                return outer.result
+        return DF()
+
+
+def test_spark_runner_returns_lists_and_wraps_failures_as_runtimeerror():
+    import pytest
+    assert s.SparkRunner(FakeSpark([(1, "a"), (2, "b")])).run("x") == [[1, "a"], [2, "b"]]
+    with pytest.raises(RuntimeError):
+        s.SparkRunner(FakeSpark(error=ValueError("table not found"))).run("x")
+
+
+def test_silver_build_does_not_need_boto3_or_bronze_load():
+    import subprocess
+    code = "import sys; sys.modules['boto3']=None; sys.path.insert(0,'scripts'); import silver_build; print('ok')"
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=s.ROOT)
+    assert out.stdout.strip() == "ok", out.stderr
+
+
+class ScriptedDb:
+    """Answers the dry-run queries; records what was run."""
+    def __init__(self):
+        self.sql = []
+
+    def run(self, stmt):
+        self.sql.append(stmt)
+        if stmt.startswith("DESCRIBE TABLE"):
+            raise RuntimeError("table not found")
+        if "count(*)" in stmt:
+            return [["5"]]
+        return [["gate_a", "0"]]
+
+
+def test_dry_run_reads_sql_from_the_given_folder_and_writes_nothing(tmp_path):
+    (tmp_path / "t.sql").write_text("SELECT 1 AS game_id, 2 AS person_id")
+    (tmp_path / "t_gates.sql").write_text("SELECT 'gate_a' AS gate, 0 AS bad FROM {T}")
+    (tmp_path / "t_warnings.sql").write_text("SELECT 'w' AS warning, 'k' AS row_key, '' AS detail FROM {T}")
+    db = ScriptedDb()
+    s.build(db, "t", {"key": ["game_id", "person_id"]}, execute=False, sql_dir=tmp_path)
+    joined = "\n".join(db.sql)
+    assert "SELECT 1 AS game_id" in joined
+    assert not any(w in joined for w in ("CREATE TABLE", "MERGE INTO", "INSERT INTO"))

@@ -26,15 +26,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import backfill  # shared R2 helpers
+from sqlutil import sql_str  # noqa: F401  (kept importable as bronze_load.sql_str)
 
 CONFIG = json.loads(backfill.CONFIG_PATH.read_text())
 
 
 # ---------- pure helpers (covered by tests/test_bronze_load.py) ----------
 
-def sql_str(s):
-    """A SQL string literal; single quotes are doubled."""
-    return "'" + str(s).replace("'", "''") + "'"
 
 
 def classify_file(r2_sha, bronze_shas):

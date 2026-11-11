@@ -1,0 +1,43 @@
+# Databricks Asset Bundle: the jobs that run inside Databricks, defined as code.
+# Deployed by the daily GitHub workflow (databricks bundle deploy) so the job always runs this repo's code.
+# The workspace address and login come from the Databricks CLI profile or DATABRICKS_HOST/DATABRICKS_TOKEN, never from this file.
+bundle:
+  name: nba-v2
+
+# Files uploaded to the workspace. Everything git-ignored is skipped by default (.env, .venv, data);
+# these excludes also keep out tests, docs and git history, so only code the jobs need goes up.
+sync:
+  exclude:
+    - .env
+    - .env.*
+    - .venv/**
+    - .git/**
+    - tests/**
+    - docs/**
+    - "*.md"
+    - .github/**
+    - .gitignore
+    - requirements*.txt
+
+resources:
+  jobs:
+    silver_build:
+      name: nba-v2 silver build
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "2"
+      tasks:
+        - task_key: build_silver
+          environment_key: default
+          spark_python_task:
+            python_file: jobs/silver_build_task.py
+            parameters:
+              - ${workspace.file_path}
+
+targets:
+  prod:
+    default: true
