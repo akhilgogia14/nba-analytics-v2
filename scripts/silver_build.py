@@ -10,12 +10,19 @@ Run order:
   3. MERGE on the key: new rows inserted, rows whose _row_hash changed updated, rows gone from the
      source removed. Unchanged rows are not touched, so the change feed shows only real changes.
   4. gates run again on the real table, and its row count is compared with the SELECT.
+  5. the run is written down: what changed (from the change feed, with a few examples), new oddities
+     from sql/silver/<name>_warnings.sql, and one summary row in <schema>._build_log.
+
+Safety: if a MERGE would delete more than 1% of the table's rows, the run stops (use --allow-large-delete
+to proceed). Delta keeps old versions, so a bad run can be rolled back with RESTORE.
 
 Dry run by default: runs the gates and reports how many rows a MERGE would insert/update/delete.
 Needs the Databricks CLI logged in (profile DEFAULT, or DATABRICKS_HOST/DATABRICKS_TOKEN).
 """
 import argparse
+import json
 import os
+from datetime import datetime, timezone
 import sys
 from pathlib import Path
 
@@ -26,6 +33,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SQL_DIR = ROOT / "sql" / "silver"
 SCHEMA = "workspace.nba_v2_silver"
 TABLES = {"player_game": {"key": ["game_id", "person_id"]}}
+MAX_DELETE_FRACTION = 0.01
+MAX_EXAMPLES = 5
+HOUSEKEEPING = ("_build_log", "_data_warnings")
 
 
 def strip_comments(sql):
@@ -74,10 +84,77 @@ def plan_sql(table, select_sql, key):
             f"FROM {table} t FULL OUTER JOIN ({source_sql(select_sql)}) s ON {on}")
 
 
-def build(db, name, cfg, execute):
+def delete_guard_trips(deletes, table_rows, fraction=MAX_DELETE_FRACTION):
+    """True when a MERGE would delete more than `fraction` of the table."""
+    return table_rows > 0 and deletes > fraction * table_rows
+
+
+def changed_columns(cols, pre, post):
+    """[(column, old, new)] for columns that differ between the before and after row (hash ignored)."""
+    return [(c, a, b) for c, a, b in zip(cols, pre, post) if a != b and c != "_row_hash"]
+
+
+def create_log_tables_sql(schema=SCHEMA):
+    return [
+        f"CREATE TABLE IF NOT EXISTS {schema}._build_log (run_id STRING, table_name STRING, run_at TIMESTAMP, "
+        "source_rows BIGINT, inserted BIGINT, updated BIGINT, deleted BIGINT, table_rows BIGINT, "
+        "version_before BIGINT, version_after BIGINT, new_warnings BIGINT, examples STRING)",
+        f"CREATE TABLE IF NOT EXISTS {schema}._data_warnings (run_id STRING, detected_at TIMESTAMP, "
+        "table_name STRING, warning STRING, row_key STRING, detail STRING)",
+    ]
+
+
+def warnings_insert_sql(table_name, run_id, warnings_text, source, schema=SCHEMA):
+    """Append only warnings not already logged for this table (same warning + row key)."""
+    q = gates_sql(warnings_text, source)
+    tn, rid = bronze_load.sql_str(table_name), bronze_load.sql_str(run_id)
+    return (f"INSERT INTO {schema}._data_warnings\n"
+            f"SELECT {rid}, current_timestamp(), {tn}, w.warning, w.row_key, w.detail FROM ({q}) w\n"
+            f"WHERE NOT EXISTS (SELECT 1 FROM {schema}._data_warnings x "
+            f"WHERE x.table_name = {tn} AND x.warning = w.warning AND x.row_key = w.row_key)")
+
+
+def log_insert_sql(run_id, table_name, c, schema=SCHEMA):
+    """One summary row. `c` has source_rows, inserted, updated, deleted, table_rows, version_before,
+    version_after, new_warnings, examples (a JSON string)."""
+    vb = "NULL" if c["version_before"] is None else str(int(c["version_before"]))
+    return (f"INSERT INTO {schema}._build_log VALUES ({bronze_load.sql_str(run_id)}, {bronze_load.sql_str(table_name)}, "
+            f"current_timestamp(), {int(c['source_rows'])}, {int(c['inserted'])}, {int(c['updated'])}, "
+            f"{int(c['deleted'])}, {int(c['table_rows'])}, {vb}, {int(c['version_after'])}, "
+            f"{int(c['new_warnings'])}, {bronze_load.sql_str(c['examples'])})")
+
+
+def table_version(db, table):
+    return int(db.run(f"SELECT max(version) FROM (DESCRIBE HISTORY {table})")[0][0])
+
+
+def change_examples(db, table, version_after, cols):
+    """Up to MAX_EXAMPLES updated rows (which columns changed, old to new) and deleted keys, from the change feed."""
+    col_list = ", ".join(cols)
+    rows = db.run(f"SELECT {col_list}, _change_type FROM table_changes('{table}', {version_after}, {version_after}) "
+                  "WHERE _change_type IN ('update_preimage', 'update_postimage', 'delete') ORDER BY 1, 2, _change_type")
+    n = len(cols)
+    pre, post, deleted = {}, {}, []
+    for r in rows:
+        kind, vals = r[n], r[:n]
+        k = tuple(vals[cols.index(c)] for c in ("game_id", "person_id") if c in cols)
+        if kind == "update_preimage":
+            pre[k] = vals
+        elif kind == "update_postimage":
+            post[k] = vals
+        else:
+            deleted.append("|".join(str(x) for x in k))
+    updates = [{"key": "|".join(str(x) for x in k),
+                "changes": {c: [a, b] for c, a, b in changed_columns(cols, pre[k], post[k])}}
+               for k in sorted(post) if k in pre][:MAX_EXAMPLES]
+    return {"updated": updates, "deleted_keys": deleted[:MAX_EXAMPLES]}
+
+
+def build(db, name, cfg, execute, allow_large_delete=False):
     table = f"{SCHEMA}.{name}"
     select_sql = (SQL_DIR / f"{name}.sql").read_text()
     gates_text = (SQL_DIR / f"{name}_gates.sql").read_text()
+    warnings_text = (SQL_DIR / f"{name}_warnings.sql").read_text()
     print(f"{'EXECUTE' if execute else 'DRY RUN'} | silver {name}\n")
 
     src_rows = int(db.run(f"SELECT count(*) FROM ({source_sql(select_sql)})")[0][0])
@@ -97,31 +174,63 @@ def build(db, name, cfg, execute):
     if exists:
         ins, upd, dele = [int(x) for x in db.run(plan_sql(table, select_sql, cfg["key"]))[0]]
         print(f"MERGE would: insert {ins:,}, update {upd:,}, delete {dele:,}")
+        existing = int(db.run(f"SELECT count(*) FROM {table}")[0][0])
+        if delete_guard_trips(dele, existing) and not allow_large_delete:
+            sys.exit(f"Stopping: the MERGE would delete {dele:,} of {existing:,} rows "
+                     f"(more than {MAX_DELETE_FRACTION:.0%}). Look at bronze first; re-run with --allow-large-delete if it is right.")
     else:
         print(f"Table {table} does not exist yet; it {'will be' if execute else 'would be'} created and filled with {src_rows:,} rows.")
     if not execute:
         print("Nothing was written. Re-run with --execute to build.")
         return
 
+    run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    version_before = table_version(db, table) if exists else None
     db.run(create_sql(table, select_sql))
     db.run(merge_sql(table, select_sql, cfg["key"]))
+    version_after = table_version(db, table)
     in_table = int(db.run(f"SELECT count(*) FROM {table}")[0][0])
     bad = failing_gates(db.run(gates_sql(gates_text, table)))
     print(f"Table rows: {in_table:,} (source {src_rows:,}) | gates on table: " + ("all pass" if not bad else f"FAILED {bad}"))
     if in_table != src_rows or bad:
         sys.exit("FAILED: silver table does not match the source rows or a gate failed.")
 
+    # what this run changed, from the change feed
+    first = 0 if version_before is None else version_before + 1
+    feed = dict((k, int(v)) for k, v in db.run(
+        f"SELECT _change_type, count(*) FROM table_changes('{table}', {first}, {version_after}) GROUP BY 1"))
+    counts = {"inserted": feed.get("insert", 0), "updated": feed.get("update_postimage", 0), "deleted": feed.get("delete", 0)}
+    print(f"Changed this run: inserted {counts['inserted']:,}, updated {counts['updated']:,}, deleted {counts['deleted']:,}")
+    examples = {"updated": [], "deleted_keys": []}
+    if counts["updated"] or counts["deleted"]:
+        cols = [r[0] for r in db.run(f"DESCRIBE TABLE {table}") if r[0] and not r[0].startswith("#")]
+        examples = change_examples(db, table, version_after, cols)
+        for u in examples["updated"]:
+            print("  updated", u["key"], {c: f"{a} -> {b}" for c, (a, b) in u["changes"].items()})
+        if examples["deleted_keys"]:
+            print("  deleted (first few):", examples["deleted_keys"])
+
+    for s in create_log_tables_sql():
+        db.run(s)
+    new_warnings = int(db.run(warnings_insert_sql(name, run_id, warnings_text, table))[0][0])
+    print(f"New oddities logged to {SCHEMA}._data_warnings: {new_warnings}")
+    db.run(log_insert_sql(run_id, name, {**counts, "source_rows": src_rows, "table_rows": in_table,
+                                         "version_before": version_before, "version_after": version_after,
+                                         "new_warnings": new_warnings, "examples": json.dumps(examples)}))
+    print(f"Run written to {SCHEMA}._build_log (run_id {run_id}, table versions {version_before} -> {version_after})")
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--execute", action="store_true", help="really build (default is a dry run)")
     ap.add_argument("--table", choices=sorted(TABLES), help="one table (default: all)")
+    ap.add_argument("--allow-large-delete", action="store_true", help="let a MERGE delete more than 1% of rows")
     args = ap.parse_args()
     cfg = bronze_load.CONFIG["bronze"]
     db = bronze_load.Databricks(os.environ.get("DATABRICKS_WAREHOUSE_ID", cfg["warehouse_id"]),
                                 [os.environ.get("DATABRICKS_TOKEN")])
     for name in ([args.table] if args.table else sorted(TABLES)):
-        build(db, name, TABLES[name], args.execute)
+        build(db, name, TABLES[name], args.execute, args.allow_large_delete)
 
 
 if __name__ == "__main__":
