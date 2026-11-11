@@ -29,11 +29,12 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 
 ## Step 10: Daily jobs
 - **10a. Daily sync to R2: DONE** (`.github/workflows/daily-sync.yml`, release note 004). Slack alerts not set up (skipped by the owner for now).
-- **10b. Bronze after the sync: NEXT.** Add a step to the same workflow that runs `scripts/bronze_load.py --execute` once the sync succeeds. Needs a Databricks token as a repo secret (owner creates it), the Databricks CLI in the workflow, and the warehouse running. Release note and PR.
+- **10b. Bronze after the sync: DONE 2026-11-10** (PR #12, release note 007). The daily workflow loads bronze after both syncs succeed. New source columns are added to bronze automatically and logged.
 - **10c. Databricks jobs for bronze to silver and silver to gold**, after silver exists (Step 11).
 
 ## Step 11: Silver for the core tables
-- **Apply the rules in `docs/spike-findings.md` section 9** (ignore team_id 0 and unplayed games; "played" means minutes greater than 0; convert minutes text; dates via the schedule; player box scores are the player source; key checks on every load)
-- **Quality gates, then release note**
+- **11a-e. `player_game`: DONE 2026-11-10** (release note 008, `sql/silver/`, `scripts/silver_build.py`). Rules from `docs/spike-findings.md` section 9 applied; 8 quality gates; MERGE with Change Data Feed.
+- **11f. Silver `team_game` from team box scores and `game` from schedules**, same pattern (SELECT, gates, add to `TABLES` in `silver_build.py`), then a release note.
+- Then Step 10c (Databricks jobs run `silver_build.py` after bronze).
 
 Later (not yet): simple gold tables, simple visuals, tier 2 in silver, the research app, back-test harness, ML. See PLAN.md and `docs/LEARNING.md`. Parked ideas are at the end of PLAN.md.
