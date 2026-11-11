@@ -32,7 +32,11 @@ from sqlutil import sql_str  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 SQL_DIR = ROOT / "sql" / "silver"
 SCHEMA = "workspace.nba_v2_silver"
-TABLES = {"player_game": {"key": ["game_id", "person_id"]}}
+TABLES = {
+    "player_game": {"key": ["game_id", "person_id"]},
+    "team_game": {"key": ["game_id", "team_id"]},
+    "game": {"key": ["game_id"]},
+}
 MAX_DELETE_FRACTION = 0.01
 MAX_EXAMPLES = 5
 HOUSEKEEPING = ("_build_log", "_data_warnings")
@@ -128,16 +132,17 @@ def table_version(db, table):
     return int(db.run(f"SELECT max(version) FROM (DESCRIBE HISTORY {table})")[0][0])
 
 
-def change_examples(db, table, version_after, cols):
+def change_examples(db, table, version_after, cols, key):
     """Up to MAX_EXAMPLES updated rows (which columns changed, old to new) and deleted keys, from the change feed."""
     col_list = ", ".join(cols)
+    order_by = ", ".join(str(cols.index(c) + 1) for c in key)  # ORDER BY the key columns' positions
     rows = db.run(f"SELECT {col_list}, _change_type FROM table_changes('{table}', {version_after}, {version_after}) "
-                  "WHERE _change_type IN ('update_preimage', 'update_postimage', 'delete') ORDER BY 1, 2, _change_type")
+                  f"WHERE _change_type IN ('update_preimage', 'update_postimage', 'delete') ORDER BY {order_by}, _change_type")
     n = len(cols)
     pre, post, deleted = {}, {}, []
     for r in rows:
         kind, vals = r[n], r[:n]
-        k = tuple(vals[cols.index(c)] for c in ("game_id", "person_id") if c in cols)
+        k = tuple(vals[cols.index(c)] for c in key)
         if kind == "update_preimage":
             pre[k] = vals
         elif kind == "update_postimage":
@@ -204,7 +209,7 @@ def build(db, name, cfg, execute, allow_large_delete=False, sql_dir=SQL_DIR):
     examples = {"updated": [], "deleted_keys": []}
     if counts["updated"] or counts["deleted"]:
         cols = [r[0] for r in db.run(f"DESCRIBE TABLE {table}") if r[0] and not r[0].startswith("#")]
-        examples = change_examples(db, table, version_after, cols)
+        examples = change_examples(db, table, version_after, cols, cfg["key"])
         for u in examples["updated"]:
             print("  updated", u["key"], {c: f"{a} -> {b}" for c, (a, b) in u["changes"].items()})
         if examples["deleted_keys"]:

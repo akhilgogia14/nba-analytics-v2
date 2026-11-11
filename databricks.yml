@@ -18,6 +18,10 @@ sync:
     - .github/**
     - .gitignore
     - requirements*.txt
+    # files the daily workflow writes into its working folder before the deploy step (logs, summary, Slack payload)
+    - "*.log"
+    - summary.txt
+    - payload.json
 
 resources:
   jobs:

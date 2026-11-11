@@ -103,7 +103,7 @@ def test_change_examples_pairs_updates_and_lists_deletes():
     rows = [["g1", "7", "6", "h2", "update_postimage"], ["g1", "7", "5", "h1", "update_preimage"],
             ["g2", "9", "4", "h3", "delete"]]
     db = FakeDb(rows)
-    out = s.change_examples(db, "t", 5, cols)
+    out = s.change_examples(db, "t", 5, cols, ["game_id", "person_id"])
     assert out["updated"] == [{"key": "g1|7", "changes": {"pts": ["5", "6"]}}]
     assert out["deleted_keys"] == ["g2|9"]
     assert "table_changes('t', 5, 5)" in db.sql[0]
@@ -115,7 +115,7 @@ def test_change_examples_caps_the_number_of_examples():
     for i in range(20):
         rows += [["g", str(i), "2", "b", "update_postimage"], ["g", str(i), "1", "a", "update_preimage"],
                  ["d", str(i), "0", "c", "delete"]]
-    out = s.change_examples(FakeDb(rows), "t", 1, cols)
+    out = s.change_examples(FakeDb(rows), "t", 1, cols, ["game_id", "person_id"])
     assert len(out["updated"]) == s.MAX_EXAMPLES and len(out["deleted_keys"]) == s.MAX_EXAMPLES
 
 
@@ -171,3 +171,11 @@ def test_dry_run_reads_sql_from_the_given_folder_and_writes_nothing(tmp_path):
     joined = "\n".join(db.sql)
     assert "SELECT 1 AS game_id" in joined
     assert not any(w in joined for w in ("CREATE TABLE", "MERGE INTO", "INSERT INTO"))
+
+
+def test_change_examples_orders_by_the_key_columns_for_one_and_two_column_keys():
+    db = FakeDb([])
+    s.change_examples(db, "t", 1, ["game_id", "person_id", "pts", "_row_hash"], ["game_id", "person_id"])
+    s.change_examples(db, "t", 1, ["game_id", "pts", "_row_hash"], ["game_id"])
+    assert "ORDER BY 1, 2, _change_type" in db.sql[0] and "{" not in db.sql[0]
+    assert "ORDER BY 1, _change_type" in db.sql[1] and "{" not in db.sql[1]
