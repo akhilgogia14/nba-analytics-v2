@@ -34,7 +34,7 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 
 ## Step 11: Silver for the core tables
 - **11a-e. `player_game`: DONE 2026-11-10** (release note 008, `sql/silver/`, `scripts/silver_build.py`). Rules from `docs/spike-findings.md` section 9 applied; 8 quality gates; MERGE with Change Data Feed, a run log (`_build_log`), an oddities table (`_data_warnings`) and a 1% delete guard (PR #13 and follow-up).
-- **11f. Silver `team_game` from team box scores and `game` from schedules**, same pattern (SELECT, gates, add to `TABLES` in `silver_build.py`), then a release note.
-- Then Step 10c (Databricks jobs run `silver_build.py` after bronze).
+- **11f. `team_game` and `game`: DONE 2026-11-11** (release note 010). All three silver tables are rebuilt by the daily Databricks job.
+- **Next: the first simple gold tables** (PLAN.md, `docs/MODELING.md`), plus a silver to gold step in the same job. Tier 2 silver (play-by-play, shots and so on) comes later.
 
 Later (not yet): simple gold tables, simple visuals, tier 2 in silver, the research app, back-test harness, ML. See PLAN.md and `docs/LEARNING.md`. Parked ideas are at the end of PLAN.md.
