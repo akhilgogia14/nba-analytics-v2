@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bronze_load  # noqa: E402  (reuses the Databricks SQL runner)
+from sqlutil import sql_str  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SQL_DIR = ROOT / "sql" / "silver"
@@ -107,7 +107,7 @@ def create_log_tables_sql(schema=SCHEMA):
 def warnings_insert_sql(table_name, run_id, warnings_text, source, schema=SCHEMA):
     """Append only warnings not already logged for this table (same warning + row key)."""
     q = gates_sql(warnings_text, source)
-    tn, rid = bronze_load.sql_str(table_name), bronze_load.sql_str(run_id)
+    tn, rid = sql_str(table_name), sql_str(run_id)
     return (f"INSERT INTO {schema}._data_warnings\n"
             f"SELECT {rid}, current_timestamp(), {tn}, w.warning, w.row_key, w.detail FROM ({q}) w\n"
             f"WHERE NOT EXISTS (SELECT 1 FROM {schema}._data_warnings x "
@@ -118,10 +118,10 @@ def log_insert_sql(run_id, table_name, c, schema=SCHEMA):
     """One summary row. `c` has source_rows, inserted, updated, deleted, table_rows, version_before,
     version_after, new_warnings, examples (a JSON string)."""
     vb = "NULL" if c["version_before"] is None else str(int(c["version_before"]))
-    return (f"INSERT INTO {schema}._build_log VALUES ({bronze_load.sql_str(run_id)}, {bronze_load.sql_str(table_name)}, "
+    return (f"INSERT INTO {schema}._build_log VALUES ({sql_str(run_id)}, {sql_str(table_name)}, "
             f"current_timestamp(), {int(c['source_rows'])}, {int(c['inserted'])}, {int(c['updated'])}, "
             f"{int(c['deleted'])}, {int(c['table_rows'])}, {vb}, {int(c['version_after'])}, "
-            f"{int(c['new_warnings'])}, {bronze_load.sql_str(c['examples'])})")
+            f"{int(c['new_warnings'])}, {sql_str(c['examples'])})")
 
 
 def table_version(db, table):
@@ -150,11 +150,11 @@ def change_examples(db, table, version_after, cols):
     return {"updated": updates, "deleted_keys": deleted[:MAX_EXAMPLES]}
 
 
-def build(db, name, cfg, execute, allow_large_delete=False):
+def build(db, name, cfg, execute, allow_large_delete=False, sql_dir=SQL_DIR):
     table = f"{SCHEMA}.{name}"
-    select_sql = (SQL_DIR / f"{name}.sql").read_text()
-    gates_text = (SQL_DIR / f"{name}_gates.sql").read_text()
-    warnings_text = (SQL_DIR / f"{name}_warnings.sql").read_text()
+    select_sql = (sql_dir / f"{name}.sql").read_text()
+    gates_text = (sql_dir / f"{name}_gates.sql").read_text()
+    warnings_text = (sql_dir / f"{name}_warnings.sql").read_text()
     print(f"{'EXECUTE' if execute else 'DRY RUN'} | silver {name}\n")
 
     src_rows = int(db.run(f"SELECT count(*) FROM ({source_sql(select_sql)})")[0][0])
@@ -216,8 +216,22 @@ def build(db, name, cfg, execute, allow_large_delete=False):
     print(f"New oddities logged to {SCHEMA}._data_warnings: {new_warnings}")
     db.run(log_insert_sql(run_id, name, {**counts, "source_rows": src_rows, "table_rows": in_table,
                                          "version_before": version_before, "version_after": version_after,
-                                         "new_warnings": new_warnings, "examples": json.dumps(examples)}))
+                                         "new_warnings": new_warnings, "examples": json.dumps(examples, default=str)}))
     print(f"Run written to {SCHEMA}._build_log (run_id {run_id}, table versions {version_before} -> {version_after})")
+
+
+class SparkRunner:
+    """Runs SQL inside a Databricks job through Spark. Same interface as the CLI runner:
+    run(sql) returns a list of rows (lists); any failure is raised as RuntimeError."""
+
+    def __init__(self, spark):
+        self.spark = spark
+
+    def run(self, stmt):
+        try:
+            return [list(r) for r in self.spark.sql(stmt).collect()]
+        except Exception as e:  # Spark raises its own exception types; build() expects RuntimeError
+            raise RuntimeError(str(e)[:400]) from None
 
 
 def main():
@@ -226,6 +240,7 @@ def main():
     ap.add_argument("--table", choices=sorted(TABLES), help="one table (default: all)")
     ap.add_argument("--allow-large-delete", action="store_true", help="let a MERGE delete more than 1% of rows")
     args = ap.parse_args()
+    import bronze_load  # only the command line needs the CLI runner (and boto3)
     cfg = bronze_load.CONFIG["bronze"]
     db = bronze_load.Databricks(os.environ.get("DATABRICKS_WAREHOUSE_ID", cfg["warehouse_id"]),
                                 [os.environ.get("DATABRICKS_TOKEN")])
