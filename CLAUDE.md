@@ -23,6 +23,11 @@ This file is loaded automatically each session. Keep it short and current.
 - Keep the repo small. Add a table or page only when a screen needs it.
 - Modeling work follows `docs/MODELING.md`.
 
+## Build conventions (decided by the owner, 2026-11-12)
+- Bronze and silver stay in SQL files (`sql/silver/`), run by `scripts/silver_build.py`.
+- New gold tables are written in PySpark as "Python tables" (`scripts/gold_<name>.py` with `build(spark)`, an entry with `"python"` in `TABLES`). Their gates and warnings stay SQL and recompute the answer independently of the PySpark code. Existing SQL tables are not converted.
+- Every table, SQL or PySpark, ships with gates, warnings, tests, and corrupted-copy checks that prove the gates fire.
+
 ## Git
 - Work on a branch. Open a pull request. The owner merges. Never push directly to `main` (the first bootstrap commit is already done).
 - Run `git fetch` before saying anything about branch or PR state.
@@ -46,7 +51,7 @@ This file is loaded automatically each session. Keep it short and current.
 - Databricks CLI: installed (v1.24.0, from the `databricks/tap` Homebrew tap). Logged in as profile `DEFAULT` on the owner's workspace; the owner runs any login.
 - R2: S3-compatible API through `boto3` (pinned in `requirements.txt`, installed in a gitignored `.venv`). Credentials are in the gitignored `.env` (names in `.env.example`); the token is scoped to `nba-bucket`. Run scripts as `.venv/bin/python scripts/<name>.py` from the repo root. Never print `.env` values.
 - Codex: CLI installed (0.167.0) and logged in, but used only when the owner asks (see "Release notes and review").
-- Python: `.venv` is Python 3.12 (made with `uv venv --python 3.12 .venv`, then `uv pip install -r requirements.txt -r requirements-dev.txt`). The old 3.9 environment is `.venv39` (unused). `pyspark` is installed for local tests only; local Spark tests need Java 21 and `PYSPARK_PYTHON` set (the test fixture does it). The Databricks side runs a newer Spark (4.x, ANSI mode on), so the job run is the final check. A PySpark table can only be dry-run on real data with Databricks Connect (a separate environment, not in the repo).
+- Python: `.venv` is Python 3.12 (made with `uv venv --python 3.12 .venv`, then `uv pip install -r requirements.txt -r requirements-dev.txt`). `pyspark` is installed for local tests only; local Spark tests need Java 21 and `PYSPARK_PYTHON` set (the test fixture does it). The Databricks side runs a newer Spark (4.x, ANSI mode on), so the job run is the final check. A PySpark table can only be dry-run on real data with Databricks Connect (a separate environment, not in the repo).
 
 ## Positioning and wording
 - This is a data product plus an NBA research study. The design target is player performance forecasts for points, rebounds, assists, 3-pointers, blocks and steals (the stat lines prop markets are built on). It is fine to say so in internal docs.
