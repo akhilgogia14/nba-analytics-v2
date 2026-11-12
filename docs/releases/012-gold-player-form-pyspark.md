@@ -15,7 +15,7 @@ Author: (Claude Code)
 PLAN.md core screen: the range for each stat and the 0/1/2/3+ bars for small counts, with sample size and window labels. The owner also wanted to try PySpark in the Databricks workflow (decision 2026-11-12: trial on this table).
 
 ## Decisions (owner, 2026-11-12)
-- Trial of PySpark for `player_form`; everything else stays SQL for now.
+- Trial of PySpark for `player_form`. After the trial: new gold tables continue in PySpark; silver and the existing SQL gold table stay SQL.
 - All players with any stats; long format.
 
 ## How to verify
@@ -44,15 +44,13 @@ PLAN.md core screen: the range for each stat and the 0/1/2/3+ bars for small cou
 - 197 players have fewer than 10 games ever, so their windows are short; `l10_games` says how short.
 - Count-stat shares over 10 games are noisy (steps of 0.1); the app shows the sample size next to them.
 - The 60 "window spans over a year" oddities include people returning from long absences; some may be data gaps rather than injuries (not checked).
-- Two local environments are left on disk, both git-ignored: `.venv39` (old 3.9) and `.venv312` (my first 3.12 one, now redundant). Nothing was removed; the owner decides.
 - Databricks Connect is not part of the repo; its environment is in a scratch folder and needs `databricks-connect==16.4.2` plus `pyarrow==17.0.0`.
 
 ## Review focus for Codex
 The window and ranking logic in `transform`, the percentile call, the label arithmetic (earlier-season relative to the latest season), and whether the SQL gates really share nothing with the PySpark code.
 
 ## Open questions for the owner
-1. After the trial: keep new gold tables in PySpark, or back to SQL? (My read: SQL for plain aggregations and windows; PySpark where a loop or Python library helps, such as peer cohorts and the ML phase.)
-2. Remove `.venv39` and `.venv312` from disk? They are local and recreatable.
+Both answered 2026-11-12: new gold tables are written in PySpark (existing SQL tables stay as they are), and `.venv39` and `.venv312` were removed from disk (both git-ignored, 43 MB and 377 MB).
 
 ## Owner walkthrough
 - **What this does:** it adds a summary table with one line per player per statistic, for example "Jalen Brunson, points". The line tells you his average, his middle value and the range his points fell in over his last 10 games (the 10th to 90th percentile, the middle 80% of games), plus how many games that covers and where they came from. For three-pointers, blocks and steals it gives the share of games with 0, 1, 2, or 3 or more, because a range doesn't make sense for small counts.
