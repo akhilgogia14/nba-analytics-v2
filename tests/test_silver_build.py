@@ -52,7 +52,10 @@ def test_merge_is_null_safe_on_every_key_column_and_only_updates_changed_rows():
 def test_real_sql_files_exist_for_every_table_and_gates_use_the_placeholder():
     for name, cfg in s.TABLES.items():
         d = s.SQL_ROOT / cfg["layer"]
-        assert (d / f"{name}.sql").exists()
+        if cfg.get("python"):  # a PySpark table has a module with build(spark) instead of a .sql file
+            assert (s.ROOT / "scripts" / f"{cfg['python']}.py").exists()
+        else:
+            assert (d / f"{name}.sql").exists()
         assert "{T}" in (d / f"{name}_gates.sql").read_text()
 
 
