@@ -50,9 +50,10 @@ def test_merge_is_null_safe_on_every_key_column_and_only_updates_changed_rows():
 
 
 def test_real_sql_files_exist_for_every_table_and_gates_use_the_placeholder():
-    for name in s.TABLES:
-        assert (s.SQL_DIR / f"{name}.sql").exists()
-        assert "{T}" in (s.SQL_DIR / f"{name}_gates.sql").read_text()
+    for name, cfg in s.TABLES.items():
+        d = s.SQL_ROOT / cfg["layer"]
+        assert (d / f"{name}.sql").exists()
+        assert "{T}" in (d / f"{name}_gates.sql").read_text()
 
 
 def test_delete_guard_trips_above_one_percent_only():
@@ -84,8 +85,8 @@ def test_log_insert_records_versions_and_escapes_quotes():
 
 
 def test_every_table_has_a_warnings_file_with_the_placeholder():
-    for name in s.TABLES:
-        assert "{T}" in (s.SQL_DIR / f"{name}_warnings.sql").read_text()
+    for name, cfg in s.TABLES.items():
+        assert "{T}" in (s.SQL_ROOT / cfg["layer"] / f"{name}_warnings.sql").read_text()
 
 
 class FakeDb:
@@ -163,11 +164,14 @@ class ScriptedDb:
 
 
 def test_dry_run_reads_sql_from_the_given_folder_and_writes_nothing(tmp_path):
-    (tmp_path / "t.sql").write_text("SELECT 1 AS game_id, 2 AS person_id")
-    (tmp_path / "t_gates.sql").write_text("SELECT 'gate_a' AS gate, 0 AS bad FROM {T}")
-    (tmp_path / "t_warnings.sql").write_text("SELECT 'w' AS warning, 'k' AS row_key, '' AS detail FROM {T}")
+    layer_dir = tmp_path / "gold"
+    layer_dir.mkdir()
+    (layer_dir / "t.sql").write_text("SELECT 1 AS game_id, 2 AS person_id")
+    (layer_dir / "t_gates.sql").write_text("SELECT 'gate_a' AS gate, 0 AS bad FROM {T}")
+    (layer_dir / "t_warnings.sql").write_text("SELECT 'w' AS warning, 'k' AS row_key, '' AS detail FROM {T}")
     db = ScriptedDb()
-    s.build(db, "t", {"key": ["game_id", "person_id"]}, execute=False, sql_dir=tmp_path)
+    s.build(db, "t", {"key": ["game_id", "person_id"], "layer": "gold"}, execute=False, sql_root=tmp_path)
+    assert any("workspace.nba_v2_gold.t" in q for q in db.sql)  # the table lives in its layer's schema
     joined = "\n".join(db.sql)
     assert "SELECT 1 AS game_id" in joined
     assert not any(w in joined for w in ("CREATE TABLE", "MERGE INTO", "INSERT INTO"))
@@ -179,3 +183,13 @@ def test_change_examples_orders_by_the_key_columns_for_one_and_two_column_keys()
     s.change_examples(db, "t", 1, ["game_id", "pts", "_row_hash"], ["game_id"])
     assert "ORDER BY 1, 2, _change_type" in db.sql[0] and "{" not in db.sql[0]
     assert "ORDER BY 1, _change_type" in db.sql[1] and "{" not in db.sql[1]
+
+
+def test_every_silver_table_comes_before_every_gold_table():
+    layers = [cfg["layer"] for cfg in s.TABLES.values()]
+    assert layers == sorted(layers, key=["silver", "gold"].index)
+
+
+def test_schema_for_layer_and_log_tables_follow_the_layer():
+    assert s.schema_for("gold") == "workspace.nba_v2_gold"
+    assert all("nba_v2_gold." in q for q in s.create_log_tables_sql(s.schema_for("gold")))

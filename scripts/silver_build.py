@@ -1,8 +1,8 @@
-"""Build silver tables from bronze with MERGE, behind quality gates.
+"""Build silver and gold tables with MERGE, behind quality gates.
 
-Silver = cleaned, typed rows with one row per key. Each table is defined by a SELECT in
-sql/silver/<name>.sql and checked by sql/silver/<name>_gates.sql (each gate returns a bad-row count,
-0 = pass).
+Silver = cleaned, typed rows with one row per key (from bronze). Gold = tables shaped for the app (from silver).
+Each table is defined by a SELECT in sql/<layer>/<name>.sql and checked by sql/<layer>/<name>_gates.sql (each
+gate returns a bad-row count, 0 = pass). Silver tables are built first, then gold.
 
 Run order:
   1. gates run on the SELECT's rows (before anything is written). Any failure stops the run.
@@ -30,12 +30,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sqlutil import sql_str  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-SQL_DIR = ROOT / "sql" / "silver"
-SCHEMA = "workspace.nba_v2_silver"
+SQL_ROOT = ROOT / "sql"
+SCHEMA = "workspace.nba_v2_silver"  # default schema for the helpers; build() uses the table's own layer
+
+
+def schema_for(layer):
+    """workspace.nba_v2_<layer>, e.g. workspace.nba_v2_gold."""
+    return f"workspace.nba_v2_{layer}"
+
+
+# Each table says which layer it belongs to (its SQL is in sql/<layer>/, the table and its run log live in that
+# layer's schema). ORDER MATTERS: every silver table is built before any gold table, because gold reads silver.
 TABLES = {
-    "player_game": {"key": ["game_id", "person_id"]},
-    "team_game": {"key": ["game_id", "team_id"]},
-    "game": {"key": ["game_id"]},
+    "player_game": {"key": ["game_id", "person_id"], "layer": "silver"},
+    "team_game": {"key": ["game_id", "team_id"], "layer": "silver"},
+    "game": {"key": ["game_id"], "layer": "silver"},
+    "player_game_log": {"key": ["game_id", "person_id"], "layer": "gold"},
 }
 MAX_DELETE_FRACTION = 0.01
 MAX_EXAMPLES = 5
@@ -155,12 +165,15 @@ def change_examples(db, table, version_after, cols, key):
     return {"updated": updates, "deleted_keys": deleted[:MAX_EXAMPLES]}
 
 
-def build(db, name, cfg, execute, allow_large_delete=False, sql_dir=SQL_DIR):
-    table = f"{SCHEMA}.{name}"
+def build(db, name, cfg, execute, allow_large_delete=False, sql_root=SQL_ROOT):
+    layer = cfg["layer"]
+    schema = schema_for(layer)
+    sql_dir = sql_root / layer
+    table = f"{schema}.{name}"
     select_sql = (sql_dir / f"{name}.sql").read_text()
     gates_text = (sql_dir / f"{name}_gates.sql").read_text()
     warnings_text = (sql_dir / f"{name}_warnings.sql").read_text()
-    print(f"{'EXECUTE' if execute else 'DRY RUN'} | silver {name}\n")
+    print(f"{'EXECUTE' if execute else 'DRY RUN'} | {layer} {name}\n")
 
     src_rows = int(db.run(f"SELECT count(*) FROM ({source_sql(select_sql)})")[0][0])
     if src_rows == 0:
@@ -191,6 +204,7 @@ def build(db, name, cfg, execute, allow_large_delete=False, sql_dir=SQL_DIR):
 
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
     version_before = table_version(db, table) if exists else None
+    db.run(f"CREATE SCHEMA IF NOT EXISTS {schema}")
     db.run(create_sql(table, select_sql))
     db.run(merge_sql(table, select_sql, cfg["key"]))
     version_after = table_version(db, table)
@@ -198,7 +212,7 @@ def build(db, name, cfg, execute, allow_large_delete=False, sql_dir=SQL_DIR):
     bad = failing_gates(db.run(gates_sql(gates_text, table)))
     print(f"Table rows: {in_table:,} (source {src_rows:,}) | gates on table: " + ("all pass" if not bad else f"FAILED {bad}"))
     if in_table != src_rows or bad:
-        sys.exit("FAILED: silver table does not match the source rows or a gate failed.")
+        sys.exit(f"FAILED: {layer} table {name} does not match the source rows or a gate failed.")
 
     # what this run changed, from the change feed
     first = 0 if version_before is None else version_before + 1
@@ -215,14 +229,14 @@ def build(db, name, cfg, execute, allow_large_delete=False, sql_dir=SQL_DIR):
         if examples["deleted_keys"]:
             print("  deleted (first few):", examples["deleted_keys"])
 
-    for s in create_log_tables_sql():
+    for s in create_log_tables_sql(schema):
         db.run(s)
-    new_warnings = int(db.run(warnings_insert_sql(name, run_id, warnings_text, table))[0][0])
-    print(f"New oddities logged to {SCHEMA}._data_warnings: {new_warnings}")
-    db.run(log_insert_sql(run_id, name, {**counts, "source_rows": src_rows, "table_rows": in_table,
+    new_warnings = int(db.run(warnings_insert_sql(name, run_id, warnings_text, table, schema))[0][0])
+    print(f"New oddities logged to {schema}._data_warnings: {new_warnings}")
+    db.run(log_insert_sql(run_id, name, schema=schema, c={**counts, "source_rows": src_rows, "table_rows": in_table,
                                          "version_before": version_before, "version_after": version_after,
                                          "new_warnings": new_warnings, "examples": json.dumps(examples, default=str)}))
-    print(f"Run written to {SCHEMA}._build_log (run_id {run_id}, table versions {version_before} -> {version_after})")
+    print(f"Run written to {schema}._build_log (run_id {run_id}, table versions {version_before} -> {version_after})")
 
 
 class SparkRunner:
@@ -242,14 +256,14 @@ class SparkRunner:
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--execute", action="store_true", help="really build (default is a dry run)")
-    ap.add_argument("--table", choices=sorted(TABLES), help="one table (default: all)")
+    ap.add_argument("--table", choices=list(TABLES), help="one table (default: all, silver first)")
     ap.add_argument("--allow-large-delete", action="store_true", help="let a MERGE delete more than 1% of rows")
     args = ap.parse_args()
     import bronze_load  # only the command line needs the CLI runner (and boto3)
     cfg = bronze_load.CONFIG["bronze"]
     db = bronze_load.Databricks(os.environ.get("DATABRICKS_WAREHOUSE_ID", cfg["warehouse_id"]),
                                 [os.environ.get("DATABRICKS_TOKEN")])
-    for name in ([args.table] if args.table else sorted(TABLES)):
+    for name in ([args.table] if args.table else list(TABLES)):  # silver tables first, then gold
         build(db, name, TABLES[name], args.execute, args.allow_large_delete)
 
 
