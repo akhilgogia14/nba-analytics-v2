@@ -37,4 +37,11 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 - **11f. `team_game` and `game`: DONE 2026-11-11** (release note 010). All three silver tables are rebuilt by the daily Databricks job.
 - **Next: the first simple gold tables** (PLAN.md, `docs/MODELING.md`), plus a silver to gold step in the same job. Tier 2 silver (play-by-play, shots and so on) comes later.
 
-Later (not yet): simple gold tables, simple visuals, tier 2 in silver, the research app, back-test harness, ML. See PLAN.md and `docs/LEARNING.md`. Parked ideas are at the end of PLAN.md.
+## Step 12: Gold (the tables the app reads)
+- **12a-c. `player_game_log`: DONE 2026-11-11** (release note 011, `sql/gold/`). One row per played player-game, with prior-10 and prior-season averages and labels. Built by the same job after silver.
+- **12d. `player_form`**: one row per player this season, with last-10 mean, median and 80% band for PTS, REB, AST and combos, and the 0/1/2/3+ shares for 3PM, BLK, STL, with sample sizes and the window labels.
+- **12e. `game_slate`**: games from yesterday through the next 7 days for "Today's games". Needs the delete-guard floor first (the guard only trips above 1% and above 100 rows), because it loses about 10 past games a day.
+- Open: add `days_since_prior_game` to the log (release 011 question).
+
+
+Later (not yet): more gold tables, simple visuals, tier 2 in silver, the research app, back-test harness, ML. See PLAN.md and `docs/LEARNING.md`. Parked ideas are at the end of PLAN.md.
