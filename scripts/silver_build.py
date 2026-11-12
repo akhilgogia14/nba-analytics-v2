@@ -46,6 +46,9 @@ TABLES = {
     "team_game": {"key": ["game_id", "team_id"], "layer": "silver"},
     "game": {"key": ["game_id"], "layer": "silver"},
     "player_game_log": {"key": ["game_id", "person_id"], "layer": "gold"},
+    # A "python" table is written in PySpark: scripts/<module>.py has build(spark) returning a DataFrame. It runs only
+    # where a Spark session exists (the Databricks job); the command line skips it.
+    "player_form": {"key": ["person_id", "stat"], "layer": "gold", "python": "gold_player_form"},
 }
 MAX_DELETE_FRACTION = 0.01
 MAX_EXAMPLES = 5
@@ -170,7 +173,17 @@ def build(db, name, cfg, execute, allow_large_delete=False, sql_root=SQL_ROOT):
     schema = schema_for(layer)
     sql_dir = sql_root / layer
     table = f"{schema}.{name}"
-    select_sql = (sql_dir / f"{name}.sql").read_text()
+    if cfg.get("python"):
+        spark = getattr(db, "spark", None)
+        if spark is None:
+            print(f"SKIP {layer} {name}: written in PySpark, so it only runs inside the Databricks job.")
+            return
+        import importlib
+        view = f"{name}_src"
+        importlib.import_module(cfg["python"]).build(spark).createOrReplaceTempView(view)
+        select_sql = f"SELECT * FROM {view}"  # the rest of the build (gates, MERGE, logs) is unchanged
+    else:
+        select_sql = (sql_dir / f"{name}.sql").read_text()
     gates_text = (sql_dir / f"{name}_gates.sql").read_text()
     warnings_text = (sql_dir / f"{name}_warnings.sql").read_text()
     print(f"{'EXECUTE' if execute else 'DRY RUN'} | {layer} {name}\n")

@@ -39,7 +39,7 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 
 ## Step 12: Gold (the tables the app reads)
 - **12a-c. `player_game_log`: DONE 2026-11-11** (release note 011, `sql/gold/`). One row per played player-game, with prior-10 and prior-season averages and labels. Built by the same job after silver.
-- **12d. `player_form`**: one row per player this season, with last-10 mean, median and 80% band for PTS, REB, AST and combos, and the 0/1/2/3+ shares for 3PM, BLK, STL, with sample sizes and the window labels.
+- **12d. `player_form`: DONE 2026-11-12** (release note 012), written in PySpark as a trial. Long table, one row per player per stat, all 1,084 players (11,924 rows). Decision pending from the owner: keep writing new gold tables in PySpark, or go back to SQL (see the trial notes in release 012).
 - **12e. `game_slate`**: games from yesterday through the next 7 days for "Today's games". Needs the delete-guard floor first (the guard only trips above 1% and above 100 rows), because it loses about 10 past games a day.
 - Open: add `days_since_prior_game` to the log (release 011 question).
 

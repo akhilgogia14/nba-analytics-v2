@@ -33,7 +33,7 @@ resources:
       environments:
         - environment_key: default
           spec:
-            environment_version: "2"
+            environment_version: "3"
       tasks:
         - task_key: build_silver
           environment_key: default
