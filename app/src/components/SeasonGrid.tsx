@@ -1,21 +1,14 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { f1 } from '../lib/geom.ts'
 import {
   BINS, GRID_STATS, MISSED, STAT_NAMES, UPCOMING, buildCells, chartPalette, hexLayout, hexPoints, hexTip,
   playedSummary, seasonMean, type Cell,
 } from '../lib/hex.ts'
-import { readableOn } from '../lib/teams.ts'
-import { panelStyle } from '../lib/styles.ts'
+import { panelStyle, pillClass, pillStyle } from '../lib/styles.ts'
 import { clampAnchor } from '../lib/tips.ts'
-import type { GridStat, Season, SeasonGrid as Grid } from '../types.ts'
+import type { GameType, GridStat, Season } from '../types.ts'
 
-const TYPE_NAMES: Record<Grid['gameType'], string> = { 'regular-season': 'Regular season', playoffs: 'Playoffs' }
-
-const pill = 'min-h-9 cursor-pointer rounded-full border border-(--pillBorder) px-3.5 text-[13px] font-semibold'
-const pillStyle = (on: boolean): CSSProperties => ({
-  background: on ? 'var(--pillOn)' : 'var(--pill)',
-  color: on ? 'var(--pillOnText)' : 'var(--pillText)',
-})
+const TYPE_NAMES: Record<GameType, string> = { 'regular-season': 'Regular season', playoffs: 'Playoffs' }
 
 /** One small hexagon-shaped swatch for the key under the chart. */
 function Swatch({ fill, stroke, dashed, ring, size = 18 }: { fill: string; stroke: string; dashed?: boolean; ring?: string; size?: number }) {
@@ -36,17 +29,14 @@ function Swatch({ fill, stroke, dashed, ring, size = 18 }: { fill: string; strok
 }
 
 /**
- * The season chart: one hexagon per team game, in date order. Played games are coloured by the chosen stat (five steps
- * from his lowest to his highest game), a game where he reached his season mean has a bright border, a game he missed
- * is dark grey, and (regular season) games not played yet are empty outlines up to 82.
- * Regular season and playoffs are separate views; a traded player has one grid per team.
+ * The season chart: one hexagon per team game, in date order, for the game type the page's toggle has chosen (regular
+ * season or playoffs, never both). Played games are coloured by the chosen stat (five steps from his lowest to his highest
+ * game, in the team's colours), a game where he reached his season average has a ring around it, a game he missed is dark
+ * grey, and (regular season) games not played yet are empty outlines up to 82. A traded player has one grid per team.
  */
-export function SeasonGrid({ season, team }: { season: Season | null; team: string }) {
+export function SeasonGrid({ season, team, gameType }: { season: Season | null; team: string; gameType: GameType }) {
   const palette = chartPalette(team)
-  // The chart's selected pills and its tooltip use the team's bright colour (the rest of the page keeps its own accent).
-  const teamVars = { '--pillOn': palette.top, '--pillOnText': readableOn(palette.top) } as CSSProperties
   const [stat, setStat] = useState<GridStat>('pts')
-  const [typeChoice, setTypeChoice] = useState<Grid['gameType']>('regular-season')
   const [teamChoice, setTeamChoice] = useState('')
   const [tip, setTip] = useState<number | null>(null)
   const box = useRef<HTMLDivElement>(null)
@@ -62,27 +52,24 @@ export function SeasonGrid({ season, team }: { season: Season | null; team: stri
   }, [tip])
 
   const shell = 'flex flex-col gap-4 rounded-[18px] border border-(--border) bg-(--panel) p-5'
-  const shellStyle = { ...panelStyle, ...teamVars }
   if (!season) {
     return (
-      <section className={shell} style={shellStyle}>
+      <section className={shell} style={panelStyle}>
         <div className="text-sm font-semibold">Season</div>
         <div className="text-sm text-(--muted)">Loading the season...</div>
       </section>
     )
   }
-  const types = (['regular-season', 'playoffs'] as const).filter((t) => season.grids.some((g) => g.gameType === t))
-  if (types.length === 0) {
+  const grids = season.grids.filter((g) => g.gameType === gameType)
+  if (grids.length === 0) {
     return (
-      <section className={shell} style={shellStyle}>
-        <div className="text-sm font-semibold">Season</div>
-        <div className="text-sm text-(--muted)">No games on record for this player yet.</div>
+      <section className={shell} style={panelStyle}>
+        <div className="text-sm font-semibold">Season · {TYPE_NAMES[gameType]}</div>
+        <div className="text-sm text-(--muted)">No {TYPE_NAMES[gameType].toLowerCase()} games on record for this player yet.</div>
       </section>
     )
   }
 
-  const type = types.includes(typeChoice) ? typeChoice : types[0]
-  const grids = season.grids.filter((g) => g.gameType === type)
   const grid = grids.find((g) => g.teamId === teamChoice) ?? grids[0]
   const cells = buildCells(grid, stat, grids)
   const mean = seasonMean(grids, stat)
@@ -97,31 +84,20 @@ export function SeasonGrid({ season, team }: { season: Season | null; team: stri
   const strokeFor = (c: Cell) => (c.kind === 'upcoming' ? UPCOMING.stroke : c.kind === 'played' ? 'none' : MISSED.stroke)
 
   return (
-    <section className={shell} style={shellStyle}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <div className="text-sm font-semibold">
-            Season · {TYPE_NAMES[type]} {grid.seasonLabel}
-          </div>
-          <div className="text-xs text-(--muted)">
-            {grid.team}: played {played} of {total} team games{total < 82 && type === 'regular-season' ? ' so far' : ''}
-            {mean !== null && <> · season mean {f1(mean)} {STAT_NAMES[stat].toLowerCase()}</>}
-          </div>
+    <section className={shell} style={panelStyle}>
+      <div className="flex flex-col gap-0.5">
+        <div className="text-sm font-semibold">
+          Season · {TYPE_NAMES[gameType]} {grid.seasonLabel}
         </div>
-        {types.length > 1 && (
-          <div className="flex gap-2" role="group" aria-label="Game type">
-            {types.map((t) => (
-              <button key={t} type="button" aria-pressed={t === type} className={pill} style={pillStyle(t === type)} onClick={() => { setTypeChoice(t); setTip(null) }}>
-                {TYPE_NAMES[t]}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="text-xs text-(--muted)">
+          {grid.team}: played {played} of {total} team games{total < 82 && gameType === 'regular-season' ? ' so far' : ''}
+          {mean !== null && <> · season average {f1(mean)} {STAT_NAMES[stat].toLowerCase()}</>}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Stat">
         {GRID_STATS.map((s) => (
-          <button key={s} type="button" aria-pressed={s === stat} className={pill} style={pillStyle(s === stat)} onClick={() => { setStat(s); setTip(null) }}>
+          <button key={s} type="button" aria-pressed={s === stat} className={pillClass} style={pillStyle(s === stat)} onClick={() => { setStat(s); setTip(null) }}>
             {STAT_NAMES[s]}
           </button>
         ))}
@@ -130,7 +106,7 @@ export function SeasonGrid({ season, team }: { season: Season | null; team: stri
       {grids.length > 1 && (
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Team">
           {grids.map((g) => (
-            <button key={g.teamId} type="button" aria-pressed={g === grid} className={pill} style={pillStyle(g === grid)} onClick={() => { setTeamChoice(g.teamId); setTip(null) }}>
+            <button key={g.teamId} type="button" aria-pressed={g === grid} className={pillClass} style={pillStyle(g === grid)} onClick={() => { setTeamChoice(g.teamId); setTip(null) }}>
               {g.team}
             </button>
           ))}
@@ -156,12 +132,12 @@ export function SeasonGrid({ season, team }: { season: Season | null; team: stri
             <div className="opacity-80">{activeTip.detail}</div>
           </div>
         )}
-        <svg viewBox={`0 0 ${layout.width} ${layout.height}`} className="block w-full" role="group" aria-label={`${STAT_NAMES[stat]} in each game of the ${grid.seasonLabel} ${TYPE_NAMES[type].toLowerCase()}`}>
+        <svg viewBox={`0 0 ${layout.width} ${layout.height}`} className="block w-full" role="group" aria-label={`${STAT_NAMES[stat]} in each game of the ${grid.seasonLabel} ${TYPE_NAMES[gameType].toLowerCase()}`}>
           {cells.map((c, i) => {
             const { cx, cy } = layout.cells[i]
             const t = hexTip(c, stat, mean)
-            // A game that reached the season mean gets a ring just outside its hexagon, with a dark gap between the two,
-            // so the ring shows whatever the fill colour is.
+            // A game that reached the season average gets a ring just outside its hexagon, with a dark gap between the
+            // two, so the ring shows whatever the fill colour is.
             const poly = (
               <>
                 {c.hit && (
@@ -216,7 +192,7 @@ export function SeasonGrid({ season, team }: { season: Season | null; team: stri
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Swatch fill={palette.ramp[BINS - 1]} stroke="none" ring={palette.ring} size={22} />
-          reached his season mean
+          reached his season average
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Swatch fill={MISSED.fill} stroke={MISSED.stroke} />

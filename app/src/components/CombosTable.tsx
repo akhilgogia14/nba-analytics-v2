@@ -15,11 +15,11 @@ export function CombosTable({ stats }: { stats: Record<string, ApiStat> }) {
           style={{ gridTemplateColumns: COLUMNS }}
         >
           <span>Stat</span>
-          <span>Average</span>
+          <span>Last-10 average</span>
           <span>Median</span>
           <span>Middle 80%</span>
           <span>Low to high</span>
-          <span>Season avg</span>
+          <span>Season average</span>
         </div>
         {TABLE_STATS.map((key) => {
           const d = complete(stats[key])

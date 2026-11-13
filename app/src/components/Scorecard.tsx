@@ -24,7 +24,7 @@ function Bubble({ tip }: { tip: Tip }) {
 
 const hitClass = 'absolute block cursor-help rounded-sm bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-(--accent)'
 
-export function Scorecard({ label, stat, games }: { label: string; stat: ApiStat | undefined; games: number | null }) {
+export function Scorecard({ label, stat, games, seasonLabel }: { label: string; stat: ApiStat | undefined; games: number | null; seasonLabel: string }) {
   const d = complete(stat)
   const season = stat?.seasonMean ?? null
   const [tip, setTip] = useState<Tip | null>(null)
@@ -69,7 +69,11 @@ export function Scorecard({ label, stat, games }: { label: string; stat: ApiStat
     <div className="flex flex-col gap-3.5 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold">{label}</span>
-        {season !== null && <span className="text-xs text-(--muted)">Season avg {f1(season)}</span>}
+        {season !== null && (
+          <span className="text-xs text-(--muted)">
+            {seasonLabel} season avg {f1(season)}
+          </span>
+        )}
       </div>
 
       <div className="flex items-baseline gap-2.5">
@@ -79,7 +83,9 @@ export function Scorecard({ label, stat, games }: { label: string; stat: ApiStat
         >
           {f1(d.mean)}
         </span>
-        <span className="text-[13px] text-(--muted)">average · median {f1(d.median)}</span>
+        <span className="text-[13px] text-(--muted)">
+          {games ? `avg of last ${games} games` : 'avg of recent games'} · median {f1(d.median)}
+        </span>
       </div>
 
       <div ref={box} className="relative flex flex-col gap-1.5">

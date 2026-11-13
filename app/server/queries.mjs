@@ -1,6 +1,6 @@
 // The three questions the page asks, as fixed SQL plus small pure helpers (easy to test).
-// The form figures read workspace.nba_v2_gold.player_form: one row per player, game type and stat; the scorecards show
-// regular-season rows only, so a regular-season figure is never blended with playoff games.
+// The form figures read workspace.nba_v2_gold.player_form: one row per player, game type and stat. The page shows ONE game
+// type at a time (its toggle: regular season or playoffs), so a regular-season figure is never blended with playoff games.
 // The season chart reads workspace.nba_v2_gold.player_season_games (see SEASON_SQL). The app identity has SELECT on
 // those two gold tables and nothing else.
 
@@ -8,6 +8,12 @@ const TABLE = 'workspace.nba_v2_gold.player_form'
 const GAME_TYPE = 'regular-season'
 // "Current season" = the newest season label in the table. Only players who played in it are listed.
 const CURRENT = `(SELECT max(last_season_label) FROM ${TABLE} WHERE game_type = '${GAME_TYPE}')`
+
+// The two game types the page can show (the page's toggle). Anything else is refused before it reaches SQL.
+export const GAME_TYPES = ['regular-season', 'playoffs']
+export function validGameType(v) {
+  return typeof v === 'string' && GAME_TYPES.includes(v)
+}
 
 export const STATS = ['pts', 'reb', 'ast', 'fg3m', 'blk', 'stl', 'pra', 'pr', 'pa', 'ra', 'minutes']
 
@@ -37,7 +43,7 @@ export const FORM_SQL = `
          season_games, l10_games, l10_first_date, l10_games_before_current_season,
          l10_mean, l10_median, l10_p10, l10_p90, l10_min, l10_max,
          l10_share_0, l10_share_1, l10_share_2, l10_share_3plus, season_mean
-  FROM ${TABLE} WHERE person_id = :id AND game_type = '${GAME_TYPE}'`
+  FROM ${TABLE} WHERE person_id = :id AND game_type = :gt`
 
 // One player's season grid: every game of each team he played for, in the latest season he has games in, for each of
 // regular season and playoffs. Rows carry their game type, and the page draws one grid per (game type, team), so a

@@ -29,6 +29,12 @@ export type PlayerInfo = {
 
 export type Form = { player: PlayerInfo; stats: Record<string, ApiStat> }
 
+/** The page's toggle: it shows one game type at a time, never a mix. */
+export type GameType = 'regular-season' | 'playoffs'
+/** A player with no games of the chosen type (only seen for the playoffs). */
+export type NoGames = { none: true; gameType: GameType }
+export type FormResult = Form | NoGames
+
 /** The six stats the season chart can show. */
 export type GridStat = 'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl'
 

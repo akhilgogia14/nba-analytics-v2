@@ -165,12 +165,12 @@ test('hexTip: value and opponent on top, date, home or away and the mean underne
   const cells = buildCells(g, 'reb', [g])
   const home = hexTip(cells[3], 'reb', 7.5) // game 4: 12 rebounds, home, at or above the mean
   assert.equal(home.title, '12 REB ✓ · vs BOS')
-  assert.equal(home.detail, 'Nov 4 · home · season mean 7.5')
-  assert.match(home.label, /^12 rebounds, vs BOS\. Nov 4 · home · season mean 7\.5\. At or above his season mean\.$/)
+  assert.equal(home.detail, 'Nov 4 · home · season average 7.5')
+  assert.match(home.label, /^12 rebounds, vs BOS\. Nov 4 · home · season average 7\.5\. At or above his season average\.$/)
   const away = hexTip(cells[0], 'reb', 7.5) // game 1: 4 rebounds, away, below
   assert.equal(away.title, '4 REB · @ BOS')
-  assert.equal(away.detail, 'Nov 1 · away · season mean 7.5')
-  assert.match(away.label, /Below his season mean\.$/)
+  assert.equal(away.detail, 'Nov 1 · away · season average 7.5')
+  assert.match(away.label, /Below his season average\.$/)
   const missed = hexTip(cells[1], 'reb', 7.5)
   assert.equal(missed.title, 'Did not play · vs BOS')
   assert.equal(missed.detail, 'Nov 2 · home')
