@@ -4,10 +4,14 @@ import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
-import { CARD_STATS, LABELS, daysSince, shortDate, teamLabel } from './lib/format.ts'
+import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
+import { GAME_TYPE_OPTIONS, formNotices, gamesWord } from './lib/gameType.ts'
+import { chartPalette } from './lib/hex.ts'
+import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
+import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { Form, PlayerOption, Season, Team } from './types.ts'
+import type { FormResult, GameType, PlayerOption, Season, Team } from './types.ts'
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -22,7 +26,8 @@ export default function App() {
   const [team, setTeam] = useState('')
   const [players, setPlayers] = useState<PlayerOption[] | null>(null)
   const [playerId, setPlayerId] = useState('')
-  const [form, setForm] = useState<Form | null>(null)
+  const [form, setForm] = useState<FormResult | null>(null)
+  const [gameType, setGameType] = useState<GameType>('regular-season') // the page's one toggle
   const [season, setSeason] = useState<Season | null>(null)
   const [seasonError, setSeasonError] = useState('')
   const [error, setError] = useState('')
@@ -43,6 +48,12 @@ export default function App() {
     setForm(null)
     setSeason(null)
     setSeasonError('')
+    setError('')
+  }
+  function chooseGameType(t: GameType) {
+    if (t === gameType) return
+    setGameType(t)
+    setForm(null)
     setError('')
   }
   function tryAgain() {
@@ -86,13 +97,13 @@ export default function App() {
   useEffect(() => {
     if (!playerId) return
     let cancelled = false
-    fetchForm(playerId)
+    fetchForm(playerId, gameType)
       .then((f) => !cancelled && setForm(f))
       .catch((e) => !cancelled && setError(errorText(e)))
     return () => {
       cancelled = true
     }
-  }, [playerId, attempt])
+  }, [playerId, gameType, attempt])
 
   // 4. The chosen player's season grid. A failure here only affects the season panel, not the rest of the page.
   useEffect(() => {
@@ -106,24 +117,22 @@ export default function App() {
     }
   }, [playerId, attempt])
 
-  const p = form?.player
-  const notices: string[] = []
-  if (p) {
-    if (p.l10Games < 10) {
-      notices.push(`Only ${p.l10Games} games on record so far. These ranges are rough and will move a lot with each new game.`)
-    }
-    if (p.l10GamesBeforeCurrentSeason > 0) {
-      notices.push(`${p.l10GamesBeforeCurrentSeason} of these ${p.l10Games} games are from before this season, because the new season is young.`)
-    }
-    const idle = daysSince(p.lastGameDate)
-    if (idle > 7) notices.push(`${p.name} last played on ${shortDate(p.lastGameDate)}, ${idle} days ago.`)
-  }
+  const data = form && !('none' in form) ? form : null
+  const noGames = form !== null && 'none' in form
+  const p = data?.player
+  const notices = p ? formNotices(p, gameType) : []
+  const words = gamesWord(gameType)
+  const chosenName = players?.find((pl) => pl.id === playerId)?.name ?? 'This player'
 
   // The chosen team lights the page like a spotlight and sets the accent colours; the theme owns everything else.
   const look = teamLook(team)
+  // Selected buttons (the toggle, the chart's pickers) and tooltip bubbles take the team's bright colour.
+  const bright = chartPalette(team).top
   const rootStyle = {
     ...THEME,
     ...look.vars,
+    '--pillOn': bright,
+    '--pillOnText': readableOn(bright),
     background: 'var(--bg)',
     color: 'var(--text)',
     fontFamily: 'Inter, system-ui, sans-serif',
@@ -168,6 +177,23 @@ export default function App() {
               ))}
             </select>
           </label>
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClass}>3. Games</span>
+            <div className="flex h-12 items-center gap-2" role="group" aria-label="Game type">
+              {GAME_TYPE_OPTIONS.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  aria-pressed={o.key === gameType}
+                  className={pillClass}
+                  style={pillStyle(o.key === gameType)}
+                  onClick={() => chooseGameType(o.key)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div aria-live="polite" className="flex flex-col gap-3">
@@ -191,11 +217,23 @@ export default function App() {
           )}
         </div>
 
-        {p && form && (
+        {noGames && (
+          <section className={`flex flex-col gap-2 rounded-[18px] border border-(--border) bg-(--panel) p-5`} style={panelStyle}>
+            <div className="text-xs font-semibold tracking-widest text-(--accent) uppercase">Player level · playoffs</div>
+            <h1 className="m-0 text-[32px] leading-[1.1] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
+              {chosenName}
+            </h1>
+            <div className="text-[15px] text-(--muted)">
+              {chosenName} has no playoff games on record. Switch back to Regular season to see this player's form.
+            </div>
+          </section>
+        )}
+
+        {p && data && (
           <>
             <section className="flex flex-col gap-2">
               <div className="text-xs font-semibold tracking-widest text-(--accent) uppercase">
-                Player level · last {p.l10Games} games
+                Player level · last {p.l10Games} {words}
               </div>
               <div className="flex flex-wrap items-center gap-5">
                 <PlayerAvatar name={p.name} playerId={playerId} />
@@ -210,8 +248,8 @@ export default function App() {
                     </span>
                   </div>
                   <div className="text-[15px] text-(--muted)">
-                    Last {p.l10Games} games played · {shortDate(p.l10FirstDate)} to {shortDate(p.lastGameDate)} ·{' '}
-                    {p.totalGames} games in the data
+                    Last {p.l10Games} {words} played · {shortDate(p.l10FirstDate)} to {shortDate(p.lastGameDate)} ·{' '}
+                    {p.totalGames} {words} in the data
                   </div>
                 </div>
               </div>
@@ -227,14 +265,14 @@ export default function App() {
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
               {CARD_STATS.map((key) => (
-                <Scorecard key={key} label={LABELS[key]} stat={form.stats[key]} games={p.l10Games} />
+                <Scorecard key={key} label={LABELS[key]} stat={data.stats[key]} games={p.l10Games} seasonLabel={p.seasonLabel} />
               ))}
             </div>
 
             <div className="flex flex-wrap items-center gap-5 text-[13px] text-(--muted)">
               <span className="inline-flex items-center gap-2">
                 <span className="inline-block size-3.5 rounded-full bg-(--dot)" />
-                average
+                average of these games
               </span>
               <span className="inline-flex items-center gap-2">
                 <span className="inline-block h-[18px] w-[3px] bg-(--median)" />
@@ -255,10 +293,10 @@ export default function App() {
                 The season chart could not load: {seasonError}
               </div>
             ) : (
-              <SeasonGrid key={playerId} season={season} team={team} />
+              <SeasonGrid key={playerId} season={season} team={team} gameType={gameType} />
             )}
 
-            <CombosTable stats={form.stats} />
+            <CombosTable stats={data.stats} />
           </>
         )}
 

@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
 import {
-  FORM_SQL, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validPlayerId, validTeam,
+  FORM_SQL, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validGameType, validPlayerId, validTeam,
 } from './queries.mjs'
 
 const app = express()
@@ -63,15 +63,22 @@ app.get('/api/teams/:team/players', async (req, res) => {
   }
 })
 
-// One player's last-10 form for every stat.
+// One player's last-10 form for every stat, for one game type (?type=regular-season, the default, or ?type=playoffs).
+// A player with no games of that type: 404 for the regular season (not a player we list), {"none":true} for the playoffs
+// (many players have not played one, and the page says so in plain words).
 app.get('/api/players/:id/form', async (req, res) => {
   const { id } = req.params
+  const type = req.query.type ?? 'regular-season'
   if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
   try {
-    const form = await cached(`form:${id}`, FIVE_MINUTES, async () =>
-      mapForm(await sql(FORM_SQL, [{ name: 'id', value: id, type: 'BIGINT' }])),
+    const form = await cached(`form:${id}:${type}`, FIVE_MINUTES, async () =>
+      mapForm(await sql(FORM_SQL, [{ name: 'id', value: id, type: 'BIGINT' }, { name: 'gt', value: type, type: 'STRING' }])),
     )
-    if (form === null) return res.status(404).json({ ok: false, error: 'No such player.' })
+    if (form === null) {
+      if (type === 'playoffs') return res.json({ none: true, gameType: type })
+      return res.status(404).json({ ok: false, error: 'No such player.' })
+    }
     res.json(form)
   } catch (err) {
     fail(res, 'form', err)

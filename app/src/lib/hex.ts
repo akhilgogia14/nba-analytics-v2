@@ -54,7 +54,7 @@ export function lightenToContrast(color: string, against: string, min: number): 
 export type ChartPalette = {
   /** The five fills, darkest to brightest, as plain hex colours. */
   ramp: string[]
-  /** The ring around a game that reached the season mean. */
+  /** The ring around a game that reached the season average. */
   ring: string
   /** The brightest fill; also used for the chart's selected pills and tooltip. */
   top: string
@@ -119,7 +119,7 @@ export function playedValues(games: SeasonGame[], stat: GridStat): number[] {
   return out
 }
 
-/** The season mean for a stat over the games he played, across the given grids (null if he played none). */
+/** The season average for a stat over the games he played, across the given grids (null if he played none). */
 export function seasonMean(grids: SeasonGrid[], stat: GridStat): number | null {
   const v = grids.flatMap((g) => playedValues(g.games, stat))
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null
@@ -137,7 +137,7 @@ export function binFor(value: number, min: number, max: number, bins = BINS): nu
   return Math.min(bins - 1, Math.max(0, Math.floor(((value - min) / (max - min)) * bins)))
 }
 
-/** Did he reach his season mean in this game? Only a played game with a value can. */
+/** Did he reach his season average in this game? Only a played game with a value can. */
 export function hitMean(value: number | null, mean: number | null): boolean {
   return value !== null && mean !== null && value >= mean - 1e-9
 }
@@ -180,10 +180,10 @@ export function hexTip(cell: Cell, stat: GridStat, mean: number | null): HexTip 
     const title = `No ${STAT_SHORT[stat]} figure · ${versus}`
     return { title, detail: where, label: `${title}. ${where}.` }
   }
-  const meanText = mean === null ? '' : ` · season mean ${f1(mean)}`
+  const meanText = mean === null ? '' : ` · season average ${f1(mean)}`
   const title = `${cell.value} ${STAT_SHORT[stat]}${cell.hit ? ' ✓' : ''} · ${versus}`
   const detail = `${where}${meanText}`
-  const verdict = mean === null ? '' : cell.hit ? ' At or above his season mean.' : ' Below his season mean.'
+  const verdict = mean === null ? '' : cell.hit ? ' At or above his season average.' : ' Below his season average.'
   return { title, detail, label: `${cell.value} ${STAT_NAMES[stat].toLowerCase()}, ${versus}. ${detail}.${verdict}` }
 }
 

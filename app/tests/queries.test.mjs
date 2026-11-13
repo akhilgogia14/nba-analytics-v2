@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  FORM_SQL, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validPlayerId, validTeam,
+  FORM_SQL, GAME_TYPES, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validGameType, validPlayerId,
+  validTeam,
 } from '../server/queries.mjs'
 
 test('validTeam accepts only three capital letters', () => {
@@ -22,14 +23,26 @@ test('validPlayerId accepts only digits, 1 to 12 long', () => {
 test('outside values only enter the SQL as named parameters', () => {
   assert.match(PLAYERS_SQL, /= :team\b/)
   assert.match(FORM_SQL, /= :id\b/)
+  assert.match(FORM_SQL, /game_type = :gt\b/)
   assert.doesNotMatch(TEAMS_SQL, /:\w+/)
   for (const s of [TEAMS_SQL, PLAYERS_SQL, FORM_SQL]) assert.doesNotMatch(s, /\$\{/)
 })
 
-test('every query reads regular-season rows only, so no figure blends in playoff games', () => {
-  for (const s of [TEAMS_SQL, PLAYERS_SQL, FORM_SQL]) assert.match(s, /game_type = 'regular-season'/)
+test('the team and player lists read regular-season rows (the current roster); the form reads exactly ONE game type', () => {
+  for (const s of [TEAMS_SQL, PLAYERS_SQL]) assert.match(s, /game_type = 'regular-season'/)
   assert.match(PLAYERS_SQL, /m\.game_type = p\.game_type/)  // minutes come from the same game type
   assert.doesNotMatch(FORM_SQL, /not_regular/)
+  // the form query is filtered to one game type by a parameter, never to a list, so no figure blends the two
+  assert.doesNotMatch(FORM_SQL, /game_type\s+(IN|<>|!=)/i)
+  assert.doesNotMatch(FORM_SQL, /'regular-season'|'playoffs'/)
+})
+
+test('validGameType accepts exactly the two game types the page toggles between', () => {
+  assert.deepEqual(GAME_TYPES, ['regular-season', 'playoffs'])
+  for (const ok of GAME_TYPES) assert.equal(validGameType(ok), true)
+  for (const bad of ['', 'play-in', 'nba-cup', 'Playoffs', 'playoffs ', "playoffs' OR 1=1 --", undefined, null, 5, ['playoffs']]) {
+    assert.equal(validGameType(bad), false, `should reject ${JSON.stringify(bad)}`)
+  }
 })
 
 test('FORM_SQL columns come back in the order mapForm reads them', () => {
