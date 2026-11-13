@@ -88,7 +88,7 @@ export type MeetingGame = {
   seasonLabel: string
   minutes: number | null
   stats: Record<'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl', number | null>
-  kind: 'this' | 'last' | 'older'
+  kind: 'this' | 'last'
 }
-/** A player against one opponent, newest game first. scope: season (7+ this season), filled (topped up from earlier seasons), earlier (none this season), none. */
+/** A player against one opponent, newest game first. scope: season (7+ this season), filled (topped up from last season), earlier (none this season, so last season's), none. */
 export type Meetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; currentSeason: string | null; games: MeetingGame[] }

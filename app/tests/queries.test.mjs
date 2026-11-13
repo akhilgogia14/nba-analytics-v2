@@ -254,7 +254,7 @@ test('previousSeasonLabel', () => {
 const meet = (id, date, season, current, pts = '20') => [id, date, 'NYK', 'BOS', 'true', season, '33', pts, '4', '5', '2', '0', '1', current, '2026-27']
 const ids = (o) => o.games.map((g) => g.id)
 
-test('mapMeetings: 7 or more meetings this season shows all of them and nothing from earlier', () => {
+test('mapMeetings: 7 or more meetings this season shows all of them and nothing from last season', () => {
   const rows = [...Array.from({ length: 8 }, (_, i) => meet(`c${8 - i}`, `2026-11-${20 - i}`, '2026-27', 'true')), meet('x', '2026-04-01', '2025-26', 'false')]
   const out = mapMeetings(rows)
   assert.equal(out.scope, 'season')
@@ -263,42 +263,50 @@ test('mapMeetings: 7 or more meetings this season shows all of them and nothing 
   assert.equal(out.currentSeason, '2026-27')
 })
 
-test('mapMeetings: fewer than 7 this season is topped up to 7 with the most recent earlier meetings, each marked', () => {
+test('mapMeetings: fewer than 7 this season is topped up with LAST SEASON only, newest first, each marked; older seasons are dropped', () => {
   const rows = [
     meet('c2', '2026-11-10', '2026-27', 'true', '31'), meet('c1', '2026-11-02', '2026-27', 'true'),
     meet('l3', '2026-04-01', '2025-26', 'false'), meet('l2', '2026-02-01', '2025-26', 'false'),
     meet('l1', '2025-12-01', '2025-26', 'false'), meet('o2', '2025-03-01', '2024-25', 'false'),
-    meet('o1', '2025-01-01', '2024-25', 'false'), meet('o0', '2024-01-01', '2023-24', 'false'),
+    meet('o1', '2025-01-01', '2024-25', 'false'),
   ]
   const out = mapMeetings(rows)
   assert.equal(MEETINGS_MIN, 7)
   assert.equal(out.scope, 'filled')
-  assert.deepEqual(ids(out), ['c2', 'c1', 'l3', 'l2', 'l1', 'o2', 'o1']) // 2 this season + 5 earlier = 7, newest first
-  assert.deepEqual(out.games.map((g) => g.kind), ['this', 'this', 'last', 'last', 'last', 'older', 'older'])
+  assert.deepEqual(ids(out), ['c2', 'c1', 'l3', 'l2', 'l1']) // 2 this season + all 3 of last season; nothing older
+  assert.deepEqual(out.games.map((g) => g.kind), ['this', 'this', 'last', 'last', 'last'])
   assert.deepEqual(out.games[0].stats, { pts: 31, reb: 4, ast: 5, fg3m: 2, blk: 0, stl: 1 })
   assert.deepEqual([out.games[0].isHome, out.games[0].team, out.games[0].opp], [true, 'NYK', 'BOS'])
 })
 
-test('mapMeetings: a fill that stays within last season is all marked last season', () => {
-  const out = mapMeetings([meet('c1', '2026-11-02', '2026-27', 'true'), ...Array.from({ length: 6 }, (_, i) => meet(`l${i}`, `2026-0${i + 1}-01`, '2025-26', 'false')).reverse()])
+test('mapMeetings: some meetings this season and none last season is just this season (no empty "fill")', () => {
+  const out = mapMeetings([meet('c2', '2026-11-10', '2026-27', 'true'), meet('c1', '2026-11-02', '2026-27', 'true'), meet('o1', '2025-01-01', '2024-25', 'false')])
+  assert.deepEqual([out.scope, ids(out)], ['season', ['c2', 'c1']])
+})
+
+test('mapMeetings: the fill stops at 7 in total', () => {
+  const rows = [meet('c1', '2026-11-02', '2026-27', 'true'), ...Array.from({ length: 9 }, (_, i) => meet(`l${9 - i}`, `2026-0${9 - i}-01`, '2025-26', 'false'))]
+  const out = mapMeetings(rows)
   assert.equal(out.games.length, 7)
   assert.deepEqual(out.games.map((g) => g.kind), ['this', 'last', 'last', 'last', 'last', 'last', 'last'])
 })
 
-test('mapMeetings: fewer meetings in total than 7 shows them all', () => {
-  const out = mapMeetings([meet('c1', '2026-11-02', '2026-27', 'true'), meet('l1', '2026-02-01', '2025-26', 'false')])
-  assert.deepEqual([out.scope, ids(out)], ['filled', ['c1', 'l1']])
-})
-
-test('mapMeetings: none this season gives the last 7, newest first, marked last season or older', () => {
-  const rows = Array.from({ length: 10 }, (_, i) => meet(`g${10 - i}`, `2025-0${(i % 9) + 1}-01`, i < 3 ? '2025-26' : '2024-25', 'false'))
+test('mapMeetings: none this season gives last season\'s meetings only (up to 7), marked last season', () => {
+  const rows = [
+    ...Array.from({ length: 9 }, (_, i) => meet(`l${9 - i}`, `2026-0${9 - i}-01`, '2025-26', 'false')),
+    meet('o1', '2025-01-01', '2024-25', 'false'),
+  ]
   const out = mapMeetings(rows)
   assert.equal(out.scope, 'earlier')
-  assert.deepEqual(ids(out), ['g10', 'g9', 'g8', 'g7', 'g6', 'g5', 'g4'])
-  assert.deepEqual(out.games.map((g) => g.kind), ['last', 'last', 'last', 'older', 'older', 'older', 'older'])
+  assert.deepEqual(ids(out), ['l9', 'l8', 'l7', 'l6', 'l5', 'l4', 'l3'])
+  assert.ok(out.games.every((g) => g.kind === 'last'))
 })
 
-test('mapMeetings: never met is scope none', () => {
+test('mapMeetings: only older meetings means none to show, but the season is still named', () => {
+  assert.deepEqual(mapMeetings([meet('o1', '2025-01-01', '2024-25', 'false')]), { scope: 'none', currentSeason: '2026-27', games: [] })
+})
+
+test('mapMeetings: never met is scope none with no season', () => {
   assert.deepEqual(mapMeetings([]), { scope: 'none', currentSeason: null, games: [] })
 })
 
