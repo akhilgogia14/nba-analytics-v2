@@ -1,7 +1,7 @@
 # Release 019: `team_form` and `player_form` split by game type (and the app follows)
 
 Date: 2026-11-13 (UTC; tables rebuilt 13:37 and 13:38, app redeployed 13:41)
-Branch / PR: `feat/form-by-game-type`, PR (number added after opening)
+Branch / PR: `feat/form-by-game-type`, PR #26
 Author: (Claude Code)
 
 ## What changed
@@ -22,7 +22,7 @@ The owner's rule: a regular-season game and a playoff game must never be blended
 - `player_game_log` still has rolling "prior last 10" columns that blend game types. Nothing reads them yet; they will matter for the back-tests (modeling) and need the same split then.
 
 ## How to verify
-- `.venv/bin/python -m pytest -q`: 91 passed at the time of the tables (hand-worked values for both tables, including: regular-season points 1..10 give p10 1.9 and p90 9.1; the separate playoff window of 11 and 12 gives mean 11.5; windows capped at 10 per type; a playoff window from an earlier season is labelled). `cd app && npm test`: 15 passed, type-check and build pass.
+- `.venv/bin/python -m pytest -q`: 86 passed (81 before this release) (hand-worked values for both tables, including: regular-season points 1..10 give p10 1.9 and p90 9.1; the separate playoff window of 11 and 12 gives mean 11.5; windows capped at 10 per type; a playoff window from an earlier season is labelled). `cd app && npm test`: 15 passed, type-check and build pass.
 - Real-data checks through Databricks Connect before writing anything (all gates pass on the real output; every deliberate break fired the right gate):
   - `team_form`: 20 breaks, including playoffs folded into regular season (56 facts rows flagged) and game types swapped.
   - `player_form`: 21 breaks, including playoffs folded in (1,036 facts, 1,771 stats, 347 shares rows flagged). One break (dropping a player's playoff rows) printed no failure at first because I picked a player with no playoff rows; with a player who has them (id 2544, 11 rows) the gate fired.
