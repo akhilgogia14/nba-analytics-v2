@@ -15,7 +15,8 @@ on a handful of rows.
 
 Columns: ids and labels (season_label like '2025-26'), the game (date, opponent, is_home), game_number and team_games
 (the game's place among the team's games of that type that season), played, minutes, pts, reb, ast, fg3m, blk, stl
-(NULL when not played), other_teams (comma-separated tricodes, NULL if the player had one team that season and type).
+(NULL when not played), other_teams (comma-separated tricodes, NULL if the player had one team that season and type), and the
+rest of the box score (started, fgm, fga, fg3a, ftm, fta, oreb, dreb, tov, pf, plus_minus; NULL when not played).
 Runs only inside Databricks (it needs a Spark session); transform() is pure DataFrame code and is unit-tested locally.
 """
 from pyspark.sql import DataFrame, Window
@@ -28,10 +29,13 @@ TEAM_TABLE = "workspace.nba_v2_silver.team_game"
 # Box-score numbers that make a game "played" when above 0 (plus/minus is handled separately: any non-zero value).
 PLAYED_STATS = ["pts", "reb", "ast", "fg3m", "blk", "stl", "tov", "pf", "fgm", "fga", "fg3a", "ftm", "fta", "oreb", "dreb"]
 STAT_COLUMNS = ["minutes", "pts", "reb", "ast", "fg3m", "blk", "stl"]
+# The rest of the box score (added 2026-11-13 for the fuller box-score table), also NULL when not played:
+# started, field goals / three-point / free-throw makes and attempts, offensive and defensive rebounds, turnovers, fouls, plus/minus.
+BOX_COLUMNS = ["started", "fgm", "fga", "fg3a", "ftm", "fta", "oreb", "dreb", "tov", "pf", "plus_minus"]
 OUTPUT_COLUMNS = [
     "person_id", "team_id", "game_id", "game_date", "season", "season_label", "game_type", "player_name",
     "team_tricode", "opponent_team_id", "opponent_tricode", "is_home", "game_number", "team_games",
-    "played", *STAT_COLUMNS, "other_teams",
+    "played", *STAT_COLUMNS, "other_teams", *BOX_COLUMNS,
 ]
 GROUP = ["person_id", "team_id", "season", "season_type"]
 TEAM_GROUP = ["team_id", "season", "season_type"]
@@ -64,7 +68,7 @@ def transform(players: DataFrame, teams: DataFrame) -> DataFrame:
     names = (players.withColumn("rn", F.row_number().over(
                  Window.partitionBy("person_id").orderBy(F.col("game_date").desc(), F.col("game_id").desc())))
              .filter("rn = 1").select("person_id", "player_name"))
-    box = played.select("game_id", "person_id", "team_id", F.lit(True).alias("played"), *STAT_COLUMNS)
+    box = played.select("game_id", "person_id", "team_id", F.lit(True).alias("played"), *STAT_COLUMNS, *BOX_COLUMNS)
 
     grid = (groups.join(schedule, TEAM_GROUP)
             .join(box, ["game_id", "person_id", "team_id"], "left")

@@ -39,7 +39,7 @@ UNION ALL SELECT 'grids_differ_from_silver', count(*) FROM
   WHERE t.person_id IS NULL OR s.person_id IS NULL
 UNION ALL SELECT 'stats_differ_from_silver', count(*) FROM {T} t
   LEFT JOIN workspace.nba_v2_silver.player_game p ON p.game_id = t.game_id AND p.person_id = t.person_id AND p.team_id = t.team_id
-  WHERE (t.played AND (NOT (t.minutes <=> p.minutes) OR NOT (t.pts <=> p.pts) OR NOT (t.reb <=> p.reb) OR NOT (t.ast <=> p.ast) OR NOT (t.fg3m <=> p.fg3m) OR NOT (t.blk <=> p.blk) OR NOT (t.stl <=> p.stl))) OR (NOT t.played AND (t.minutes IS NOT NULL OR t.pts IS NOT NULL OR t.reb IS NOT NULL OR t.ast IS NOT NULL OR t.fg3m IS NOT NULL OR t.blk IS NOT NULL OR t.stl IS NOT NULL))
+  WHERE (t.played AND (NOT (t.minutes <=> p.minutes) OR NOT (t.pts <=> p.pts) OR NOT (t.reb <=> p.reb) OR NOT (t.ast <=> p.ast) OR NOT (t.fg3m <=> p.fg3m) OR NOT (t.blk <=> p.blk) OR NOT (t.stl <=> p.stl) OR NOT (t.started <=> p.started) OR NOT (t.fgm <=> p.fgm) OR NOT (t.fga <=> p.fga) OR NOT (t.fg3a <=> p.fg3a) OR NOT (t.ftm <=> p.ftm) OR NOT (t.fta <=> p.fta) OR NOT (t.oreb <=> p.oreb) OR NOT (t.dreb <=> p.dreb) OR NOT (t.tov <=> p.tov) OR NOT (t.pf <=> p.pf) OR NOT (t.plus_minus <=> p.plus_minus))) OR (NOT t.played AND (t.minutes IS NOT NULL OR t.pts IS NOT NULL OR t.reb IS NOT NULL OR t.ast IS NOT NULL OR t.fg3m IS NOT NULL OR t.blk IS NOT NULL OR t.stl IS NOT NULL OR t.started IS NOT NULL OR t.fgm IS NOT NULL OR t.fga IS NOT NULL OR t.fg3a IS NOT NULL OR t.ftm IS NOT NULL OR t.fta IS NOT NULL OR t.oreb IS NOT NULL OR t.dreb IS NOT NULL OR t.tov IS NOT NULL OR t.pf IS NOT NULL OR t.plus_minus IS NOT NULL))
 UNION ALL SELECT 'other_teams_wrong', count(*) FROM {T} t
   LEFT JOIN (SELECT a.person_id, a.team_id, a.season, a.season_type,
                     nullif(array_join(array_sort(collect_set(CASE WHEN b.team_id <> a.team_id THEN b.tri END)), ','), '') AS other
@@ -58,3 +58,11 @@ UNION ALL SELECT 'player_name_wrong', count(*) FROM {T} t
   LEFT JOIN (SELECT person_id, max_by(player_name, struct(game_date, game_id)) AS nm FROM workspace.nba_v2_silver.player_game GROUP BY person_id) n
     ON n.person_id = t.person_id
   WHERE n.person_id IS NULL OR NOT (t.player_name <=> n.nm)
+-- Basketball arithmetic on the table's own numbers (checked on all 144,822 real silver rows first: 0 violations of any rule).
+-- Makes never exceed attempts, threes are part of field goals, the rebound split adds up, and points are 2 x field goals made
+-- plus threes made plus free throws made. This catches a wrong or misaligned column that the comparison with silver alone would
+-- not (it holds for any correct source row, whatever the PySpark code does).
+UNION ALL SELECT 'box_score_arithmetic_wrong', count_if(played AND (fgm > fga OR fg3m > fg3a OR ftm > fta OR fg3m > fgm OR fg3a > fga
+     OR oreb + dreb <> reb OR pts <> 2 * fgm + fg3m + ftm OR fgm < 0 OR fga < 0 OR ftm < 0 OR fta < 0 OR tov < 0 OR pf < 0 OR oreb < 0 OR dreb < 0)) FROM {T}
+UNION ALL SELECT 'played_row_missing_box_score', count_if(played AND (started IS NULL OR fgm IS NULL OR fga IS NULL OR fg3a IS NULL OR ftm IS NULL
+     OR fta IS NULL OR oreb IS NULL OR dreb IS NULL OR tov IS NULL OR pf IS NULL OR plus_minus IS NULL)) FROM {T}
