@@ -28,6 +28,9 @@ This file is loaded automatically each session. Keep it short and current.
 - New gold tables are written in PySpark as "Python tables" (`scripts/gold_<name>.py` with `build(spark)`, an entry with `"python"` in `TABLES`). Their gates and warnings stay SQL and recompute the answer independently of the PySpark code. Existing SQL tables are not converted.
 - Every table, SQL or PySpark, ships with gates, warnings, tests, and corrupted-copy checks that prove the gates fire.
 
+## Deploy
+- The app deploys itself: `.github/workflows/deploy-app.yml` runs on every merge to `main` that touches `app/`, twice a day (Free Edition stops an app ~24h after its last deploy), and on demand. Merging is the owner's approval to deploy. Check the run before saying the app is live.
+
 ## Git
 - Work on a branch. Open a pull request. The owner merges. Never push directly to `main` (the first bootstrap commit is already done).
 - Run `git fetch` before saying anything about branch or PR state.
