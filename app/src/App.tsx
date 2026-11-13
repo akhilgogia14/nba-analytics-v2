@@ -255,7 +255,7 @@ export default function App() {
                 The season chart could not load: {seasonError}
               </div>
             ) : (
-              <SeasonGrid key={playerId} season={season} accent={look.vars['--accent'] ?? THEME['--accent']} />
+              <SeasonGrid key={playerId} season={season} team={team} />
             )}
 
             <CombosTable stats={form.stats} />

@@ -1,10 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  BINS, BIN_STRENGTH, COLUMNS, REGULAR_SEASON_GAMES, binColor, binFor, buildCells, hexLayout, hexPoints, hexTip, hitMean,
-  playedSummary, seasonMean, valueRange,
+  BINS, CARD_BASE, COLUMNS, LOW_VS_MISSED, MISSED, REGULAR_SEASON_GAMES, RING_CONTRAST, TOP_CONTRAST, binFor, buildCells, chartPalette, chroma, hexLayout, hexPoints, hexTip, hitMean,
+  lightenToContrast, playedSummary, seasonMean, valueRange,
 } from '../src/lib/hex.ts'
-import { luminance } from '../src/lib/teams.ts'
+import { TEAM_STYLES, contrast, luminance } from '../src/lib/teams.ts'
+import { blend } from '../src/lib/teamTheme.ts'
 
 // A made-up 6-game team season. Rebounds by game: 4, (missed), 8, 12, (missed), 6. He played 4 of 6.
 const game = (n, played, reb, over = {}) => ({
@@ -66,13 +67,59 @@ test('binFor: five steps from his lowest to his highest game; all-equal games us
   assert.equal(binFor(3, 4, 12), 0) // out of range stays inside 0..4
 })
 
-test('binColor: plain hex colours, each step lighter than the last, and none is the missed-game grey', () => {
-  const cols = [0, 1, 2, 3, 4].map((b) => binColor('#4F9DFF', b))
-  for (const c of cols) assert.match(c, /^#[0-9a-f]{6}$/)
-  for (let i = 1; i < cols.length; i++) assert.ok(luminance(cols[i]) > luminance(cols[i - 1]), `step ${i} lighter than step ${i - 1}`)
-  assert.equal(cols[4], '#4f9dff') // the top step is the team colour itself
-  assert.notEqual(cols[0], '#171b25')
-  assert.deepEqual(BIN_STRENGTH.length, BINS)
+test('chroma: white, grey and black have none; saturated colours have a lot', () => {
+  for (const c of ['#ffffff', '#000000', '#808080', '#C4CED4']) assert.ok(chroma(c) < 0.12, c)
+  for (const c of ['#006BB6', '#CE1141', '#552583', '#F58426']) assert.ok(chroma(c) > 0.3, c)
+  assert.equal(chroma('#ff0000'), 1)
+})
+
+test('lightenToContrast: untouched if already enough; otherwise white mixed in only as needed', () => {
+  assert.equal(lightenToContrast('#ffffff', CARD_BASE, 6), '#ffffff')
+  assert.equal(lightenToContrast('#5eead4', CARD_BASE, 6), '#5eead4') // already bright enough
+  const dark = lightenToContrast('#1d1160', CARD_BASE, 6) // a deep navy-purple
+  assert.ok(contrast(dark, CARD_BASE) >= 6)
+  assert.ok(contrast(blend('#ffffff', '#1d1160', 0.02 * Math.max(0, Math.round(((parseInt(dark.slice(1, 3), 16) - 0x1d) / (255 - 0x1d)) * 50) - 1)), CARD_BASE) < 6) // one notch less would not have been enough
+  assert.equal(blend('#ffffff', '#000000', 0.5), '#808080') // hand-worked: half white over black
+  assert.ok(contrast(lightenToContrast('#000000', CARD_BASE, 4.5), CARD_BASE) >= 4.5)
+})
+
+test('chartPalette: Knicks fills come from their blue and the ring from their orange', () => {
+  const p = chartPalette('NYK')
+  assert.equal(p.ramp.length, BINS)
+  for (const c of [...p.ramp, p.ring, p.top]) assert.match(c, /^#[0-9a-f]{6}$/)
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(p.top.slice(i, i + 2), 16))
+  assert.ok(b > r, 'the top fill is blue-ish') // #006BB6 lightened is still bluer than it is red
+  const [rr, , rb] = [1, 3, 5].map((i) => parseInt(p.ring.slice(i, i + 2), 16))
+  assert.ok(rr > rb, 'the ring is orange-ish')
+  assert.equal(p.ramp[BINS - 1], p.top)
+  void g
+})
+
+test('chartPalette: a white or silver primary hands the fills to the secondary colour; two plain colours give a white ring', () => {
+  // Brooklyn is white and black, San Antonio silver and black: no colour at all, so the ring is white
+  for (const t of ['BKN', 'SAS']) assert.equal(chartPalette(t).ring, '#ffffff')
+  // ...and the fills run up to the LIGHT colour (white or silver), never to a lightened black
+  for (const t of ['BKN', 'SAS']) assert.ok(luminance(chartPalette(t).top) > 0.5, `${t} top is light`)
+  // Houston is silver and red: the red (the only real colour) drives the fills, so they are red-ish
+  const hou = chartPalette('HOU').top
+  const [r, g] = [1, 3].map((i) => parseInt(hou.slice(i, i + 2), 16))
+  assert.ok(r > g, 'Houston fills are red-ish')
+  // an unknown team gets the page's own teal accent
+  assert.equal(chartPalette('ZZZ').top, '#5eead4')
+  assert.equal(chartPalette(null).top, '#5eead4')
+})
+
+test('chartPalette, all 30 teams: steps get lighter, the darkest is clearly not the missed-game grey, the top and the ring show on the card', () => {
+  const teams = Object.keys(TEAM_STYLES)
+  assert.equal(teams.length, 30)
+  for (const t of teams) {
+    const p = chartPalette(t)
+    for (let i = 1; i < p.ramp.length; i++) assert.ok(luminance(p.ramp[i]) > luminance(p.ramp[i - 1]), `${t}: step ${i} lighter than step ${i - 1}`)
+    assert.ok(contrast(p.ramp[0], MISSED.fill) >= LOW_VS_MISSED - 0.01, `${t}: darkest step vs a missed game = ${contrast(p.ramp[0], MISSED.fill).toFixed(2)}`)
+    assert.ok(contrast(p.top, CARD_BASE) >= TOP_CONTRAST - 0.01, `${t}: top vs card`)
+    assert.ok(contrast(p.ring, CARD_BASE) >= RING_CONTRAST - 0.01, `${t}: ring vs card = ${contrast(p.ring, CARD_BASE).toFixed(2)}`)
+    for (let i = 1; i < p.ramp.length; i++) assert.ok(contrast(p.ramp[i], p.ramp[i - 1]) >= 1.1, `${t}: neighbouring steps can be told apart`)
+  }
 })
 
 test('hitMean: at or above the mean counts; nothing counts without a value or a mean', () => {
