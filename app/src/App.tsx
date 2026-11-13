@@ -1,8 +1,10 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { fetchForm, fetchPlayers, fetchTeams } from './api.ts'
+import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { CARD_STATS, LABELS, daysSince, shortDate, teamLabel } from './lib/format.ts'
+import { teamLook } from './lib/teamTheme.ts'
 import { THEMES, THEME_ORDER, loadTheme, saveTheme, type ThemeKey } from './lib/themes.ts'
 import type { Form, PlayerOption, Team } from './types.ts'
 
@@ -103,9 +105,12 @@ export default function App() {
     if (idle > 7) notices.push(`${p.name} last played on ${shortDate(p.lastGameDate)}, ${idle} days ago.`)
   }
 
+  // The chosen team tints the top of the page and sets the accent colours; the theme still owns everything else.
+  const look = teamLook(team, themeKey, THEMES[themeKey].vars['--accent'])
   const rootStyle = {
     ...THEMES[themeKey].vars,
-    background: 'var(--bg)',
+    ...look.vars,
+    background: look.wash === 'none' ? 'var(--bg)' : `${look.wash}, var(--bg)`,
     color: 'var(--text)',
     fontFamily: 'Inter, system-ui, sans-serif',
   } as CSSProperties
@@ -197,15 +202,23 @@ export default function App() {
               <div className="text-xs font-semibold tracking-widest text-(--accent) uppercase">
                 Player level · last {p.l10Games} games
               </div>
-              <div className="flex flex-wrap items-baseline gap-3.5">
-                <h1 className="m-0 text-[44px] leading-[1.1] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
-                  {p.name}
-                </h1>
-                <span className="text-[15px] font-semibold text-(--accent)">{p.team}</span>
-              </div>
-              <div className="text-[15px] text-(--muted)">
-                Last {p.l10Games} games played · {shortDate(p.l10FirstDate)} to {shortDate(p.lastGameDate)} ·{' '}
-                {p.totalGames} games in the data
+              <div className="flex flex-wrap items-center gap-5">
+                <PlayerAvatar name={p.name} playerId={playerId} />
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center gap-3.5">
+                    <h1 className="m-0 text-[44px] leading-[1.1] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
+                      {p.name}
+                    </h1>
+                    <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-(--accent)">
+                      <TeamBadge abbrev={p.team} size={36} />
+                      {p.team}
+                    </span>
+                  </div>
+                  <div className="text-[15px] text-(--muted)">
+                    Last {p.l10Games} games played · {shortDate(p.l10FirstDate)} to {shortDate(p.lastGameDate)} ·{' '}
+                    {p.totalGames} games in the data
+                  </div>
+                </div>
               </div>
               {notices.map((n) => (
                 <div
@@ -219,7 +232,7 @@ export default function App() {
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
               {CARD_STATS.map((key) => (
-                <Scorecard key={key} label={LABELS[key]} stat={form.stats[key]} />
+                <Scorecard key={key} label={LABELS[key]} stat={form.stats[key]} games={p.l10Games} />
               ))}
             </div>
 
