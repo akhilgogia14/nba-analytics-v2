@@ -99,18 +99,22 @@ export default function App() {
     if (idle > 7) notices.push(`${p.name} last played on ${shortDate(p.lastGameDate)}, ${idle} days ago.`)
   }
 
-  // The chosen team tints the top of the page and sets the accent colours; the theme still owns everything else.
+  // The chosen team lights the page like a spotlight and sets the accent colours; the theme owns everything else.
   const look = teamLook(team)
   const rootStyle = {
     ...THEME,
     ...look.vars,
-    background: look.wash === 'none' ? 'var(--bg)' : `${look.wash}, var(--bg)`,
+    background: 'var(--bg)',
     color: 'var(--text)',
     fontFamily: 'Inter, system-ui, sans-serif',
   } as CSSProperties
 
   return (
-    <div className="min-h-screen px-6 pt-8 pb-14" style={rootStyle}>
+    <div className="relative isolate min-h-screen px-6 pt-8 pb-14" style={rootStyle}>
+      {/* The spotlight: fixed to the screen so it stays put while the page scrolls, behind everything else. */}
+      {look.wash !== 'none' && (
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10" style={{ backgroundImage: look.wash }} />
+      )}
       <div className="mx-auto flex max-w-[1200px] flex-col gap-[26px]">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-col gap-0.5">

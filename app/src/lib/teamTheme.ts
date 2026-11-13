@@ -8,10 +8,13 @@ import { THEME } from './themes.ts'
  */
 export const THEME_BASE = { bg: '#070A12', panel: '#10131B', text: '#EAF0FF', muted: '#9FB0CC' }
 
-/** How strongly the team colour tints the top of the page (0 to 1). Teams that cannot take it are lowered. */
+/** How bright the main cone of light is at its centre (0 to 1). Teams that cannot take it are lowered. */
 export const WASH_TARGET = 0.32
-/** The tint fades out over this many pixels. */
-export const WASH_HEIGHT = 560
+/** The glow where the light starts and the thin core of the beam, as a share of the cone's brightness. */
+export const GLOW_SHARE = 0.8
+export const CORE_SHARE = 0.5
+/** The see-through cards lighten whatever is behind them by about this much (white at this strength). */
+export const CARD_LIFT = 0.06
 /** Normal and muted text must keep at least this contrast on the tinted page (4.5 is the usual rule). */
 export const MIN_TEXT_CONTRAST = 4.5
 /** Smallest contrast an accent colour must have against both the page and the cards (normal text: 4.5). */
@@ -28,23 +31,38 @@ export function blend(top: string, under: string, alpha: number): string {
   return '#' + a.map((v, i) => Math.round(v * alpha + b[i] * (1 - alpha)).toString(16).padStart(2, '0')).join('')
 }
 
-/** The muted text colour used under a team tint, lighter than the plain one. A plain hex value. */
+/** The muted text colour used under the spotlight, lighter than the plain one. A plain hex value. */
 export function mutedUnderTint(): string {
   return blend(THEME_BASE.text, THEME_BASE.muted, MUTED_TOWARD_TEXT)
 }
 
-/** The strongest tint (up to the target) under which both text colours keep the minimum contrast; 0 if none does. */
-export function maxReadableAlpha(primary: string, bg: string, texts: string[], target: number): number {
+/** Lays a colour over another at a strength, rounded the way the CSS writes it. */
+const alphaOf = (a: number) => Math.round(a * 100) / 100
+
+/**
+ * The colour at the brightest point of the beam (top, middle): the cone, the glow and the core all stack there.
+ * It is a worst case: everywhere else the light is dimmer. `lift` adds the card's own lightening on top.
+ */
+export function beamPeak(primary: string, secondary: string, scale: number, lift = true): string {
+  let c = blend(primary, THEME_BASE.bg, alphaOf(scale))
+  c = blend(primary, c, alphaOf(scale * GLOW_SHARE))
+  c = blend(secondary, c, alphaOf(scale * CORE_SHARE))
+  return lift ? blend('#ffffff', c, CARD_LIFT) : c
+}
+
+/** The strongest scale (up to the target) under which both text colours stay readable at the peak; 0 if none does. */
+export function maxReadableScale(peakAt: (scale: number) => string, texts: string[], target: number): number {
   for (let a = target; a > 0; a = Math.round((a - 0.01) * 100) / 100) {
-    const under = blend(primary, bg, a)
+    const under = peakAt(a)
     if (texts.every((c) => contrast(c, under) >= MIN_TEXT_CONTRAST)) return a
   }
   return 0
 }
 
-/** The tint strength used for this team. */
+/** The cone brightness used for this team. */
 export function washAlphaFor(abbrev: string | null | undefined): number {
-  return maxReadableAlpha(teamStyle(abbrev).primary, THEME_BASE.bg, [THEME_BASE.text, mutedUnderTint()], WASH_TARGET)
+  const s = teamStyle(abbrev)
+  return maxReadableScale((a) => beamPeak(s.primary, s.secondary, a), [THEME_BASE.text, mutedUnderTint()], WASH_TARGET)
 }
 
 const KNOWN = new Set(
@@ -63,7 +81,7 @@ export function accentFor(abbrev: string | null | undefined): string {
 }
 
 export type TeamLook = {
-  /** A CSS background layer to put on top of the theme's own background. */
+  /** The CSS background of the spotlight layer, drawn behind the page content. */
   wash: string
   /** CSS variables that replace the theme's accent colours. */
   vars: Record<string, string>
@@ -74,10 +92,20 @@ export const NO_LOOK: TeamLook = { wash: 'none', vars: {} }
 
 export function teamLook(abbrev: string | null | undefined): TeamLook {
   if (!isKnown(abbrev)) return NO_LOOK
-  const [r, g, b] = rgb(teamStyle(abbrev).primary)
+  const s = teamStyle(abbrev)
+  const [pr, pg, pb] = rgb(s.primary)
+  const [sr, sg, sb] = rgb(s.secondary)
+  const a = washAlphaFor(abbrev)
   const accent = accentFor(abbrev)
+  const P = (alpha: number) => `rgba(${pr}, ${pg}, ${pb}, ${alphaOf(alpha)})`
+  const S = (alpha: number) => `rgba(${sr}, ${sg}, ${sb}, ${alphaOf(alpha)})`
   return {
-    wash: `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, ${washAlphaFor(abbrev)}) 0px, rgba(${r}, ${g}, ${b}, 0) ${WASH_HEIGHT}px)`,
+    // Light from a point just above the top-middle, pointing straight down (180deg). Each cone fades out at its edges.
+    wash: [
+      `conic-gradient(from 170deg at 50% -4%, transparent 0deg, ${S(0)} 2deg, ${S(a * CORE_SHARE)} 10deg, ${S(0)} 18deg, transparent 20deg)`,
+      `radial-gradient(ellipse 38% 280px at 50% 0%, ${P(a * GLOW_SHARE)}, ${P(0)})`,
+      `conic-gradient(from 154deg at 50% -4%, transparent 0deg, ${P(0)} 4deg, ${P(a)} 26deg, ${P(0)} 48deg, transparent 52deg)`,
+    ].join(', '),
     vars: {
       '--muted': mutedUnderTint(),
       '--accent': accent,
