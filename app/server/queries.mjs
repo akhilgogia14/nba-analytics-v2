@@ -1,7 +1,8 @@
 // The three questions the page asks, as fixed SQL plus small pure helpers (easy to test).
-// Everything reads workspace.nba_v2_gold.player_form, the only table the app identity may read.
-// player_form has one row per player, game type and stat; this page shows regular-season rows only, so a
-// regular-season figure is never blended with playoff games.
+// The form figures read workspace.nba_v2_gold.player_form: one row per player, game type and stat; the scorecards show
+// regular-season rows only, so a regular-season figure is never blended with playoff games.
+// The season chart reads workspace.nba_v2_gold.player_season_games (see SEASON_SQL). The app identity has SELECT on
+// those two gold tables and nothing else.
 
 const TABLE = 'workspace.nba_v2_gold.player_form'
 const GAME_TYPE = 'regular-season'
@@ -38,6 +39,20 @@ export const FORM_SQL = `
          l10_share_0, l10_share_1, l10_share_2, l10_share_3plus, season_mean
   FROM ${TABLE} WHERE person_id = :id AND game_type = '${GAME_TYPE}'`
 
+// One player's season grid: every game of each team he played for, in the latest season he has games in, for each of
+// regular season and playoffs. Rows carry their game type, and the page draws one grid per (game type, team), so a
+// regular-season game and a playoff game are never in the same grid or the same average.
+const SEASON_TABLE = 'workspace.nba_v2_gold.player_season_games'
+export const SEASON_GAME_TYPES = ['regular-season', 'playoffs']
+export const SEASON_SQL = `
+  SELECT t.game_type, t.season_label, t.team_id, t.team_tricode, t.other_teams, t.team_games, t.game_number,
+         t.game_id, t.game_date, t.opponent_tricode, t.is_home, t.played, t.minutes,
+         t.pts, t.reb, t.ast, t.fg3m, t.blk, t.stl
+  FROM ${SEASON_TABLE} t
+  WHERE t.person_id = :id AND t.game_type IN ('regular-season', 'playoffs')
+    AND t.season = (SELECT max(x.season) FROM ${SEASON_TABLE} x WHERE x.person_id = t.person_id AND x.game_type = t.game_type)
+  ORDER BY t.game_type, t.team_id, t.game_number`
+
 // ---- row mapping (the warehouse returns every value as a string or null) ----
 const num = (v) => (v === null || v === undefined ? null : Number(v))
 
@@ -69,4 +84,34 @@ export function mapForm(rows) {
     },
     stats,
   }
+}
+
+const bool = (v) => v === true || v === 'true'
+
+// Rows come in SEASON_SQL's column order. Returns { grids: [...] }: one grid per game type and team, regular season
+// first, and within a game type the team he played for most recently first. A player with no games gets no grids.
+export function mapSeason(rows) {
+  const grids = new Map()
+  for (const r of rows) {
+    const key = `${r[0]}|${r[2]}`
+    if (!grids.has(key)) {
+      grids.set(key, {
+        gameType: r[0], seasonLabel: r[1], teamId: r[2], team: r[3], otherTeams: r[4] ?? null, teamGames: num(r[5]), games: [],
+      })
+    }
+    grids.get(key).games.push({
+      id: r[7], n: num(r[6]), date: r[8], opp: r[9], isHome: bool(r[10]), played: bool(r[11]), minutes: num(r[12]),
+      stats: { pts: num(r[13]), reb: num(r[14]), ast: num(r[15]), fg3m: num(r[16]), blk: num(r[17]), stl: num(r[18]) },
+    })
+  }
+  const lastPlayed = (g) => g.games.reduce((d, x) => (x.played && x.date > d ? x.date : d), '')
+  const out = [...grids.values()]
+  out.sort(
+    (a, b) =>
+      SEASON_GAME_TYPES.indexOf(a.gameType) - SEASON_GAME_TYPES.indexOf(b.gameType) ||
+      (lastPlayed(b) > lastPlayed(a) ? 1 : lastPlayed(b) < lastPlayed(a) ? -1 : 0) ||
+      Number(a.teamId) - Number(b.teamId),
+  )
+  for (const g of out) g.games.sort((a, b) => a.n - b.n)
+  return { grids: out }
 }

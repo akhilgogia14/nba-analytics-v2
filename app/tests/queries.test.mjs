@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  FORM_SQL, PLAYERS_SQL, TEAMS_SQL, mapForm, mapPlayers, mapTeams, validPlayerId, validTeam,
+  FORM_SQL, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validPlayerId, validTeam,
 } from '../server/queries.mjs'
 
 test('validTeam accepts only three capital letters', () => {
@@ -78,4 +78,64 @@ test('mapForm maps one player: names, windows, numbers, shares', () => {
 
 test('mapForm returns null for an unknown player', () => {
   assert.equal(mapForm([]), null)
+})
+
+// ---- the season chart ----
+
+test('SEASON_SQL: named parameter only, one table, regular season and playoffs only, latest season PER game type', () => {
+  assert.match(SEASON_SQL, /= :id\b/)
+  assert.doesNotMatch(SEASON_SQL, /\$\{/)
+  assert.match(SEASON_SQL, /FROM workspace\.nba_v2_gold\.player_season_games t/)
+  assert.match(SEASON_SQL, /t\.game_type IN \('regular-season', 'playoffs'\)/)
+  // the newest season is looked up inside the same game type, so a playoff grid can be from an earlier season
+  assert.match(SEASON_SQL, /x\.person_id = t\.person_id AND x\.game_type = t\.game_type/)
+  assert.doesNotMatch(SEASON_SQL, /player_form|player_game_log/)
+})
+
+test('SEASON_SQL columns come back in the order mapSeason reads them', () => {
+  const cols = SEASON_SQL.match(/SELECT([\s\S]*?)FROM/)[1].split(',').map((c) => c.trim().replace(/^t\./, ''))
+  assert.deepEqual(cols, [
+    'game_type', 'season_label', 'team_id', 'team_tricode', 'other_teams', 'team_games', 'game_number', 'game_id',
+    'game_date', 'opponent_tricode', 'is_home', 'played', 'minutes', 'pts', 'reb', 'ast', 'fg3m', 'blk', 'stl',
+  ])
+})
+
+// Row order is the SELECT order in SEASON_SQL: type, label, team id, tricode, other teams, team games, game number,
+// game id, date, opponent, home, played, minutes, pts, reb, ast, fg3m, blk, stl. The warehouse sends strings.
+const srow = (type, tid, tri, other, n, date, opp, home, played, st = [null, null, null, null, null, null]) =>
+  [type, '2025-26', tid, tri, other, '3', String(n), `${tid}-${n}`, date, opp, home, played, played === 'true' ? '30.5' : null, ...st]
+
+test('mapSeason: one grid per game type and team, regular season first, most recent team first, games in order', () => {
+  const rows = [
+    // a traded player: team 1 (AAA) early in the season, team 2 (BBB) later; rows arrive ordered by type, team, game
+    srow('playoffs', '2', 'BBB', null, 1, '2026-04-20', 'CCC', 'true', 'true', ['10', '4', '2', '1', '0', '3']),
+    srow('regular-season', '1', 'AAA', 'BBB', 1, '2026-01-02', 'CCC', 'true', 'true', ['20', '5', '3', '2', '1', '0']),
+    srow('regular-season', '1', 'AAA', 'BBB', 2, '2026-01-04', 'DDD', 'false', 'false'),
+    srow('regular-season', '1', 'AAA', 'BBB', 3, '2026-01-06', 'EEE', 'true', 'false'),
+    srow('regular-season', '2', 'BBB', 'AAA', 2, '2026-02-04', 'DDD', 'false', 'true', ['8', '1', '1', '0', '0', '0']),
+    srow('regular-season', '2', 'BBB', 'AAA', 1, '2026-02-02', 'CCC', 'true', 'false'),
+  ]
+  const { grids } = mapSeason(rows)
+  assert.deepEqual(grids.map((g) => `${g.gameType}:${g.team}`), ['regular-season:BBB', 'regular-season:AAA', 'playoffs:BBB'])
+  const [b, a, po] = grids
+  assert.equal(a.otherTeams, 'BBB')
+  assert.equal(b.otherTeams, 'AAA')
+  assert.equal(po.otherTeams, null)
+  assert.equal(b.teamGames, 3)
+  assert.equal(a.seasonLabel, '2025-26')
+  assert.deepEqual(b.games.map((g) => g.n), [1, 2]) // sorted by game number although they arrived 2, 1
+  assert.deepEqual(a.games.map((g) => [g.n, g.played, g.isHome]), [[1, true, true], [2, false, false], [3, false, true]])
+  assert.deepEqual(a.games[0], {
+    id: '1-1', n: 1, date: '2026-01-02', opp: 'CCC', isHome: true, played: true, minutes: 30.5,
+    stats: { pts: 20, reb: 5, ast: 3, fg3m: 2, blk: 1, stl: 0 },
+  })
+  assert.deepEqual(a.games[1].stats, { pts: null, reb: null, ast: null, fg3m: null, blk: null, stl: null }) // missed: empty, not 0
+  assert.equal(a.games[1].minutes, null)
+})
+
+test('mapSeason: a player with no games gets no grids; real booleans work too', () => {
+  assert.deepEqual(mapSeason([]), { grids: [] })
+  const g = mapSeason([srow('regular-season', '1', 'AAA', null, 1, '2026-01-02', 'CCC', true, true, ['1', '2', '3', '4', '5', '6'])]).grids[0]
+  assert.equal(g.games[0].isHome, true)
+  assert.equal(g.games[0].played, true)
 })

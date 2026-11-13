@@ -1,12 +1,13 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchForm, fetchPlayers, fetchTeams } from './api.ts'
+import { fetchForm, fetchPlayers, fetchSeason, fetchTeams } from './api.ts'
 import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
+import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, daysSince, shortDate, teamLabel } from './lib/format.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { Form, PlayerOption, Team } from './types.ts'
+import type { Form, PlayerOption, Season, Team } from './types.ts'
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -22,6 +23,8 @@ export default function App() {
   const [players, setPlayers] = useState<PlayerOption[] | null>(null)
   const [playerId, setPlayerId] = useState('')
   const [form, setForm] = useState<Form | null>(null)
+  const [season, setSeason] = useState<Season | null>(null)
+  const [seasonError, setSeasonError] = useState('')
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0) // bumped by "Try again"
 
@@ -31,15 +34,20 @@ export default function App() {
     setPlayers(null)
     setPlayerId('')
     setForm(null)
+    setSeason(null)
+    setSeasonError('')
     setError('')
   }
   function choosePlayer(id: string) {
     setPlayerId(id)
     setForm(null)
+    setSeason(null)
+    setSeasonError('')
     setError('')
   }
   function tryAgain() {
     setError('')
+    setSeasonError('')
     setAttempt((n) => n + 1)
   }
 
@@ -81,6 +89,18 @@ export default function App() {
     fetchForm(playerId)
       .then((f) => !cancelled && setForm(f))
       .catch((e) => !cancelled && setError(errorText(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [playerId, attempt])
+
+  // 4. The chosen player's season grid. A failure here only affects the season panel, not the rest of the page.
+  useEffect(() => {
+    if (!playerId) return
+    let cancelled = false
+    fetchSeason(playerId)
+      .then((s) => !cancelled && setSeason(s))
+      .catch((e) => !cancelled && setSeasonError(errorText(e)))
     return () => {
       cancelled = true
     }
@@ -229,6 +249,14 @@ export default function App() {
                 lowest to highest game
               </span>
             </div>
+
+            {seasonError ? (
+              <div className="rounded-xl border border-(--warnBorder) bg-(--warnBg) px-4 py-3 text-sm text-(--warnText)" role="alert">
+                The season chart could not load: {seasonError}
+              </div>
+            ) : (
+              <SeasonGrid key={playerId} season={season} accent={look.vars['--accent'] ?? THEME['--accent']} />
+            )}
 
             <CombosTable stats={form.stats} />
           </>
