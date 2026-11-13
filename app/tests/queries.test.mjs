@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  FORM_SQL, GAMES_SQL, GAMES_WINDOW, MEETINGS_LIMIT, MEETINGS_MIN, MEETINGS_SQL, GAME_TYPES, PLAYERS_SQL, PLAYOFF_PLAYERS_SQL, PLAYOFF_TEAMS_SQL, SEASON_SQL, TEAMS_SQL, mapForm,
-  mapGames, mapMeetings, mapPlayers, previousSeasonLabel, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType, validPlayerId, validTeam,
+  FORM_SQL, GAMELOG_SQL, GAMELOG_WINDOW, GAMES_SQL, GAMES_WINDOW, MEETINGS_LIMIT, MEETINGS_MIN, MEETINGS_SQL, GAME_TYPES, PLAYERS_SQL, PLAYOFF_PLAYERS_SQL, PLAYOFF_TEAMS_SQL, SEASON_SQL, TEAMS_SQL, mapForm,
+  mapGameLog, mapGames, mapMeetings, mapPlayers, previousSeasonLabel, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType, validPlayerId, validTeam,
 } from '../server/queries.mjs'
 
 test('validTeam accepts only three capital letters', () => {
@@ -317,4 +317,26 @@ test('mapMeetings: a gap stays null and the warehouse\'s string booleans convert
   assert.equal(g.minutes, null)
   assert.equal(g.stats.reb, null)
   assert.equal(g.stats.pts, 12)
+})
+
+// ---- the box-score table: the last 15 games, newest first ----
+
+test('GAMELOG_SQL is the games query with a 15-game window', () => {
+  assert.equal(GAMELOG_WINDOW, 15)
+  assert.match(GAMELOG_SQL, /LIMIT 15$/)
+  assert.equal(GAMELOG_SQL.replace(/LIMIT 15$/, 'LIMIT 10'), GAMES_SQL) // nothing else differs, so the same columns and rules
+  assert.match(GAMELOG_SQL, /AND played\b/)
+  assert.match(GAMELOG_SQL, /ORDER BY game_date DESC, game_id DESC/)
+})
+
+test('mapGameLog: keeps newest first (the opposite of mapGames) and converts values', () => {
+  const rows = [
+    ['g3', '2026-11-11', 'BOS', 'false', '2026-27', '36.5', '31', '4', '6', '3', '0', '2'],
+    ['g2', '2026-11-09', 'MIA', 'true', '2026-27', '30', '22', '5', '7', '2', '1', null],
+  ]
+  const { games } = mapGameLog(rows)
+  assert.deepEqual(games.map((g) => g.id), ['g3', 'g2'])
+  assert.deepEqual([games[0].opp, games[0].isHome, games[0].minutes, games[0].stats.pts], ['BOS', false, 36.5, 31])
+  assert.equal(games[1].stats.stl, null)
+  assert.deepEqual(mapGameLog([]), { games: [] })
 })

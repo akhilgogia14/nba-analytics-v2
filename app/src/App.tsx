@@ -1,11 +1,13 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchForm, fetchMeetings, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
+import { fetchForm, fetchLog, fetchMeetings, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
 import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
+import { GameLog } from './components/GameLog.tsx'
 import { MeetingsPanel } from './components/Meetings.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
+import { LOG_VIEWS, type LogView } from './lib/gamelog.ts'
 import { GAME_TYPE_OPTIONS, formNotices, gamesWord } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
@@ -13,7 +15,7 @@ import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { TEAM_IDS, readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { FormResult, GameType, Meetings, PlayerOption, Recent, Season, Team } from './types.ts'
+import type { FormResult, GameType, Meetings, PlayerOption, Recent, RecentGame, Season, Team } from './types.ts'
 
 const ALL_TEAMS = Object.keys(TEAM_IDS).sort()
 
@@ -34,6 +36,9 @@ export default function App() {
   const [gameType, setGameType] = useState<GameType>('regular-season') // the page's one toggle
   const [season, setSeason] = useState<Season | null>(null)
   const [recent, setRecent] = useState<Recent | null>(null) // the games behind the lines under the scorecards
+  const [view, setView] = useState<LogView>('log') // box scores (default) or the six average cards
+  const [log, setLog] = useState<RecentGame[] | null>(null) // the last 15 games for the box-score table
+  const [logError, setLogError] = useState('')
   const [opp, setOpp] = useState('') // the opponent chosen in the meetings panel
   const [meetings, setMeetings] = useState<Meetings | null>(null)
   const [meetingsError, setMeetingsError] = useState('')
@@ -50,6 +55,8 @@ export default function App() {
     setRecent(null)
     setMeetings(null)
     setMeetingsError('')
+    setLog(null)
+    setLogError('')
     setSeason(null)
     setSeasonError('')
     setError('')
@@ -60,6 +67,8 @@ export default function App() {
     setRecent(null)
     setMeetings(null)
     setMeetingsError('')
+    setLog(null)
+    setLogError('')
     setSeason(null)
     setSeasonError('')
     setError('')
@@ -75,6 +84,8 @@ export default function App() {
     setRecent(null)
     setMeetings(null)
     setMeetingsError('')
+    setLog(null)
+    setLogError('')
     setError('')
   }
   function chooseOpp(code: string) {
@@ -142,6 +153,18 @@ export default function App() {
     fetchRecent(playerId, gameType)
       .then((r) => !cancelled && setRecent(r))
       .catch(() => !cancelled && setRecent({ games: [] }))
+    return () => {
+      cancelled = true
+    }
+  }, [playerId, players, gameType, attempt])
+
+  // 3b2. The last 15 games for the box-score table. Only that table is affected if this fails.
+  useEffect(() => {
+    if (!playerId || !players?.some((pl) => pl.id === playerId)) return
+    let cancelled = false
+    fetchLog(playerId, gameType)
+      .then((r) => !cancelled && setLog(r.games))
+      .catch((e) => !cancelled && setLogError(errorText(e)))
     return () => {
       cancelled = true
     }
@@ -318,30 +341,44 @@ export default function App() {
               ))}
             </section>
 
-            <div className="cards grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
-              {CARD_STATS.map((key) => (
-                <Scorecard key={key} label={LABELS[key]} stat={data.stats[key]} statKey={key} games={p.l10Games} seasonLabel={p.seasonLabel} recent={recent?.games ?? null} />
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="View">
+              {LOG_VIEWS.map((v) => (
+                <button key={v.key} type="button" aria-pressed={v.key === view} className={pillClass} style={pillStyle(v.key === view)} onClick={() => setView(v.key)}>
+                  {v.label}
+                </button>
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-5 text-[13px] text-(--muted)">
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block size-3.5 rounded-full bg-(--dot)" />
-                average of these games
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-[18px] w-[3px] bg-(--median)" />
-                median (the middle game)
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-3 w-7 rounded-md bg-(--band)" />
-                middle 80% of games
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-0.5 w-7 bg-(--whisker)" />
-                lowest to highest game
-              </span>
-            </div>
+            {view === 'log' ? (
+              <GameLog games={log} error={logError} gamesWord={words} />
+            ) : (
+              <div className="cards grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
+                {CARD_STATS.map((key) => (
+                  <Scorecard key={key} label={LABELS[key]} stat={data.stats[key]} statKey={key} games={p.l10Games} seasonLabel={p.seasonLabel} recent={recent?.games ?? null} />
+                ))}
+              </div>
+            )}
+
+            {view === 'cards' && (
+              <div className="flex flex-wrap items-center gap-5 text-[13px] text-(--muted)">
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block size-3.5 rounded-full bg-(--dot)" />
+                  average of these games
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-[18px] w-[3px] bg-(--median)" />
+                  median (the middle game)
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-3 w-7 rounded-md bg-(--band)" />
+                  middle 80% of games
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-0.5 w-7 bg-(--whisker)" />
+                  lowest to highest game
+                </span>
+              </div>
+            )}
 
             {seasonError ? (
               <div className="rounded-xl border border-(--warnBorder) bg-(--warnBg) px-4 py-3 text-sm text-(--warnText)" role="alert">
