@@ -18,6 +18,9 @@ The owner asked for a GitHub action to deploy, which also ends the manual restar
 - The workflow file parses (checked with Ruby's YAML reader); the commands in it were run by hand against the real app earlier in this project, and its check on the deploy result was tried on a good and a bad sample (exit 0 and 1).
 - **Not tested on GitHub yet:** a workflow can only run from `main`, so its first real run is the one triggered by merging this pull request. That first run will also deploy the current `main`, which includes pull request #38 (meetings fill from last season only). If it fails, the live app stays as it is; open the run page and tell me.
 
+## First run (2026-11-13): failed safely, then fixed
+- The run triggered by merging the pull request failed at the "Check the app" step: `npm test` passed the folder `tests/` to `node --test`, which GitHub's Node 24 reads as a file name (MODULE_NOT_FOUND). Nothing was deployed and the live app was unchanged, which is what the check is for. Fix: the test command is now `node --test tests/*.test.mjs` (same 97 tests, 97 pass locally). The next merge to `main` that touches `app/` reruns it; the result is recorded below once seen.
+
 ## Files added or changed
 - `.github/workflows/deploy-app.yml` (new), `CLAUDE.md` (one line), `docs/NEXT.md`.
 
