@@ -6,16 +6,18 @@ import type { ApiStat } from '../types.ts'
 
 const pct = (n: number) => `${n}%`
 
-/** The small bubble. It sits above the mark it describes; the colours come from the theme's button pair. */
+/**
+ * The small bubble: just the name and the number. It sits above the mark it describes; the colours come from the
+ * theme's button pair. The longer explanation stays in the hit area's aria-label, for screen readers only.
+ */
 function Bubble({ tip }: { tip: Tip }) {
   return (
     <div
       role="tooltip"
-      className="pointer-events-none absolute bottom-full z-20 mb-2 w-56 -translate-x-1/2 rounded-lg px-3 py-2 text-xs leading-snug shadow-lg"
+      className="pointer-events-none absolute bottom-full z-20 mb-2 -translate-x-1/2 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap shadow-lg"
       style={{ left: `${tip.left}%`, background: 'var(--pillOn)', color: 'var(--pillOnText)' }}
     >
-      <div className="font-semibold">{tip.title}</div>
-      <div className="mt-0.5 opacity-90">{tip.text}</div>
+      {tip.title}
     </div>
   )
 }
