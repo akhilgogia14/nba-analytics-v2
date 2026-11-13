@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { LOG_COLUMNS, LOG_VIEWS, SPLITS, averageRow, logNote, madeAtt, mean, signed, splitValue } from '../src/lib/gamelog.ts'
+import { DEFAULT_VIEW, LOG_COLUMNS, LOG_VIEWS, SPLITS, averageRow, logNote, madeAtt, mean, signed, splitValue } from '../src/lib/gamelog.ts'
 
 const game = (id, pts, over = {}, box = {}) => ({
   id, date: '2026-11-11', opp: 'CLE', isHome: true, seasonLabel: '2026-27', minutes: 30,
@@ -9,8 +9,10 @@ const game = (id, pts, over = {}, box = {}) => ({
   ...over,
 })
 
-test('the view switch has box scores first (the page default) and averages', () => {
-  assert.deepEqual(LOG_VIEWS.map((v) => v.key), ['log', 'cards'])
+test('the view switch has averages first (the page default) and box scores', () => {
+  assert.deepEqual(LOG_VIEWS.map((v) => v.key), ['cards', 'log'])
+  assert.deepEqual(LOG_VIEWS.map((v) => v.label), ['Averages', 'Box scores'])
+  assert.equal(DEFAULT_VIEW, 'cards')
   assert.deepEqual(LOG_COLUMNS.map(([, l]) => l), ['REB', 'AST', 'STL', 'BLK'])
   assert.deepEqual(SPLITS.map(([, , l]) => l), ['FG', '3P', 'FT'])
 })
