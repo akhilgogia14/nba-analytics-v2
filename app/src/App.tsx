@@ -5,7 +5,7 @@ import { CombosTable } from './components/CombosTable.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { CARD_STATS, LABELS, daysSince, shortDate, teamLabel } from './lib/format.ts'
 import { teamLook } from './lib/teamTheme.ts'
-import { THEMES, THEME_ORDER, loadTheme, saveTheme, type ThemeKey } from './lib/themes.ts'
+import { THEME } from './lib/themes.ts'
 import type { Form, PlayerOption, Team } from './types.ts'
 
 const selectClass =
@@ -17,7 +17,6 @@ function errorText(e: unknown): string {
 }
 
 export default function App() {
-  const [themeKey, setThemeKey] = useState<ThemeKey>(loadTheme)
   const [teams, setTeams] = useState<Team[] | null>(null)
   const [team, setTeam] = useState('')
   const [players, setPlayers] = useState<PlayerOption[] | null>(null)
@@ -87,11 +86,6 @@ export default function App() {
     }
   }, [playerId, attempt])
 
-  function pickTheme(key: ThemeKey) {
-    setThemeKey(key)
-    saveTheme(key)
-  }
-
   const p = form?.player
   const notices: string[] = []
   if (p) {
@@ -105,18 +99,22 @@ export default function App() {
     if (idle > 7) notices.push(`${p.name} last played on ${shortDate(p.lastGameDate)}, ${idle} days ago.`)
   }
 
-  // The chosen team tints the top of the page and sets the accent colours; the theme still owns everything else.
-  const look = teamLook(team, themeKey, THEMES[themeKey].vars['--accent'])
+  // The chosen team lights the page like a spotlight and sets the accent colours; the theme owns everything else.
+  const look = teamLook(team)
   const rootStyle = {
-    ...THEMES[themeKey].vars,
+    ...THEME,
     ...look.vars,
-    background: look.wash === 'none' ? 'var(--bg)' : `${look.wash}, var(--bg)`,
+    background: 'var(--bg)',
     color: 'var(--text)',
     fontFamily: 'Inter, system-ui, sans-serif',
   } as CSSProperties
 
   return (
-    <div className="min-h-screen px-6 pt-8 pb-14" style={rootStyle}>
+    <div className="relative isolate min-h-screen px-6 pt-8 pb-14" style={rootStyle}>
+      {/* The spotlight: fixed to the screen so it stays put while the page scrolls, behind everything else. */}
+      {look.wash !== 'none' && (
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10" style={{ backgroundImage: look.wash }} />
+      )}
       <div className="mx-auto flex max-w-[1200px] flex-col gap-[26px]">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-col gap-0.5">
@@ -124,29 +122,6 @@ export default function App() {
               Player form
             </div>
             <div className="text-[13px] text-(--muted)">Recent games as a range, not a single number</div>
-          </div>
-          <div role="group" aria-label="Colour theme" className="flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-xs text-(--muted)">Theme</span>
-            {THEME_ORDER.map((key) => {
-              const on = key === themeKey
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => pickTheme(key)}
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-semibold"
-                  style={{
-                    borderColor: on ? 'var(--pillOn)' : 'var(--pillBorder)',
-                    background: on ? 'var(--pillOn)' : 'var(--pill)',
-                    color: on ? 'var(--pillOnText)' : 'var(--pillText)',
-                  }}
-                >
-                  <span className="inline-block size-2.5 rounded-full" style={{ background: THEMES[key].swatch }} />
-                  {THEMES[key].name}
-                </button>
-              )
-            })}
           </div>
         </header>
 
