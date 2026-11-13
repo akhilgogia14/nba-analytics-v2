@@ -4,6 +4,7 @@ import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { CARD_STATS, LABELS, daysSince, shortDate, teamLabel } from './lib/format.ts'
+import { teamLook } from './lib/teamTheme.ts'
 import { THEMES, THEME_ORDER, loadTheme, saveTheme, type ThemeKey } from './lib/themes.ts'
 import type { Form, PlayerOption, Team } from './types.ts'
 
@@ -104,9 +105,12 @@ export default function App() {
     if (idle > 7) notices.push(`${p.name} last played on ${shortDate(p.lastGameDate)}, ${idle} days ago.`)
   }
 
+  // The chosen team tints the top of the page and sets the accent colours; the theme still owns everything else.
+  const look = teamLook(team, themeKey, THEMES[themeKey].vars['--accent'])
   const rootStyle = {
     ...THEMES[themeKey].vars,
-    background: 'var(--bg)',
+    ...look.vars,
+    background: look.wash === 'none' ? 'var(--bg)' : `${look.wash}, var(--bg)`,
     color: 'var(--text)',
     fontFamily: 'Inter, system-ui, sans-serif',
   } as CSSProperties
