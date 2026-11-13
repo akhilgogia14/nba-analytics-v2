@@ -51,7 +51,8 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 - **13c. The Player form page: DONE 2026-11-13** (release note 015). Team and Player dropdowns, six scorecards with range bars, combined-stats table, four themes (Paper default). Reads only `player_form`. Deployed; not yet looked at in a browser by anyone (owner's first look is the real test).
 - **13d-1. Plan agreed with the owner** (three gold tables, PySpark, opponent figures labelled by year and regular season or playoffs; build order team_form, team_vs_opponent, player_vs_opponent, one PR each).
 - **13d-2. `team_form`: DONE 2026-11-13** (release note 016). 240 rows, 10 gates, 15 corrupted-copy checks, built by the daily job. Not read by the app yet (needs its own SELECT grant).
-- **13d-3. `team_vs_opponent`** (next), then **13d-4. `player_vs_opponent`**, then app endpoints and the Opponent dropdown and team view, each new table with its own SELECT grant. Also open: reach players who have not played this season; auto-deploy from GitHub.
+- **13d-3. `team_vs_opponent`: DONE 2026-11-13** (release note 017). 51,984 rows, 11 gates, 20 corrupted-copy checks, built by the daily job. Not read by the app yet (needs its own SELECT grant).
+- **13d-4. `player_vs_opponent`** (next), then app endpoints and the Opponent dropdown and team view, each new table with its own SELECT grant. Also open: reach players who have not played this season; auto-deploy from GitHub.
 - Later: the real Player form page from the Scorecards design; team form and player-vs-opponent gold tables; D1 export and the always-on host.
 
 

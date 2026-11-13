@@ -50,6 +50,7 @@ TABLES = {
     # where a Spark session exists (the Databricks job); the command line skips it.
     "player_form": {"key": ["person_id", "stat"], "layer": "gold", "python": "gold_player_form"},
     "team_form": {"key": ["team_id", "stat"], "layer": "gold", "python": "gold_team_form"},
+    "team_vs_opponent": {"key": ["team_id", "opponent_team_id", "scope", "scope_value", "stat"], "layer": "gold", "python": "gold_team_vs_opponent"},
 }
 MAX_DELETE_FRACTION = 0.01
 MAX_EXAMPLES = 5
