@@ -1,7 +1,7 @@
 # Release 021: one dark theme with a team-colour spotlight
 
 Date: 2026-11-13 (UTC)
-Branch / PR: `feat/dark-spotlight`, PR (number added after opening)
+Branch / PR: `feat/dark-spotlight`, PR #29
 Author: (Claude Code)
 
 ## What changed
