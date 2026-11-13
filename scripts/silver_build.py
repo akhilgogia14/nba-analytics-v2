@@ -48,8 +48,8 @@ TABLES = {
     "player_game_log": {"key": ["game_id", "person_id"], "layer": "gold"},
     # A "python" table is written in PySpark: scripts/<module>.py has build(spark) returning a DataFrame. It runs only
     # where a Spark session exists (the Databricks job); the command line skips it.
-    "player_form": {"key": ["person_id", "stat"], "layer": "gold", "python": "gold_player_form"},
-    "team_form": {"key": ["team_id", "stat"], "layer": "gold", "python": "gold_team_form"},
+    "player_form": {"key": ["person_id", "game_type", "stat"], "layer": "gold", "python": "gold_player_form"},
+    "team_form": {"key": ["team_id", "game_type", "stat"], "layer": "gold", "python": "gold_team_form"},
     "team_vs_opponent": {"key": ["team_id", "opponent_team_id", "season_label", "game_type", "stat"], "layer": "gold", "python": "gold_team_vs_opponent"},
 }
 MAX_DELETE_FRACTION = 0.01
