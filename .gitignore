@@ -24,3 +24,7 @@ tmp/
 
 # macOS
 .DS_Store
+
+# Front-end app (rebuilt from package-lock.json)
+node_modules/
+app/dist/
