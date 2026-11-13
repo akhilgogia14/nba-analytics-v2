@@ -17,3 +17,5 @@ export const fetchRecent = (id: string, type: GameType) =>
   getJson<Recent>(`/api/players/${encodeURIComponent(id)}/games?type=${type}`)
 export const fetchMeetings = (id: string, type: GameType, opp: string) =>
   getJson<Meetings>(`/api/players/${encodeURIComponent(id)}/meetings?type=${type}&opp=${encodeURIComponent(opp)}`)
+export const fetchLog = (id: string, type: GameType) =>
+  getJson<{ games: import('./types.ts').RecentGame[] }>(`/api/players/${encodeURIComponent(id)}/log?type=${type}`)

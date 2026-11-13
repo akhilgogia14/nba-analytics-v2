@@ -84,12 +84,16 @@ export const playersSqlFor = (gameType) => (gameType === 'playoffs' ? PLAYOFF_PL
 // Read from player_season_games (every row there is one game of one team; `played` is the owner's rule: any minutes, any stat
 // above 0, or a non-zero plus/minus). Newest first here; mapGames turns it around so the line runs oldest to newest.
 export const GAMES_WINDOW = 10
-export const GAMES_SQL = `
+const lastGamesSql = (n) => `
   SELECT game_id, game_date, opponent_tricode, is_home, season_label, minutes, pts, reb, ast, fg3m, blk, stl
   FROM ${SEASON_TABLE}
   WHERE person_id = :id AND game_type = :gt AND played
   ORDER BY game_date DESC, game_id DESC
-  LIMIT ${GAMES_WINDOW}`
+  LIMIT ${n}`
+export const GAMES_SQL = lastGamesSql(GAMES_WINDOW)
+// The box-score table: the same query with a longer window (his last 15 games played of one game type, any opponent).
+export const GAMELOG_WINDOW = 15
+export const GAMELOG_SQL = lastGamesSql(GAMELOG_WINDOW)
 
 // A player's games against ONE opponent, of one game type. The page shows every meeting from the current season (the newest
 // season that has any game of this type). If there are fewer than MEETINGS_MIN, it is filled up to MEETINGS_MIN with his
@@ -212,4 +216,10 @@ export function mapMeetings(rows) {
   if (thisSeason.length > 0) return { scope: 'filled', currentSeason, games: [...thisSeason, ...last.slice(0, MEETINGS_MIN - thisSeason.length)] }
   if (last.length > 0) return { scope: 'earlier', currentSeason, games: last.slice(0, MEETINGS_MIN) }
   return { scope: 'none', currentSeason, games: [] }
+}
+
+// Rows come in GAMELOG_SQL's column order (the same as GAMES_SQL), newest first. Returns { games: [...] } newest first, the order
+// of a box-score table; no games gives an empty list.
+export function mapGameLog(rows) {
+  return { games: mapGames(rows).games.reverse() }
 }

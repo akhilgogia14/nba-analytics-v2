@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
 import {
-  FORM_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGames, mapMeetings, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
+  FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validPlayerId, validTeam,
 } from './queries.mjs'
 
@@ -106,6 +106,24 @@ app.get('/api/players/:id/games', async (req, res) => {
     )
   } catch (err) {
     fail(res, 'games', err)
+  }
+})
+
+// One player's last 15 games played of one game type (?type=regular-season, the default, or ?type=playoffs), newest first:
+// the box-score table. Any opponent.
+app.get('/api/players/:id/log', async (req, res) => {
+  const { id } = req.params
+  const type = req.query.type ?? 'regular-season'
+  if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+  try {
+    res.json(
+      await cached(`log:${id}:${type}`, FIVE_MINUTES, async () =>
+        mapGameLog(await sql(GAMELOG_SQL, [{ name: 'id', value: id, type: 'BIGINT' }, { name: 'gt', value: type, type: 'STRING' }])),
+      ),
+    )
+  } catch (err) {
+    fail(res, 'log', err)
   }
 })
 
