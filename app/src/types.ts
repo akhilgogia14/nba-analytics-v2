@@ -28,3 +28,33 @@ export type PlayerInfo = {
 }
 
 export type Form = { player: PlayerInfo; stats: Record<string, ApiStat> }
+
+/** The six stats the season chart can show. */
+export type GridStat = 'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl'
+
+/** One team game in a player's season grid. `played` is false for a game he missed (its stats are then null). */
+export type SeasonGame = {
+  id: string
+  /** The game's place among the team's games of this type that season (1 = first). */
+  n: number
+  date: string
+  opp: string
+  isHome: boolean
+  played: boolean
+  minutes: number | null
+  stats: Record<GridStat, number | null>
+}
+
+/** All of one team's games of one game type in one season. A traded player has one grid per team. */
+export type SeasonGrid = {
+  gameType: 'regular-season' | 'playoffs'
+  seasonLabel: string
+  teamId: string
+  team: string
+  /** Tricodes of the player's other teams that season and game type, e.g. "WAS" or "AAA,BBB"; null if he had one. */
+  otherTeams: string | null
+  teamGames: number
+  games: SeasonGame[]
+}
+
+export type Season = { grids: SeasonGrid[] }

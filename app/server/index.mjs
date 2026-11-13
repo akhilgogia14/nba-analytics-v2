@@ -2,7 +2,9 @@ import express from 'express'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
-import { FORM_SQL, PLAYERS_SQL, TEAMS_SQL, mapForm, mapPlayers, mapTeams, validPlayerId, validTeam } from './queries.mjs'
+import {
+  FORM_SQL, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validPlayerId, validTeam,
+} from './queries.mjs'
 
 const app = express()
 const dist = fileURLToPath(new URL('../dist', import.meta.url))
@@ -73,6 +75,21 @@ app.get('/api/players/:id/form', async (req, res) => {
     res.json(form)
   } catch (err) {
     fail(res, 'form', err)
+  }
+})
+
+// One player's season grid (every game of his team or teams, played or not) for the latest season. No grids = empty list.
+app.get('/api/players/:id/season', async (req, res) => {
+  const { id } = req.params
+  if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
+  try {
+    res.json(
+      await cached(`season:${id}`, FIVE_MINUTES, async () =>
+        mapSeason(await sql(SEASON_SQL, [{ name: 'id', value: id, type: 'BIGINT' }])),
+      ),
+    )
+  } catch (err) {
+    fail(res, 'season', err)
   }
 })
 
