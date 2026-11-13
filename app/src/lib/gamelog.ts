@@ -46,7 +46,7 @@ export function averageRow(games: LogGame[]) {
     pts: col((g) => g.stats.pts),
     stats: Object.fromEntries(LOG_COLUMNS.map(([k]) => [k, col((g) => g.stats[k])])) as Record<(typeof LOG_COLUMNS)[number][0], number | null>,
     splits: SPLITS.map(([made, att]) => madeAtt(col((g) => splitValue(g, made)), col((g) => splitValue(g, att)))),
-    oreb: col((g) => g.box.oreb), dreb: col((g) => g.box.dreb), tov: col((g) => g.box.tov), pf: col((g) => g.box.pf),
+    tov: col((g) => g.box.tov), pf: col((g) => g.box.pf),
     plusMinus: col((g) => g.box.plusMinus),
     started: games.filter((g) => g.box.started === true).length,
   }
