@@ -1,4 +1,4 @@
-import type { FormResult, GameType, Meetings, PlayerOption, Recent, Season, Team } from './types.ts'
+import type { FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, Season, Team } from './types.ts'
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -18,4 +18,4 @@ export const fetchRecent = (id: string, type: GameType) =>
 export const fetchMeetings = (id: string, type: GameType, opp: string) =>
   getJson<Meetings>(`/api/players/${encodeURIComponent(id)}/meetings?type=${type}&opp=${encodeURIComponent(opp)}`)
 export const fetchLog = (id: string, type: GameType) =>
-  getJson<{ games: import('./types.ts').RecentGame[] }>(`/api/players/${encodeURIComponent(id)}/log?type=${type}`)
+  getJson<{ games: LogGame[] }>(`/api/players/${encodeURIComponent(id)}/log?type=${type}`)

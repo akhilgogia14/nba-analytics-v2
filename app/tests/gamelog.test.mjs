@@ -1,35 +1,72 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { LOG_COLUMNS, LOG_VIEWS, averageRow, logNote } from '../src/lib/gamelog.ts'
+import { LOG_COLUMNS, LOG_VIEWS, SPLITS, averageRow, logNote, madeAtt, mean, signed, splitValue } from '../src/lib/gamelog.ts'
 
-const game = (id, pts, over = {}) => ({
+const game = (id, pts, over = {}, box = {}) => ({
   id, date: '2026-11-11', opp: 'CLE', isHome: true, seasonLabel: '2026-27', minutes: 30,
-  stats: { pts, reb: 4, ast: 6, fg3m: 2, blk: 0, stl: 1 }, ...over,
+  stats: { pts, reb: 4, ast: 6, fg3m: 2, blk: 0, stl: 1 },
+  box: { started: true, fgm: 8, fga: 16, fg3a: 5, ftm: 2, fta: 2, oreb: 1, dreb: 3, tov: 2, pf: 3, plusMinus: 5, ...box },
+  ...over,
 })
 
 test('the view switch has box scores first (the page default) and averages', () => {
   assert.deepEqual(LOG_VIEWS.map((v) => v.key), ['log', 'cards'])
-  assert.deepEqual(LOG_COLUMNS.map(([, l]) => l), ['PTS', 'REB', 'AST', '3PM', 'BLK', 'STL'])
+  assert.deepEqual(LOG_COLUMNS.map(([, l]) => l), ['REB', 'AST', 'STL', 'BLK'])
+  assert.deepEqual(SPLITS.map(([, , l]) => l), ['FG', '3P', 'FT'])
 })
 
-test('averageRow: mean of each column to one decimal', () => {
-  const avg = averageRow([game('a', 20, { minutes: 30 }), game('b', 25, { minutes: 35 }), game('c', 28, { minutes: 33 })])
-  assert.equal(avg.stats.pts, 24.3) // 73 / 3
-  assert.equal(avg.minutes, 32.7) // 98 / 3
+test('madeAtt and signed: made-attempted, a dash for a gap, plus/minus with its sign', () => {
+  assert.equal(madeAtt(7, 15), '7-15')
+  assert.equal(madeAtt(0, 0), '0-0')
+  assert.equal(madeAtt(null, 15), '–')
+  assert.equal(signed(5), '+5')
+  assert.equal(signed(-20), '-20')
+  assert.equal(signed(0), '0')
+  assert.equal(signed(null), '–')
+})
+
+test('splitValue: threes made come from the six stats, the other shooting numbers from the fuller box score', () => {
+  const g = game('a', 20)
+  assert.equal(splitValue(g, 'fg3m'), 2)
+  assert.equal(splitValue(g, 'fga'), 16)
+  assert.equal(splitValue(g, 'fta'), 2)
+})
+
+test('mean: to one decimal, a gap is skipped, all gaps is null', () => {
+  assert.equal(mean([20, 25, 28]), 24.3)
+  assert.equal(mean([20, null, 30]), 25)
+  assert.equal(mean([null]), null)
+  assert.equal(mean([]), null)
+})
+
+test('averageRow: every column, makes and attempts averaged separately, plus the number of starts', () => {
+  const avg = averageRow([
+    game('a', 20, {}, { fgm: 7, fga: 15, plusMinus: -6 }),
+    game('b', 25, { minutes: 36 }, { fgm: 9, fga: 18, started: false, plusMinus: 10 }),
+    game('c', 28, {}, { fgm: 8, fga: 17, plusMinus: 2 }),
+  ])
+  assert.equal(avg.pts, 24.3)
+  assert.equal(avg.minutes, 32)
+  assert.equal(avg.splits[0], '8-16.7') // 24/3 and 50/3
+  assert.equal(avg.splits[1], '2-5') // threes made 2 and attempted 5 in every game
+  assert.equal(avg.plusMinus, 2) // (-6 + 10 + 2) / 3
+  assert.equal(avg.started, 2)
   assert.equal(avg.stats.reb, 4)
+  assert.equal(avg.tov, 2)
 })
 
-test('averageRow: a missing figure is skipped, not counted as zero; all missing is null', () => {
-  const avg = averageRow([game('a', 20), game('b', null, { minutes: null }), game('c', 30)])
-  assert.equal(avg.stats.pts, 25)
+test('averageRow: a missing figure is skipped, not counted as zero', () => {
+  const avg = averageRow([game('a', 20, {}, { tov: null, plusMinus: null }), game('b', null, { minutes: null }, { tov: 4, plusMinus: null })])
+  assert.equal(avg.pts, 20)
   assert.equal(avg.minutes, 30)
-  assert.deepEqual(averageRow([game('a', null, { minutes: null })]).stats.pts, null)
-  assert.equal(averageRow([]).stats.pts, null)
+  assert.equal(avg.tov, 4)
+  assert.equal(avg.plusMinus, null)
+  assert.equal(averageRow([]).pts, null)
 })
 
-test('averageRow equals the card number for the same games (first 10 of 15 average like the card)', () => {
+test('averageRow equals the card number for the same games (the first 10 average like the card)', () => {
   const games = Array.from({ length: 10 }, (_, i) => game(`g${i}`, 20 + i))
-  assert.equal(averageRow(games).stats.pts, 24.5)
+  assert.equal(averageRow(games).pts, 24.5)
 })
 
 test('logNote: counts the games, says newest first and any opponent, and names the seasons when it spans two', () => {

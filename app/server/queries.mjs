@@ -91,9 +91,17 @@ const lastGamesSql = (n) => `
   ORDER BY game_date DESC, game_id DESC
   LIMIT ${n}`
 export const GAMES_SQL = lastGamesSql(GAMES_WINDOW)
-// The box-score table: the same query with a longer window (his last 15 games played of one game type, any opponent).
+// The box-score table: his last 15 games played of one game type, any opponent, with the fuller box score (the 11 extra columns
+// gold player_season_games carries for played games). The first 12 columns are exactly GAMES_SQL's, so the first 10 games are the
+// ones the scorecards describe.
 export const GAMELOG_WINDOW = 15
-export const GAMELOG_SQL = lastGamesSql(GAMELOG_WINDOW)
+export const GAMELOG_SQL = `
+  SELECT game_id, game_date, opponent_tricode, is_home, season_label, minutes, pts, reb, ast, fg3m, blk, stl,
+         started, fgm, fga, fg3a, ftm, fta, oreb, dreb, tov, pf, plus_minus
+  FROM ${SEASON_TABLE}
+  WHERE person_id = :id AND game_type = :gt AND played
+  ORDER BY game_date DESC, game_id DESC
+  LIMIT ${GAMELOG_WINDOW}`
 
 // A player's games against ONE opponent, of one game type. The page shows every meeting from the current season (the newest
 // season that has any game of this type). If there are fewer than MEETINGS_MIN, it is filled up to MEETINGS_MIN with his
@@ -218,8 +226,21 @@ export function mapMeetings(rows) {
   return { scope: 'none', currentSeason, games: [] }
 }
 
-// Rows come in GAMELOG_SQL's column order (the same as GAMES_SQL), newest first. Returns { games: [...] } newest first, the order
-// of a box-score table; no games gives an empty list.
+// Rows come in GAMELOG_SQL's column order, newest first. Returns { games: [...] } newest first, the order of a box-score table; each
+// game is a mapGames game plus `box` (the fuller box score). No games gives an empty list.
 export function mapGameLog(rows) {
-  return { games: mapGames(rows).games.reverse() }
+  const base = mapGames(rows.map((r) => r.slice(0, 12))).games.reverse()
+  return {
+    games: base.map((g, i) => {
+      const r = rows[i]
+      return {
+        ...g,
+        box: {
+          started: r[12] === null || r[12] === undefined ? null : bool(r[12]),
+          fgm: num(r[13]), fga: num(r[14]), fg3a: num(r[15]), ftm: num(r[16]), fta: num(r[17]),
+          oreb: num(r[18]), dreb: num(r[19]), tov: num(r[20]), pf: num(r[21]), plusMinus: num(r[22]),
+        },
+      }
+    }),
+  }
 }
