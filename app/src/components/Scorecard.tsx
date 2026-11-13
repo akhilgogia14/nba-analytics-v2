@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { complete, f1, geometry, shareSegments } from '../lib/geom.ts'
 import { panelStyle } from '../lib/styles.ts'
+import { changeVsSeason } from '../lib/spark.ts'
 import { markTips, shareTips, type Tip } from '../lib/tips.ts'
-import type { ApiStat } from '../types.ts'
+import type { ApiStat, GridStat, RecentGame } from '../types.ts'
+import { Sparkline } from './Sparkline.tsx'
 
 const pct = (n: number) => `${n}%`
 
@@ -24,7 +26,17 @@ function Bubble({ tip }: { tip: Tip }) {
 
 const hitClass = 'absolute block cursor-help rounded-sm bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-(--accent)'
 
-export function Scorecard({ label, stat, games, seasonLabel }: { label: string; stat: ApiStat | undefined; games: number | null; seasonLabel: string }) {
+export function Scorecard({
+  label, stat, statKey, games, seasonLabel, recent,
+}: {
+  label: string
+  stat: ApiStat | undefined
+  statKey: GridStat
+  games: number | null
+  seasonLabel: string
+  /** The games of the window, oldest first, for the line under the number (null while loading or if unavailable). */
+  recent: RecentGame[] | null
+}) {
   const d = complete(stat)
   const season = stat?.seasonMean ?? null
   const [tip, setTip] = useState<Tip | null>(null)
@@ -61,6 +73,7 @@ export function Scorecard({ label, stat, games, seasonLabel }: { label: string; 
   }
 
   const g = geometry(d)
+  const change = changeVsSeason(d.mean, season)
   const segments = shareSegments(stat?.shares ?? null)
   const [mean, median, band, range] = markTips(d, g, games)
   const shares = shareTips(segments)
@@ -86,7 +99,17 @@ export function Scorecard({ label, stat, games, seasonLabel }: { label: string; 
         <span className="text-[13px] text-(--muted)">
           {games ? `avg of last ${games} games` : 'avg of recent games'} · median {f1(d.median)}
         </span>
+        {change && (
+          <span
+            className="ml-auto text-xs font-semibold whitespace-nowrap"
+            style={{ color: change.dir === 'up' ? '#4ADE80' : change.dir === 'down' ? '#F87171' : 'var(--muted)' }}
+          >
+            {change.text}
+          </span>
+        )}
       </div>
+
+      {recent && <Sparkline games={recent} stat={statKey} seasonAvg={season} />}
 
       <div ref={box} className="relative flex flex-col gap-1.5">
         {tip && <Bubble tip={tip} />}

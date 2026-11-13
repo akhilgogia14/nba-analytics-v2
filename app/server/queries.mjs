@@ -80,6 +80,17 @@ export const PLAYOFF_PLAYERS_SQL = `
 export const teamsSqlFor = (gameType) => (gameType === 'playoffs' ? PLAYOFF_TEAMS_SQL : TEAMS_SQL)
 export const playersSqlFor = (gameType) => (gameType === 'playoffs' ? PLAYOFF_PLAYERS_SQL : PLAYERS_SQL)
 
+// The player's last 10 games PLAYED of one game type, across seasons if needed (the same window the scorecards describe).
+// Read from player_season_games (every row there is one game of one team; `played` is the owner's rule: any minutes, any stat
+// above 0, or a non-zero plus/minus). Newest first here; mapGames turns it around so the line runs oldest to newest.
+export const GAMES_WINDOW = 10
+export const GAMES_SQL = `
+  SELECT game_id, game_date, opponent_tricode, is_home, season_label, minutes, pts, reb, ast, fg3m, blk, stl
+  FROM ${SEASON_TABLE}
+  WHERE person_id = :id AND game_type = :gt AND played
+  ORDER BY game_date DESC, game_id DESC
+  LIMIT ${GAMES_WINDOW}`
+
 // ---- row mapping (the warehouse returns every value as a string or null) ----
 const num = (v) => (v === null || v === undefined ? null : Number(v))
 
@@ -141,4 +152,13 @@ export function mapSeason(rows) {
   )
   for (const g of out) g.games.sort((a, b) => a.n - b.n)
   return { grids: out }
+}
+
+// Rows come in GAMES_SQL's column order, newest first. Returns { games: [...] } oldest first; no games gives an empty list.
+export function mapGames(rows) {
+  const games = rows.map((r) => ({
+    id: r[0], date: r[1], opp: r[2], isHome: bool(r[3]), seasonLabel: r[4], minutes: num(r[5]),
+    stats: { pts: num(r[6]), reb: num(r[7]), ast: num(r[8]), fg3m: num(r[9]), blk: num(r[10]), stl: num(r[11]) },
+  }))
+  return { games: games.reverse() }
 }
