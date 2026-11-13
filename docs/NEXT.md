@@ -47,7 +47,8 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 ## Step 13: The first app (React + TypeScript + Vite + Tailwind)
 - Owner decisions (2026-11-12): first pass as a Databricks App, then an always-on host (Cloudflare D1 with Pages and Workers); the app never queries Databricks in the long run. Design idea: the Scorecards mock-up (team, player, opponent selectors, switchable themes).
 - **13a. Scaffold and health check: DONE** (release note 013, `app/`). Builds, and the server reads `player_form` through the warehouse locally.
-- **13b. Deploy to Databricks Apps** (next): create the app, grant its identity read access (list the exact grants and wait for a yes on each), open the link.
+- **13b. Deploy to Databricks Apps: DONE 2026-11-13** (release note 014). App `nba-player-form` is running and reads `player_form`; the app identity has four approved grants. It is not public and stops after about 24 hours (restart: `databricks apps start nba-player-form`).
+- **13c. The real Player form page** (next): the Scorecards design on real data. Open: default colour theme; whether team and opponent views get their own gold tables first; whether to deploy from GitHub with auto-deploy.
 - Later: the real Player form page from the Scorecards design; team form and player-vs-opponent gold tables; D1 export and the always-on host.
 
 
