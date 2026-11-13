@@ -11,8 +11,8 @@ const selectClass =
   'h-10 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3 text-[14px] font-semibold text-(--text) disabled:opacity-50'
 
 /**
- * The player's games against one opponent: all of this season's, topped up with earlier ones when there are few. Games from
- * an earlier season are marked in the Season column and shown dimmer, with a dashed line where they start.
+ * The player's games against one opponent: all of this season's, topped up with last season's when there are few. Games from
+ * last season are marked in the Season column and shown dimmer, with a dashed line where they start.
  */
 export function MeetingsPanel({
   opponents, opp, onOpp, meetings, error, gameType, gamesWord,
