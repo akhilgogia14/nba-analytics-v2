@@ -1,7 +1,7 @@
 # Release 016: gold `team_form` (first of three new gold tables)
 
 Date: 2026-11-13 (UTC; table first built 03:03 UTC)
-Branch / PR: `feat/gold-team-form`, PR (number added after opening)
+Branch / PR: `feat/gold-team-form`, PR #23
 Author: (Claude Code)
 
 ## What changed
