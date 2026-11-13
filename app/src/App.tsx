@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchForm, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
+import { fetchForm, fetchMeetings, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
 import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
+import { MeetingsPanel } from './components/Meetings.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
@@ -9,10 +10,12 @@ import { GAME_TYPE_OPTIONS, formNotices, gamesWord } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
-import { readableOn } from './lib/teams.ts'
+import { TEAM_IDS, readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { FormResult, GameType, PlayerOption, Recent, Season, Team } from './types.ts'
+import type { FormResult, GameType, Meetings, PlayerOption, Recent, Season, Team } from './types.ts'
+
+const ALL_TEAMS = Object.keys(TEAM_IDS).sort()
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -31,6 +34,9 @@ export default function App() {
   const [gameType, setGameType] = useState<GameType>('regular-season') // the page's one toggle
   const [season, setSeason] = useState<Season | null>(null)
   const [recent, setRecent] = useState<Recent | null>(null) // the games behind the lines under the scorecards
+  const [opp, setOpp] = useState('') // the opponent chosen in the meetings panel
+  const [meetings, setMeetings] = useState<Meetings | null>(null)
+  const [meetingsError, setMeetingsError] = useState('')
   const [seasonError, setSeasonError] = useState('')
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0) // bumped by "Try again"
@@ -42,6 +48,8 @@ export default function App() {
     setPlayerId('')
     setForm(null)
     setRecent(null)
+    setMeetings(null)
+    setMeetingsError('')
     setSeason(null)
     setSeasonError('')
     setError('')
@@ -50,6 +58,8 @@ export default function App() {
     setPlayerId(id)
     setForm(null)
     setRecent(null)
+    setMeetings(null)
+    setMeetingsError('')
     setSeason(null)
     setSeasonError('')
     setError('')
@@ -63,7 +73,14 @@ export default function App() {
     setPlayers(null)
     setForm(null)
     setRecent(null)
+    setMeetings(null)
+    setMeetingsError('')
     setError('')
+  }
+  function chooseOpp(code: string) {
+    setOpp(code)
+    setMeetings(null)
+    setMeetingsError('')
   }
   function tryAgain() {
     setError('')
@@ -129,6 +146,18 @@ export default function App() {
       cancelled = true
     }
   }, [playerId, players, gameType, attempt])
+
+  // 3c. The chosen player's games against the chosen opponent. Only the meetings panel is affected if this fails.
+  useEffect(() => {
+    if (!opp || !playerId || !players?.some((pl) => pl.id === playerId)) return
+    let cancelled = false
+    fetchMeetings(playerId, gameType, opp)
+      .then((m) => !cancelled && setMeetings(m))
+      .catch((e) => !cancelled && setMeetingsError(errorText(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [opp, playerId, players, gameType, attempt])
 
   // 4. The chosen player's season grid. A failure here only affects the season panel, not the rest of the page.
   useEffect(() => {
@@ -321,6 +350,16 @@ export default function App() {
             ) : (
               <SeasonGrid key={playerId} season={season} team={team} gameType={gameType} />
             )}
+
+            <MeetingsPanel
+              opponents={ALL_TEAMS.filter((t) => t !== p.team)}
+              opp={opp === p.team ? '' : opp}
+              onOpp={chooseOpp}
+              meetings={meetings}
+              error={meetingsError}
+              gameType={gameType}
+              gamesWord={words}
+            />
 
             <CombosTable stats={data.stats} />
           </div>
