@@ -1,7 +1,7 @@
 # Release 020: look and feel (headshots, logos, team colours, chart tooltips)
 
 Date: 2026-11-13 (UTC)
-Branch / PR: `feat/look-and-feel`, PR (number added after opening)
+Branch / PR: `feat/look-and-feel`, PR #27
 Author: (Claude Code)
 
 ## What changed
