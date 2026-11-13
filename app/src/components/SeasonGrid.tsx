@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { f1 } from '../lib/geom.ts'
 import {
-  BINS, GRID_STATS, HIT_STROKE, MISSED, STAT_NAMES, UPCOMING, binColor, buildCells, hexLayout, hexPoints, hexTip,
+  BINS, GRID_STATS, MISSED, STAT_NAMES, UPCOMING, buildCells, chartPalette, hexLayout, hexPoints, hexTip,
   playedSummary, seasonMean, type Cell,
 } from '../lib/hex.ts'
+import { readableOn } from '../lib/teams.ts'
 import { panelStyle } from '../lib/styles.ts'
 import { clampAnchor } from '../lib/tips.ts'
 import type { GridStat, Season, SeasonGrid as Grid } from '../types.ts'
@@ -17,15 +18,16 @@ const pillStyle = (on: boolean): CSSProperties => ({
 })
 
 /** One small hexagon-shaped swatch for the key under the chart. */
-function Swatch({ fill, stroke, dashed, width = 1, size = 18 }: { fill: string; stroke: string; dashed?: boolean; width?: number; size?: number }) {
-  const r = size / 2 - 1.5
+function Swatch({ fill, stroke, dashed, ring, size = 18 }: { fill: string; stroke: string; dashed?: boolean; ring?: string; size?: number }) {
+  const r = ring ? size / 2 - 5 : size / 2 - 1.5
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden className="shrink-0">
+      {ring && <polygon points={hexPoints(size / 2, size / 2, size / 2 - 1.2)} fill="none" stroke={ring} strokeWidth={1.4} strokeLinejoin="round" />}
       <polygon
         points={hexPoints(size / 2, size / 2, r)}
         fill={fill}
         stroke={stroke}
-        strokeWidth={width}
+        strokeWidth={1}
         strokeDasharray={dashed ? '3 2' : undefined}
         strokeLinejoin="round"
       />
@@ -39,7 +41,10 @@ function Swatch({ fill, stroke, dashed, width = 1, size = 18 }: { fill: string; 
  * is dark grey, and (regular season) games not played yet are empty outlines up to 82.
  * Regular season and playoffs are separate views; a traded player has one grid per team.
  */
-export function SeasonGrid({ season, accent }: { season: Season | null; accent: string }) {
+export function SeasonGrid({ season, team }: { season: Season | null; team: string }) {
+  const palette = chartPalette(team)
+  // The chart's selected pills and its tooltip use the team's bright colour (the rest of the page keeps its own accent).
+  const teamVars = { '--pillOn': palette.top, '--pillOnText': readableOn(palette.top) } as CSSProperties
   const [stat, setStat] = useState<GridStat>('pts')
   const [typeChoice, setTypeChoice] = useState<Grid['gameType']>('regular-season')
   const [teamChoice, setTeamChoice] = useState('')
@@ -57,9 +62,10 @@ export function SeasonGrid({ season, accent }: { season: Season | null; accent: 
   }, [tip])
 
   const shell = 'flex flex-col gap-4 rounded-[18px] border border-(--border) bg-(--panel) p-5'
+  const shellStyle = { ...panelStyle, ...teamVars }
   if (!season) {
     return (
-      <section className={shell} style={panelStyle}>
+      <section className={shell} style={shellStyle}>
         <div className="text-sm font-semibold">Season</div>
         <div className="text-sm text-(--muted)">Loading the season...</div>
       </section>
@@ -68,7 +74,7 @@ export function SeasonGrid({ season, accent }: { season: Season | null; accent: 
   const types = (['regular-season', 'playoffs'] as const).filter((t) => season.grids.some((g) => g.gameType === t))
   if (types.length === 0) {
     return (
-      <section className={shell} style={panelStyle}>
+      <section className={shell} style={shellStyle}>
         <div className="text-sm font-semibold">Season</div>
         <div className="text-sm text-(--muted)">No games on record for this player yet.</div>
       </section>
@@ -87,11 +93,11 @@ export function SeasonGrid({ season, accent }: { season: Season | null; accent: 
   const activeTip = active ? hexTip(active, stat, mean) : null
   const anchor = tip === null ? null : layout.cells[tip]
 
-  const fillFor = (c: Cell) => (c.kind === 'played' ? binColor(accent, c.bin) : c.kind === 'upcoming' ? 'none' : MISSED.fill)
-  const strokeFor = (c: Cell) => (c.kind === 'upcoming' ? UPCOMING.stroke : c.hit ? HIT_STROKE : c.kind === 'played' ? 'none' : MISSED.stroke)
+  const fillFor = (c: Cell) => (c.kind === 'played' ? palette.ramp[c.bin] : c.kind === 'upcoming' ? 'none' : MISSED.fill)
+  const strokeFor = (c: Cell) => (c.kind === 'upcoming' ? UPCOMING.stroke : c.kind === 'played' ? 'none' : MISSED.stroke)
 
   return (
-    <section className={shell} style={panelStyle}>
+    <section className={shell} style={shellStyle}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <div className="text-sm font-semibold">
@@ -154,15 +160,29 @@ export function SeasonGrid({ season, accent }: { season: Season | null; accent: 
           {cells.map((c, i) => {
             const { cx, cy } = layout.cells[i]
             const t = hexTip(c, stat, mean)
+            // A game that reached the season mean gets a ring just outside its hexagon, with a dark gap between the two,
+            // so the ring shows whatever the fill colour is.
             const poly = (
-              <polygon
-                points={hexPoints(cx, cy, layout.radius - (c.hit ? 2.2 : 1.2))}
-                fill={fillFor(c)}
-                stroke={strokeFor(c)}
-                strokeWidth={c.hit ? 2.2 : 1}
-                strokeDasharray={c.kind === 'upcoming' ? '3 3' : undefined}
-                strokeLinejoin="round"
-              />
+              <>
+                {c.hit && (
+                  <polygon
+                    data-ring
+                    points={hexPoints(cx, cy, layout.radius - 1.4)}
+                    fill="none"
+                    stroke={palette.ring}
+                    strokeWidth={1.6}
+                    strokeLinejoin="round"
+                  />
+                )}
+                <polygon
+                  points={hexPoints(cx, cy, layout.radius - 4.6)}
+                  fill={fillFor(c)}
+                  stroke={strokeFor(c)}
+                  strokeWidth={1}
+                  strokeDasharray={c.kind === 'upcoming' ? '3 3' : undefined}
+                  strokeLinejoin="round"
+                />
+              </>
             )
             if (!t) return <g key={i} aria-hidden>{poly}</g>
             return (
@@ -190,12 +210,12 @@ export function SeasonGrid({ season, accent }: { season: Season | null; accent: 
         <span className="inline-flex items-center gap-1.5">
           Less
           {Array.from({ length: BINS }, (_, b) => (
-            <Swatch key={b} fill={binColor(accent, b)} stroke="none" />
+            <Swatch key={b} fill={palette.ramp[b]} stroke="none" />
           ))}
           More
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <Swatch fill={binColor(accent, BINS - 1)} stroke={HIT_STROKE} width={2} />
+          <Swatch fill={palette.ramp[BINS - 1]} stroke="none" ring={palette.ring} size={22} />
           reached his season mean
         </span>
         <span className="inline-flex items-center gap-1.5">

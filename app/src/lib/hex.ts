@@ -1,6 +1,8 @@
 import { f1 } from './geom.ts'
 import { shortDate } from './format.ts'
+import { TEAM_STYLES, contrast, luminance } from './teams.ts'
 import { blend } from './teamTheme.ts'
+import { THEME } from './themes.ts'
 import type { GridStat, SeasonGame, SeasonGrid } from '../types.ts'
 
 /** The stats the season chart can show, in picker order. */
@@ -17,15 +19,70 @@ export const REGULAR_SEASON_GAMES = 82
 export const COLUMNS = 14
 /** How many colour steps the played games are sorted into (the "Less ... More" key shows all of them). */
 export const BINS = 5
-/** Strength of the team colour for each step, over the dark card colour. The first is clearly tinted, never grey. */
-export const BIN_STRENGTH = [0.28, 0.46, 0.64, 0.82, 1]
 export const CARD_BASE = '#10131B'
 /** A game he missed: a flat dark grey with a faint edge. */
 export const MISSED = { fill: '#171B25', stroke: '#262D3A' }
 /** A game not played yet: no fill, a dashed edge. */
 export const UPCOMING = { stroke: '#2B3342' }
-/** The border drawn around a game where he reached his season mean. */
-export const HIT_STROKE = '#EAF0FF'
+
+/** The brightest step must stand out from the dark card at least this much (contrast ratio). */
+export const TOP_CONTRAST = 6
+/** The ring around a game that reached the mean must show against the card at least this much. */
+export const RING_CONTRAST = 4.5
+/** The darkest step must differ from the grey of a missed game by at least this much, so "played, but low" never looks like "did not play". */
+export const LOW_VS_MISSED = 1.8
+/** A colour with less colour than this (0 to 1) counts as white, silver, grey or black. */
+export const MIN_CHROMA = 0.12
+
+const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+
+/** How much colour a hex value has: 0 for white, grey and black, up to 1 for a fully saturated colour. */
+export function chroma(hex: string): number {
+  const c = channels(hex)
+  return (Math.max(...c) - Math.min(...c)) / 255
+}
+
+/** The colour mixed with white, as little as needed, until it reaches the contrast against `against` (a plain hex colour). */
+export function lightenToContrast(color: string, against: string, min: number): string {
+  for (let i = 0; i <= 50; i++) {
+    const c = blend('#ffffff', color, i / 50)
+    if (contrast(c, against) >= min) return c
+  }
+  return '#ffffff'
+}
+
+export type ChartPalette = {
+  /** The five fills, darkest to brightest, as plain hex colours. */
+  ramp: string[]
+  /** The ring around a game that reached the season mean. */
+  ring: string
+  /** The brightest fill; also used for the chart's selected pills and tooltip. */
+  top: string
+}
+
+/**
+ * The chart's colours from a team's two colours. The fills are built from the team's main colour (its primary, unless that
+ * is white, silver or black and the secondary has real colour; if both are plain, the lighter one), lightened as much as needed to glow on the dark card,
+ * and run from a dark tint up to that bright colour. The ring uses the team's other colour, lightened until it shows on the
+ * dark card. An unknown team gets the page's own accent.
+ */
+export function chartPalette(abbrev: string | null | undefined): ChartPalette {
+  const known = !!abbrev && abbrev.toUpperCase() in TEAM_STYLES
+  const style = known ? TEAM_STYLES[abbrev.toUpperCase()] : { primary: THEME['--accent'], secondary: '#EAF0FF' }
+  const plain = (c: string) => chroma(c) < MIN_CHROMA
+  // Colour wins over plain; if both are plain (white, silver, grey, black) the lighter one drives the fills.
+  const flip = plain(style.primary)
+    ? !plain(style.secondary) || luminance(style.secondary) > luminance(style.primary)
+    : false
+  const [main, other] = flip ? [style.secondary, style.primary] : [style.primary, style.secondary]
+  const top = lightenToContrast(main, CARD_BASE, TOP_CONTRAST)
+  const bothPlain = chroma(main) < MIN_CHROMA && chroma(other) < MIN_CHROMA
+  const ring = bothPlain ? '#ffffff' : lightenToContrast(other, CARD_BASE, RING_CONTRAST)
+  const mix = (t: number) => blend(top, CARD_BASE, t)
+  let low = 0.3 // share of the bright colour in the darkest step; raised until it is clearly not the missed-game grey
+  while (low < 0.6 && contrast(mix(low), MISSED.fill) < LOW_VS_MISSED) low = Math.round((low + 0.02) * 100) / 100
+  return { ramp: Array.from({ length: BINS }, (_, k) => mix(low + ((1 - low) * k) / (BINS - 1))), ring, top }
+}
 
 export type HexCell = { cx: number; cy: number }
 export type HexLayout = { cells: HexCell[]; width: number; height: number; radius: number }
@@ -78,11 +135,6 @@ export function valueRange(grids: SeasonGrid[], stat: GridStat): { min: number; 
 export function binFor(value: number, min: number, max: number, bins = BINS): number {
   if (!(max > min)) return Math.floor(bins / 2)
   return Math.min(bins - 1, Math.max(0, Math.floor(((value - min) / (max - min)) * bins)))
-}
-
-/** The fill of a colour step, as a plain hex colour. */
-export function binColor(accent: string, bin: number): string {
-  return blend(accent, CARD_BASE, BIN_STRENGTH[Math.min(BINS - 1, Math.max(0, bin))])
 }
 
 /** Did he reach his season mean in this game? Only a played game with a value can. */
