@@ -25,7 +25,6 @@ export type PlayerInfo = {
   l10Games: number
   l10FirstDate: string
   l10GamesBeforeCurrentSeason: number
-  l10GamesNotRegular: number
 }
 
 export type Form = { player: PlayerInfo; stats: Record<string, ApiStat> }
