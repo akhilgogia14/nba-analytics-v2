@@ -1,7 +1,7 @@
 # Release 015: the Player form page (first real screen)
 
 Date: 2026-11-13 (UTC; deployed at 01:53 UTC)
-Branch / PR: `feat/player-form-page` (PR number added when opened)
+Branch / PR: `feat/player-form-page`, PR #22
 Author: (Claude Code)
 
 ## What changed
