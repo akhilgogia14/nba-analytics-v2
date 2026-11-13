@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
 import {
-  FORM_SQL, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validGameType, validPlayerId, validTeam,
+  FORM_SQL, SEASON_SQL, mapForm, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType, validPlayerId,
+  validTeam,
 } from './queries.mjs'
 
 const app = express()
@@ -39,23 +40,29 @@ app.get('/api/health', async (_req, res) => {
   }
 })
 
-// Teams that have a player in the current season.
-app.get('/api/teams', async (_req, res) => {
+// Teams for the page's game type (?type=regular-season, the default, or ?type=playoffs): the 30 teams with a player this
+// season, or the teams that were in the latest playoffs.
+app.get('/api/teams', async (req, res) => {
+  const type = req.query.type ?? 'regular-season'
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
   try {
-    res.json(await cached('teams', FIVE_MINUTES, async () => mapTeams(await sql(TEAMS_SQL))))
+    res.json(await cached(`teams:${type}`, FIVE_MINUTES, async () => mapTeams(await sql(teamsSqlFor(type)))))
   } catch (err) {
     fail(res, 'teams', err)
   }
 })
 
-// Current-season players on one team, most minutes first.
+// Players on one team for the page's game type: this season's roster, or the players who played the latest playoffs
+// for that team. Most minutes first.
 app.get('/api/teams/:team/players', async (req, res) => {
   const { team } = req.params
+  const type = req.query.type ?? 'regular-season'
   if (!validTeam(team)) return res.status(400).json({ ok: false, error: 'Team must be three capital letters.' })
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
   try {
     res.json(
-      await cached(`players:${team}`, FIVE_MINUTES, async () =>
-        mapPlayers(await sql(PLAYERS_SQL, [{ name: 'team', value: team, type: 'STRING' }])),
+      await cached(`players:${team}:${type}`, FIVE_MINUTES, async () =>
+        mapPlayers(await sql(playersSqlFor(type), [{ name: 'team', value: team, type: 'STRING' }])),
       ),
     )
   } catch (err) {
