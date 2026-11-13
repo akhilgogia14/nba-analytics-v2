@@ -26,7 +26,7 @@ The owner wants a season chart on the player page: one hexagon per team game (82
 - Real data through Databricks Connect, read-only, before any write: all **14 gates pass** on the real output (source rows 288,143). Spot checks: Luka Doncic 2025-26 regular season = 82 rows for LAL, 64 played (silver minutes above 0: 64); AJ Johnson has an 82-game grid for DAL (23 played) and one for WAS (25 played), each noting the other team; Danilo Gallinari 2023-24 has three grids (WAS, DET, MIL).
 - **22 corrupted copies of the real output** (duplicate row, null key, wrong game type, wrong season label, a row dropped, wrong opponent, date or home flag, wrong game number or team-game count, a whole grid with no played game, a played flag flipped either way, a played row dropped, a whole grid dropped, points +1, a missed game given a stat, minutes +1, a wrong, dropped or invented `other_teams`, a wrong name) each fired the expected gate; the untouched output fires none. Several corruptions also fire neighbouring gates (they overlap on purpose).
 - Warnings on the real output: `completed_season_grid_not_82_games` fires 0 times (every completed season's regular-season grid has 82 games); `three_or_more_teams_in_one_season` fires for 89 grids (players with three or more teams in one season).
-- **Real job run** (`databricks bundle deploy` from this branch, then `databricks bundle run silver_build`, 2026-11-13 16:05 UTC): `gold player_season_games` source rows 288,143, gates on source and on the table pass, inserted 288,143, updated 0, deleted 0, 89 new oddities logged (the three-or-more-teams warning), run_id `2026-11-13T160545Z`. The other four gold tables: 0 inserted, 0 updated, 0 deleted. Read back from the real table: Luka Doncic 2025-26 regular season = 82 rows, 64 played. The app does not read the table yet and has no grant on it.
+- **Real job run** (`databricks bundle deploy` from this branch, then `databricks bundle run silver_build`, 2026-11-13 16:05 UTC): `gold player_season_games` source rows 288,143, gates on source and on the table pass, inserted 288,143, updated 0, deleted 0, 89 new oddities logged (the three-or-more-teams warning), run_id `2026-11-13T160545Z`. The other four gold tables: 0 inserted, 0 updated, 0 deleted. Read back from the real table: Luka Doncic 2025-26 regular season = 82 rows, 64 played. The app identity was then granted `SELECT` on the table (owner approved; read back: `SELECT TABLE workspace.nba_v2_gold.player_season_games`). The app does not read it yet.
 
 ## Files added or changed
 - `scripts/gold_player_season_games.py` (new): the PySpark table.
@@ -52,7 +52,7 @@ The owner wants a season chart on the player page: one hexagon per team game (82
 
 ## Open questions for the owner
 1. Decided 2026-11-13: the "hit their average" border uses the season **mean** (of the same season as the grid).
-2. The app needs its own `SELECT` grant on `player_season_games` (I will list it and wait for your yes).
+2. Done 2026-11-13 (owner approved): the app identity has `SELECT` on `player_season_games`. Grants live in Databricks, not in git.
 
 ## Owner walkthrough
 - **What changed:** nothing you can see in the app yet. This adds one new table that holds, for every player and every team he played for in a season, a row for each of that team's games: 82 in a regular season. Games he played have his numbers (points, rebounds, assists, threes, blocks, steals, minutes). Games he did not play are listed but empty, so the chart can draw them grey.
