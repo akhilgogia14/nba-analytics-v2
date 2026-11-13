@@ -11,7 +11,7 @@ const head = 'py-1.5 pr-3 text-right font-semibold'
 /**
  * The box-score table: the player's last 15 games played of the page's game type (regular season or playoffs, never both),
  * newest first, whatever the opponent. Date, game, a marker for games he started, minutes, shooting splits (made-attempted),
- * rebounds (offensive, defensive, total), assists, steals, blocks, turnovers, fouls, plus/minus and points, with an average
+ * rebounds, assists, steals, blocks, turnovers, fouls, plus/minus and points, with an average
  * row at the bottom. A game from an earlier season shows its year. The table scrolls sideways on a narrow screen.
  */
 export function GameLog({ games, error, gamesWord }: { games: LogGame[] | null; error: string; gamesWord: string }) {
@@ -50,8 +50,6 @@ export function GameLog({ games, error, gamesWord }: { games: LogGame[] | null; 
                 {SPLITS.map(([, , label]) => (
                   <th key={label} className={head}>{label}</th>
                 ))}
-                <th className={head}>OREB</th>
-                <th className={head}>DREB</th>
                 {LOG_COLUMNS.map(([k, label]) => (
                   <th key={k} className={head}>{label}</th>
                 ))}
@@ -74,8 +72,6 @@ export function GameLog({ games, error, gamesWord }: { games: LogGame[] | null; 
                   {SPLITS.map(([made, att, label]) => (
                     <td key={label} className={cell}>{madeAtt(splitValue(g, made), splitValue(g, att))}</td>
                   ))}
-                  <td className={cell}>{num(g.box.oreb)}</td>
-                  <td className={cell}>{num(g.box.dreb)}</td>
                   {LOG_COLUMNS.map(([k]) => (
                     <td key={k} className={cell}>{num(g.stats[k])}</td>
                   ))}
@@ -92,8 +88,6 @@ export function GameLog({ games, error, gamesWord }: { games: LogGame[] | null; 
                 {avg.splits.map((v, i) => (
                   <td key={SPLITS[i][2]} className={cell}>{v}</td>
                 ))}
-                <td className={cell}>{num(avg.oreb)}</td>
-                <td className={cell}>{num(avg.dreb)}</td>
                 {LOG_COLUMNS.map(([k]) => (
                   <td key={k} className={cell}>{num(avg.stats[k])}</td>
                 ))}

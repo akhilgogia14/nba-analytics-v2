@@ -53,6 +53,7 @@ test('averageRow: every column, makes and attempts averaged separately, plus the
   assert.equal(avg.started, 2)
   assert.equal(avg.stats.reb, 4)
   assert.equal(avg.tov, 2)
+  assert.equal('oreb' in avg || 'dreb' in avg, false) // the offensive/defensive split is not shown
 })
 
 test('averageRow: a missing figure is skipped, not counted as zero', () => {
