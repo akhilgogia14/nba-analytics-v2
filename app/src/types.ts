@@ -92,3 +92,12 @@ export type MeetingGame = {
 }
 /** A player against one opponent, newest game first. scope: season (7+ this season), filled (topped up from last season), earlier (none this season, so last season's), none. */
 export type Meetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; currentSeason: string | null; games: MeetingGame[] }
+
+/** The rest of a played game's box score (any of these can be null if the source had a gap). */
+export type Box = {
+  started: boolean | null
+  fgm: number | null; fga: number | null; fg3a: number | null; ftm: number | null; fta: number | null
+  oreb: number | null; dreb: number | null; tov: number | null; pf: number | null; plusMinus: number | null
+}
+/** A game in the box-score table: the same as a RecentGame plus the fuller box score. */
+export type LogGame = RecentGame & { box: Box }

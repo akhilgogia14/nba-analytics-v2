@@ -15,7 +15,7 @@ import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { TEAM_IDS, readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { FormResult, GameType, Meetings, PlayerOption, Recent, RecentGame, Season, Team } from './types.ts'
+import type { FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, Season, Team } from './types.ts'
 
 const ALL_TEAMS = Object.keys(TEAM_IDS).sort()
 
@@ -37,7 +37,7 @@ export default function App() {
   const [season, setSeason] = useState<Season | null>(null)
   const [recent, setRecent] = useState<Recent | null>(null) // the games behind the lines under the scorecards
   const [view, setView] = useState<LogView>('log') // box scores (default) or the six average cards
-  const [log, setLog] = useState<RecentGame[] | null>(null) // the last 15 games for the box-score table
+  const [log, setLog] = useState<LogGame[] | null>(null) // the last 15 games for the box-score table
   const [logError, setLogError] = useState('')
   const [opp, setOpp] = useState('') // the opponent chosen in the meetings panel
   const [meetings, setMeetings] = useState<Meetings | null>(null)

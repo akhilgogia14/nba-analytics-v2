@@ -321,22 +321,30 @@ test('mapMeetings: a gap stays null and the warehouse\'s string booleans convert
 
 // ---- the box-score table: the last 15 games, newest first ----
 
-test('GAMELOG_SQL is the games query with a 15-game window', () => {
+test('GAMELOG_SQL: the games query with a 15-game window and the 11 fuller box-score columns', () => {
   assert.equal(GAMELOG_WINDOW, 15)
   assert.match(GAMELOG_SQL, /LIMIT 15$/)
-  assert.equal(GAMELOG_SQL.replace(/LIMIT 15$/, 'LIMIT 10'), GAMES_SQL) // nothing else differs, so the same columns and rules
-  assert.match(GAMELOG_SQL, /AND played\b/)
+  assert.match(GAMELOG_SQL, /FROM workspace\.nba_v2_gold\.player_season_games/)
+  assert.match(GAMELOG_SQL, /person_id = :id AND game_type = :gt AND played/)
   assert.match(GAMELOG_SQL, /ORDER BY game_date DESC, game_id DESC/)
+  assert.equal([...GAMELOG_SQL.matchAll(/:\w+/g)].length, 2)
+  assert.doesNotMatch(GAMELOG_SQL, /'regular-season'|'playoffs'|game_type\s+IN/i)
+  const cols = GAMELOG_SQL.match(/SELECT([\s\S]*?)FROM/)[1].split(',').map((c) => c.trim())
+  const games = GAMES_SQL.match(/SELECT([\s\S]*?)FROM/)[1].split(',').map((c) => c.trim())
+  assert.deepEqual(cols.slice(0, 12), games) // the same first 12 columns as the cards' query: the same games
+  assert.deepEqual(cols.slice(12), ['started', 'fgm', 'fga', 'fg3a', 'ftm', 'fta', 'oreb', 'dreb', 'tov', 'pf', 'plus_minus'])
 })
 
-test('mapGameLog: keeps newest first (the opposite of mapGames) and converts values', () => {
+test('mapGameLog: keeps newest first (the opposite of mapGames), converts values and adds the fuller box score', () => {
   const rows = [
-    ['g3', '2026-11-11', 'BOS', 'false', '2026-27', '36.5', '31', '4', '6', '3', '0', '2'],
-    ['g2', '2026-11-09', 'MIA', 'true', '2026-27', '30', '22', '5', '7', '2', '1', null],
+    ['g3', '2026-11-11', 'BOS', 'false', '2026-27', '36.5', '31', '4', '6', '3', '0', '2', 'true', '11', '22', '8', '6', '7', '1', '3', '2', '1', '-12.0'],
+    ['g2', '2026-11-09', 'MIA', 'true', '2026-27', '30', '22', '5', '7', '2', '1', null, 'false', '8', '17', '4', '2', '2', '0', '5', null, '2', '0', null],
   ]
   const { games } = mapGameLog(rows)
   assert.deepEqual(games.map((g) => g.id), ['g3', 'g2'])
   assert.deepEqual([games[0].opp, games[0].isHome, games[0].minutes, games[0].stats.pts], ['BOS', false, 36.5, 31])
+  assert.deepEqual(games[0].box, { started: true, fgm: 11, fga: 22, fg3a: 8, ftm: 6, fta: 7, oreb: 1, dreb: 3, tov: 2, pf: 1, plusMinus: -12 })
+  assert.deepEqual(games[1].box, { started: false, fgm: 8, fga: 17, fg3a: 4, ftm: 2, fta: 2, oreb: 0, dreb: 5, tov: null, pf: 2, plusMinus: 0 }) // a gap stays null; 0 is 0
   assert.equal(games[1].stats.stl, null)
   assert.deepEqual(mapGameLog([]), { games: [] })
 })
