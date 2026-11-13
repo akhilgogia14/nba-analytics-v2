@@ -1,7 +1,7 @@
 # Release 018: `team_vs_opponent` reworked so no row blends regular season and playoffs
 
 Date: 2026-11-13 (UTC; table rebuilt 05:25 UTC)
-Branch / PR: `feat/team-vs-opponent-by-type`, PR (number added after opening)
+Branch / PR: `feat/team-vs-opponent-by-type`, PR #25
 Author: (Claude Code)
 
 ## What changed
