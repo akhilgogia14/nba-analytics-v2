@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { fetchForm, fetchPlayers, fetchTeams } from './api.ts'
+import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { CARD_STATS, LABELS, daysSince, shortDate, teamLabel } from './lib/format.ts'
@@ -197,15 +198,23 @@ export default function App() {
               <div className="text-xs font-semibold tracking-widest text-(--accent) uppercase">
                 Player level · last {p.l10Games} games
               </div>
-              <div className="flex flex-wrap items-baseline gap-3.5">
-                <h1 className="m-0 text-[44px] leading-[1.1] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
-                  {p.name}
-                </h1>
-                <span className="text-[15px] font-semibold text-(--accent)">{p.team}</span>
-              </div>
-              <div className="text-[15px] text-(--muted)">
-                Last {p.l10Games} games played · {shortDate(p.l10FirstDate)} to {shortDate(p.lastGameDate)} ·{' '}
-                {p.totalGames} games in the data
+              <div className="flex flex-wrap items-center gap-5">
+                <PlayerAvatar name={p.name} playerId={playerId} />
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center gap-3.5">
+                    <h1 className="m-0 text-[44px] leading-[1.1] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
+                      {p.name}
+                    </h1>
+                    <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-(--accent)">
+                      <TeamBadge abbrev={p.team} size={36} />
+                      {p.team}
+                    </span>
+                  </div>
+                  <div className="text-[15px] text-(--muted)">
+                    Last {p.l10Games} games played · {shortDate(p.l10FirstDate)} to {shortDate(p.lastGameDate)} ·{' '}
+                    {p.totalGames} games in the data
+                  </div>
+                </div>
               </div>
               {notices.map((n) => (
                 <div
