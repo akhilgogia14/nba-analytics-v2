@@ -1,7 +1,7 @@
 # Release 013: app scaffold (React + TypeScript + Vite + Tailwind, Node server)
 
 Date: 2026-11-12
-Branch / PR: `feat/app-scaffold` (PR number added when opened)
+Branch / PR: `feat/app-scaffold`, PR #20
 Author: (Claude Code)
 
 ## What changed
