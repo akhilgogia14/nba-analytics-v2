@@ -1,7 +1,7 @@
 # Release 017: gold `team_vs_opponent` (second of three new gold tables)
 
 Date: 2026-11-13 (UTC; table first built 04:43 UTC)
-Branch / PR: `feat/gold-team-vs-opponent`, PR (number added after opening)
+Branch / PR: `feat/gold-team-vs-opponent`, PR #24
 Author: (Claude Code)
 
 ## What changed
