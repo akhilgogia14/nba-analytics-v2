@@ -26,6 +26,21 @@ test('outside values only enter the SQL as named parameters', () => {
   for (const s of [TEAMS_SQL, PLAYERS_SQL, FORM_SQL]) assert.doesNotMatch(s, /\$\{/)
 })
 
+test('every query reads regular-season rows only, so no figure blends in playoff games', () => {
+  for (const s of [TEAMS_SQL, PLAYERS_SQL, FORM_SQL]) assert.match(s, /game_type = 'regular-season'/)
+  assert.match(PLAYERS_SQL, /m\.game_type = p\.game_type/)  // minutes come from the same game type
+  assert.doesNotMatch(FORM_SQL, /not_regular/)
+})
+
+test('FORM_SQL columns come back in the order mapForm reads them', () => {
+  const cols = FORM_SQL.match(/SELECT([\s\S]*?)FROM/)[1].split(',').map((c) => c.trim())
+  assert.equal(cols.length, 22)
+  assert.equal(cols[10], 'l10_games_before_current_season')
+  assert.equal(cols[11], 'l10_mean')
+  assert.equal(cols[17], 'l10_share_0')
+  assert.equal(cols[21], 'season_mean')
+})
+
 test('mapTeams and mapPlayers turn strings into numbers', () => {
   assert.deepEqual(mapTeams([['DEN', '19'], ['NYK', '21']]), [
     { team: 'DEN', players: 19 }, { team: 'NYK', players: 21 },
@@ -38,7 +53,7 @@ test('mapTeams and mapPlayers turn strings into numbers', () => {
 // Row order is the SELECT order in FORM_SQL.
 const row = (stat, nums, shares) => [
   stat, 'Jalen Brunson', 'NYK', '2026-11-11', '2026-27', '454', '2026-27',
-  '11', '10', '2026-10-23', '0', '0',
+  '11', '10', '2026-10-23', '0',
   ...nums, ...shares,
 ]
 
@@ -52,7 +67,7 @@ test('mapForm maps one player: names, windows, numbers, shares', () => {
   assert.deepEqual(out.player, {
     name: 'Jalen Brunson', team: 'NYK', lastGameDate: '2026-11-11', lastSeasonLabel: '2026-27', totalGames: 454,
     seasonLabel: '2026-27', seasonGames: 11, l10Games: 10, l10FirstDate: '2026-10-23',
-    l10GamesBeforeCurrentSeason: 0, l10GamesNotRegular: 0,
+    l10GamesBeforeCurrentSeason: 0,
   })
   assert.deepEqual(out.stats.pts, {
     mean: 26.5, median: 25.5, p10: 19, p90: 33.5, min: 19, max: 38, seasonMean: 26, shares: null,

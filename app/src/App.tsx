@@ -99,9 +99,6 @@ export default function App() {
     if (p.l10GamesBeforeCurrentSeason > 0) {
       notices.push(`${p.l10GamesBeforeCurrentSeason} of these ${p.l10Games} games are from before this season, because the new season is young.`)
     }
-    if (p.l10GamesNotRegular > 0) {
-      notices.push(`${p.l10GamesNotRegular} of these ${p.l10Games} games are not regular-season games.`)
-    }
     const idle = daysSince(p.lastGameDate)
     if (idle > 7) notices.push(`${p.name} last played on ${shortDate(p.lastGameDate)}, ${idle} days ago.`)
   }
