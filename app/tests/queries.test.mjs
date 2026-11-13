@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  FORM_SQL, GAME_TYPES, PLAYERS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason, mapTeams, validGameType, validPlayerId,
-  validTeam,
+  FORM_SQL, GAME_TYPES, PLAYERS_SQL, PLAYOFF_PLAYERS_SQL, PLAYOFF_TEAMS_SQL, SEASON_SQL, TEAMS_SQL, mapForm, mapPlayers, mapSeason,
+  mapTeams, playersSqlFor, teamsSqlFor, validGameType, validPlayerId, validTeam,
 } from '../server/queries.mjs'
 
 test('validTeam accepts only three capital letters', () => {
@@ -151,4 +151,37 @@ test('mapSeason: a player with no games gets no grids; real booleans work too', 
   const g = mapSeason([srow('regular-season', '1', 'AAA', null, 1, '2026-01-02', 'CCC', true, true, ['1', '2', '3', '4', '5', '6'])]).grids[0]
   assert.equal(g.games[0].isHome, true)
   assert.equal(g.games[0].played, true)
+})
+
+// ---- the pickers in playoffs mode ----
+
+test('playoff team and player lists: one table, playoff rows of the NEWEST playoffs season, named parameter only', () => {
+  for (const s of [PLAYOFF_TEAMS_SQL, PLAYOFF_PLAYERS_SQL]) {
+    assert.match(s, /FROM workspace\.nba_v2_gold\.player_season_games/)
+    assert.match(s, /game_type = 'playoffs'/)
+    assert.doesNotMatch(s, /regular-season/)
+    assert.doesNotMatch(s, /\$\{/)
+    // the newest season that has any playoff game, looked up inside the playoff rows (so it is last year's until the new playoffs start)
+    assert.match(s, /season = \(SELECT max\(season\) FROM workspace\.nba_v2_gold\.player_season_games WHERE game_type = 'playoffs'\)/)
+  }
+  assert.doesNotMatch(PLAYOFF_TEAMS_SQL, /:\w+/)
+  assert.match(PLAYOFF_PLAYERS_SQL, /team_tricode = :team\b/)
+  assert.equal([...PLAYOFF_PLAYERS_SQL.matchAll(/:\w+/g)].length, 1)
+  assert.match(PLAYOFF_PLAYERS_SQL, /ORDER BY minutes DESC NULLS LAST/) // Spark puts NULLs first on DESC otherwise
+})
+
+test('playoff lists give the same columns as the regular lists, so the same mappers read them', () => {
+  const cols = (s) => s.match(/SELECT([\s\S]*?)FROM/)[1].split(/,(?![^()]*\))/).map((c) => c.trim())
+  assert.equal(cols(PLAYOFF_PLAYERS_SQL).length, cols(PLAYERS_SQL).length) // id, name, games, minutes
+  assert.equal(cols(PLAYOFF_TEAMS_SQL).length, cols(TEAMS_SQL).length) // team, players
+  assert.deepEqual(mapPlayers([['1628973', 'Jalen Brunson', '19', '38.2']]), [{ id: '1628973', name: 'Jalen Brunson', l10Games: 19, minutes: 38.2 }])
+  assert.deepEqual(mapPlayers([['7', 'A Player', '2', null]]), [{ id: '7', name: 'A Player', l10Games: 2, minutes: null }])
+})
+
+test('teamsSqlFor and playersSqlFor pick the lists for the page game type', () => {
+  assert.equal(teamsSqlFor('playoffs'), PLAYOFF_TEAMS_SQL)
+  assert.equal(teamsSqlFor('regular-season'), TEAMS_SQL)
+  assert.equal(playersSqlFor('playoffs'), PLAYOFF_PLAYERS_SQL)
+  assert.equal(playersSqlFor('regular-season'), PLAYERS_SQL)
+  assert.equal(teamsSqlFor(undefined), TEAMS_SQL) // the routes refuse any other type before this is called
 })

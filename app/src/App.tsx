@@ -50,9 +50,13 @@ export default function App() {
     setSeasonError('')
     setError('')
   }
+  // The toggle changes which teams and players are listed (all 30 teams and this season's rosters, or the teams and players
+  // of the latest playoffs). The current team and player stay selected when they are still in the new lists.
   function chooseGameType(t: GameType) {
     if (t === gameType) return
     setGameType(t)
+    setTeams(null)
+    setPlayers(null)
     setForm(null)
     setError('')
   }
@@ -62,40 +66,44 @@ export default function App() {
     setAttempt((n) => n + 1)
   }
 
-  // 1. The list of teams, once. New York is the default if it is there.
+  // 1. The list of teams for the chosen game type. The current team stays if it is in the list; otherwise New York
+  // (if it is there), otherwise the first team.
   useEffect(() => {
     let cancelled = false
-    fetchTeams()
+    fetchTeams(gameType)
       .then((list) => {
         if (cancelled) return
         setTeams(list)
-        setTeam((current) => current || (list.some((t) => t.team === 'NYK') ? 'NYK' : (list[0]?.team ?? '')))
+        setTeam((current) =>
+          list.some((t) => t.team === current) ? current : list.some((t) => t.team === 'NYK') ? 'NYK' : (list[0]?.team ?? ''),
+        )
       })
       .catch((e) => !cancelled && setError(errorText(e)))
     return () => {
       cancelled = true
     }
-  }, [attempt])
+  }, [gameType, attempt])
 
-  // 2. The players on the chosen team; the one with the most minutes is picked first.
+  // 2. The players on the chosen team, most minutes first. The current player stays if he is in the list; otherwise the
+  // first one is picked. (Waits for the team list, so a team that is not in the new list is never asked for.)
   useEffect(() => {
-    if (!team) return
+    if (!team || !teams) return
     let cancelled = false
-    fetchPlayers(team)
+    fetchPlayers(team, gameType)
       .then((list) => {
         if (cancelled) return
         setPlayers(list)
-        setPlayerId(list[0]?.id ?? '')
+        setPlayerId((current) => (list.some((pl) => pl.id === current) ? current : (list[0]?.id ?? '')))
       })
       .catch((e) => !cancelled && setError(errorText(e)))
     return () => {
       cancelled = true
     }
-  }, [team, attempt])
+  }, [team, teams, gameType, attempt])
 
-  // 3. The chosen player's form.
+  // 3. The chosen player's form (only once the player list has arrived, so a player from the old list is never asked for).
   useEffect(() => {
-    if (!playerId) return
+    if (!playerId || !players?.some((pl) => pl.id === playerId)) return
     let cancelled = false
     fetchForm(playerId, gameType)
       .then((f) => !cancelled && setForm(f))
@@ -103,7 +111,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [playerId, gameType, attempt])
+  }, [playerId, players, gameType, attempt])
 
   // 4. The chosen player's season grid. A failure here only affects the season panel, not the rest of the page.
   useEffect(() => {

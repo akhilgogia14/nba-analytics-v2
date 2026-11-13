@@ -59,6 +59,27 @@ export const SEASON_SQL = `
     AND t.season = (SELECT max(x.season) FROM ${SEASON_TABLE} x WHERE x.person_id = t.person_id AND x.game_type = t.game_type)
   ORDER BY t.game_type, t.team_id, t.game_number`
 
+// The pickers in PLAYOFFS mode: only teams and players that were in the latest playoffs (the newest season that has any
+// playoff game). They read player_season_games, whose grid has the team the player actually played the playoffs for
+// (player_form only knows his current team). A grid exists only if he played at least one playoff game for that team.
+const PLAYOFFS_SEASON = `(SELECT max(season) FROM ${SEASON_TABLE} WHERE game_type = 'playoffs')`
+export const PLAYOFF_TEAMS_SQL = `
+  SELECT team_tricode, count(DISTINCT person_id) AS players
+  FROM ${SEASON_TABLE}
+  WHERE game_type = 'playoffs' AND season = ${PLAYOFFS_SEASON}
+  GROUP BY team_tricode ORDER BY team_tricode`
+// Same four columns as PLAYERS_SQL: id, name, games (his playoff games that season, not the last-10 count), minutes.
+export const PLAYOFF_PLAYERS_SQL = `
+  SELECT person_id, max(player_name) AS player_name, count_if(played) AS games,
+         avg(CASE WHEN played THEN minutes END) AS minutes
+  FROM ${SEASON_TABLE}
+  WHERE game_type = 'playoffs' AND team_tricode = :team AND season = ${PLAYOFFS_SEASON}
+  GROUP BY person_id ORDER BY minutes DESC NULLS LAST, player_name`
+
+/** The team-list and player-list SQL for the page's game type (regular season = this season's roster). */
+export const teamsSqlFor = (gameType) => (gameType === 'playoffs' ? PLAYOFF_TEAMS_SQL : TEAMS_SQL)
+export const playersSqlFor = (gameType) => (gameType === 'playoffs' ? PLAYOFF_PLAYERS_SQL : PLAYERS_SQL)
+
 // ---- row mapping (the warehouse returns every value as a string or null) ----
 const num = (v) => (v === null || v === undefined ? null : Number(v))
 
