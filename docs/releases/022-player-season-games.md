@@ -26,7 +26,7 @@ The owner wants a season chart on the player page: one hexagon per team game (82
 - Real data through Databricks Connect, read-only, before any write: all **14 gates pass** on the real output (source rows 288,143). Spot checks: Luka Doncic 2025-26 regular season = 82 rows for LAL, 64 played (silver minutes above 0: 64); AJ Johnson has an 82-game grid for DAL (23 played) and one for WAS (25 played), each noting the other team; Danilo Gallinari 2023-24 has three grids (WAS, DET, MIL).
 - **22 corrupted copies of the real output** (duplicate row, null key, wrong game type, wrong season label, a row dropped, wrong opponent, date or home flag, wrong game number or team-game count, a whole grid with no played game, a played flag flipped either way, a played row dropped, a whole grid dropped, points +1, a missed game given a stat, minutes +1, a wrong, dropped or invented `other_teams`, a wrong name) each fired the expected gate; the untouched output fires none. Several corruptions also fire neighbouring gates (they overlap on purpose).
 - Warnings on the real output: `completed_season_grid_not_82_games` fires 0 times (every completed season's regular-season grid has 82 games); `three_or_more_teams_in_one_season` fires for 89 grids (players with three or more teams in one season).
-- **Not yet run as a real job:** the table does not exist in Databricks yet. The daily job (or a manual `databricks bundle deploy` plus `bundle run silver_build`) will create it. The app does not read it yet and has no grant on it.
+- **Real job run** (`databricks bundle deploy` from this branch, then `databricks bundle run silver_build`, 2026-11-13 16:05 UTC): `gold player_season_games` source rows 288,143, gates on source and on the table pass, inserted 288,143, updated 0, deleted 0, 89 new oddities logged (the three-or-more-teams warning), run_id `2026-11-13T160545Z`. The other four gold tables: 0 inserted, 0 updated, 0 deleted. Read back from the real table: Luka Doncic 2025-26 regular season = 82 rows, 64 played. The app does not read the table yet and has no grant on it.
 
 ## Files added or changed
 - `scripts/gold_player_season_games.py` (new): the PySpark table.
@@ -40,7 +40,7 @@ The owner wants a season chart on the player page: one hexagon per team game (82
 - **Missed-game labels:** a grey hexagon means "no minutes and no stats", not "injured". The data does not say why on most rows, and the page should not claim a reason.
 - **Trades:** a player's grid for the team he left shows grey for the games after the trade, exactly like a game he sat out. The note (`other_teams`) tells the reader why.
 - **Ten-day and two-way players** who played one game get a full 82-game grid with one coloured hexagon. That is what was asked for, but it will look sparse.
-- **Size:** about 288 thousand rows (about 19 columns). The daily job gets a little slower (the new table reads silver `player_game` and `team_game` once each); not measured yet.
+- **Size:** about 288 thousand rows (about 19 columns). The daily job gets a little slower (the new table reads silver `player_game` and `team_game` once each); not timed.
 - A game that exists in `player_game` but not in `team_game` would not appear in a grid; a gate (`played_game_missing_from_table`) would then fail the build loudly. It does not happen today.
 - The silver `played` flag and this table's `played` differ on 4 rows. Nothing reads silver's flag for the chart; if you want one rule everywhere, silver would change (its rule is documented in `docs/spike-findings.md` section 9).
 
@@ -51,13 +51,12 @@ The owner wants a season chart on the player page: one hexagon per team game (82
 - NULL handling: stats must be NULL (not 0) on missed games.
 
 ## Open questions for the owner
-1. Which average draws the "hit their average" border: the season **mean** (my default) or the **median**? And is "season" the same season as the grid (yes, my default)?
-2. May I run the real job now (`databricks bundle deploy` from this branch, then `bundle run silver_build`)? It only adds a new table, drops nothing, and takes a few minutes.
-3. After that, the app needs its own `SELECT` grant on `player_season_games` (I will list it and wait for your yes).
+1. Decided 2026-11-13: the "hit their average" border uses the season **mean** (of the same season as the grid).
+2. The app needs its own `SELECT` grant on `player_season_games` (I will list it and wait for your yes).
 
 ## Owner walkthrough
 - **What changed:** nothing you can see in the app yet. This adds one new table that holds, for every player and every team he played for in a season, a row for each of that team's games: 82 in a regular season. Games he played have his numbers (points, rebounds, assists, threes, blocks, steals, minutes). Games he did not play are listed but empty, so the chart can draw them grey.
 - **Example:** Luka Doncic's 2025-26 regular season has 82 rows for the Lakers. 64 have his numbers; the other 18 are empty (17 of them were not in the source data at all, and are filled in from the Lakers' schedule). A player traded in the middle of a season has two sets of rows, one per team, and each set says which other team he was on.
 - **What counts as "played":** any minutes, any stat above zero, or a non-zero plus/minus. A row with nothing at all counts as a game he missed.
 - **What each new file does:** `scripts/gold_player_season_games.py` builds the table; `sql/gold/player_season_games_gates.sql` rechecks the answer from the raw tables in a different way and stops the build if anything disagrees; the warnings file lists odd-but-possible cases; the test file proves the logic on small made-up seasons.
-- **What to check yourself:** nothing until the table is built. Once it is, open `workspace.nba_v2_gold.player_season_games` in Databricks, filter `player_name = 'Luka Dončić'`, `season_label = '2025-26'` and `game_type = 'regular-season'`: you should see 82 rows, 64 with `played = true`.
+- **What to check yourself:** the table is built. Open `workspace.nba_v2_gold.player_season_games` in Databricks, filter `player_name = 'Luka Dončić'`, `season_label = '2025-26'` and `game_type = 'regular-season'`: you should see 82 rows, 64 with `played = true`.
