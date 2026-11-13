@@ -64,3 +64,16 @@ export type SeasonGrid = {
 }
 
 export type Season = { grids: SeasonGrid[] }
+
+/** One game in a player's last-10 window (the line under each scorecard). `stats` can hold nulls if the table has a gap. */
+export type RecentGame = {
+  id: string
+  date: string
+  opp: string
+  isHome: boolean
+  seasonLabel: string
+  minutes: number | null
+  stats: Record<GridStat, number | null>
+}
+/** The last 10 games played of one game type, oldest first. */
+export type Recent = { games: RecentGame[] }

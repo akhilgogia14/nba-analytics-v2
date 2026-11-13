@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchForm, fetchPlayers, fetchSeason, fetchTeams } from './api.ts'
+import { fetchForm, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
 import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
@@ -11,7 +11,7 @@ import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { FormResult, GameType, PlayerOption, Season, Team } from './types.ts'
+import type { FormResult, GameType, PlayerOption, Recent, Season, Team } from './types.ts'
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -29,6 +29,7 @@ export default function App() {
   const [form, setForm] = useState<FormResult | null>(null)
   const [gameType, setGameType] = useState<GameType>('regular-season') // the page's one toggle
   const [season, setSeason] = useState<Season | null>(null)
+  const [recent, setRecent] = useState<Recent | null>(null) // the games behind the lines under the scorecards
   const [seasonError, setSeasonError] = useState('')
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0) // bumped by "Try again"
@@ -39,6 +40,7 @@ export default function App() {
     setPlayers(null)
     setPlayerId('')
     setForm(null)
+    setRecent(null)
     setSeason(null)
     setSeasonError('')
     setError('')
@@ -46,6 +48,7 @@ export default function App() {
   function choosePlayer(id: string) {
     setPlayerId(id)
     setForm(null)
+    setRecent(null)
     setSeason(null)
     setSeasonError('')
     setError('')
@@ -58,6 +61,7 @@ export default function App() {
     setTeams(null)
     setPlayers(null)
     setForm(null)
+    setRecent(null)
     setError('')
   }
   function tryAgain() {
@@ -108,6 +112,18 @@ export default function App() {
     fetchForm(playerId, gameType)
       .then((f) => !cancelled && setForm(f))
       .catch((e) => !cancelled && setError(errorText(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [playerId, players, gameType, attempt])
+
+  // 3b. The games behind the lines under the scorecards. The lines are an extra: if this fails the cards still show.
+  useEffect(() => {
+    if (!playerId || !players?.some((pl) => pl.id === playerId)) return
+    let cancelled = false
+    fetchRecent(playerId, gameType)
+      .then((r) => !cancelled && setRecent(r))
+      .catch(() => !cancelled && setRecent({ games: [] }))
     return () => {
       cancelled = true
     }
@@ -273,7 +289,7 @@ export default function App() {
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
               {CARD_STATS.map((key) => (
-                <Scorecard key={key} label={LABELS[key]} stat={data.stats[key]} games={p.l10Games} seasonLabel={p.seasonLabel} />
+                <Scorecard key={key} label={LABELS[key]} stat={data.stats[key]} statKey={key} games={p.l10Games} seasonLabel={p.seasonLabel} recent={recent?.games ?? null} />
               ))}
             </div>
 
