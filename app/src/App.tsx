@@ -7,7 +7,7 @@ import { MeetingsPanel } from './components/Meetings.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
-import { LOG_VIEWS, type LogView } from './lib/gamelog.ts'
+import { DEFAULT_VIEW, LOG_VIEWS, type LogView } from './lib/gamelog.ts'
 import { GAME_TYPE_OPTIONS, formNotices, gamesWord } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
@@ -36,7 +36,7 @@ export default function App() {
   const [gameType, setGameType] = useState<GameType>('regular-season') // the page's one toggle
   const [season, setSeason] = useState<Season | null>(null)
   const [recent, setRecent] = useState<Recent | null>(null) // the games behind the lines under the scorecards
-  const [view, setView] = useState<LogView>('log') // box scores (default) or the six average cards
+  const [view, setView] = useState<LogView>(DEFAULT_VIEW) // the six average cards (default) or the box scores
   const [log, setLog] = useState<LogGame[] | null>(null) // the last 15 games for the box-score table
   const [logError, setLogError] = useState('')
   const [opp, setOpp] = useState('') // the opponent chosen in the meetings panel

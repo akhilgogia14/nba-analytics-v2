@@ -1,10 +1,12 @@
 import type { LogGame } from '../types.ts'
 
 export type LogView = 'log' | 'cards'
+/** The page's two views, in the order of the pills. The first one is what the page opens on (Averages, the six cards). */
 export const LOG_VIEWS: { key: LogView; label: string }[] = [
-  { key: 'log', label: 'Box scores' },
   { key: 'cards', label: 'Averages' },
+  { key: 'log', label: 'Box scores' },
 ]
+export const DEFAULT_VIEW: LogView = LOG_VIEWS[0].key
 
 /** The simple stat columns shown after the shooting splits (stat key on a game and its heading). */
 export const LOG_COLUMNS = [
