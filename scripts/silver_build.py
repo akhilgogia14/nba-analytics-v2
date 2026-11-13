@@ -49,6 +49,7 @@ TABLES = {
     # A "python" table is written in PySpark: scripts/<module>.py has build(spark) returning a DataFrame. It runs only
     # where a Spark session exists (the Databricks job); the command line skips it.
     "player_form": {"key": ["person_id", "stat"], "layer": "gold", "python": "gold_player_form"},
+    "team_form": {"key": ["team_id", "stat"], "layer": "gold", "python": "gold_team_form"},
 }
 MAX_DELETE_FRACTION = 0.01
 MAX_EXAMPLES = 5
