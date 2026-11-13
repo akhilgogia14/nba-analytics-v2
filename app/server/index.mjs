@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
 import {
-  FORM_SQL, GAMES_SQL, SEASON_SQL, mapForm, mapGames, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
+  FORM_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGames, mapMeetings, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validPlayerId, validTeam,
 } from './queries.mjs'
 
@@ -106,6 +106,31 @@ app.get('/api/players/:id/games', async (req, res) => {
     )
   } catch (err) {
     fail(res, 'games', err)
+  }
+})
+
+// One player's games against one opponent (?opp=NYK), of one game type: this season's meetings, else the last 7 earlier ones.
+app.get('/api/players/:id/meetings', async (req, res) => {
+  const { id } = req.params
+  const type = req.query.type ?? 'regular-season'
+  const opp = req.query.opp
+  if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+  if (!validTeam(opp)) return res.status(400).json({ ok: false, error: 'Opponent must be a team abbreviation.' })
+  try {
+    res.json(
+      await cached(`meetings:${id}:${type}:${opp}`, FIVE_MINUTES, async () =>
+        mapMeetings(
+          await sql(MEETINGS_SQL, [
+            { name: 'id', value: id, type: 'BIGINT' },
+            { name: 'gt', value: type, type: 'STRING' },
+            { name: 'opp', value: opp, type: 'STRING' },
+          ]),
+        ),
+      ),
+    )
+  } catch (err) {
+    fail(res, 'meetings', err)
   }
 })
 

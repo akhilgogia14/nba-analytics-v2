@@ -77,3 +77,18 @@ export type RecentGame = {
 }
 /** The last 10 games played of one game type, oldest first. */
 export type Recent = { games: RecentGame[] }
+
+/** One game against the chosen opponent. kind says which season it is from, relative to the current one. */
+export type MeetingGame = {
+  id: string
+  date: string
+  team: string
+  opp: string
+  isHome: boolean
+  seasonLabel: string
+  minutes: number | null
+  stats: Record<'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl', number | null>
+  kind: 'this' | 'last' | 'older'
+}
+/** A player against one opponent, newest game first. scope: season (7+ this season), filled (topped up from earlier seasons), earlier (none this season), none. */
+export type Meetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; currentSeason: string | null; games: MeetingGame[] }
