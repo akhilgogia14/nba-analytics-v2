@@ -232,7 +232,7 @@ export default function App() {
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
               {CARD_STATS.map((key) => (
-                <Scorecard key={key} label={LABELS[key]} stat={form.stats[key]} />
+                <Scorecard key={key} label={LABELS[key]} stat={form.stats[key]} games={p.l10Games} />
               ))}
             </div>
 
