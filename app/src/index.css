@@ -14,3 +14,81 @@ select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Motion. Everything here is switched off for people who ask their device for reduced motion (last block). */
+
+/* Cards, sections and the season chart float up and fade in, one after another, when a team or player is picked. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.stagger > :not(.cards),
+.cards > * {
+  animation: rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > :nth-child(2) { animation-delay: 60ms; }
+.stagger > :nth-child(3) { animation-delay: 120ms; }
+.stagger > :nth-child(4) { animation-delay: 180ms; }
+.stagger > :nth-child(5) { animation-delay: 240ms; }
+.stagger > :nth-child(6) { animation-delay: 300ms; }
+.cards > :nth-child(1) { animation-delay: 80ms; }
+.cards > :nth-child(2) { animation-delay: 140ms; }
+.cards > :nth-child(3) { animation-delay: 200ms; }
+.cards > :nth-child(4) { animation-delay: 260ms; }
+.cards > :nth-child(5) { animation-delay: 320ms; }
+.cards > :nth-child(6) { animation-delay: 380ms; }
+
+/* The last-10-games line draws itself from left to right, then its fill fades in. */
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.spark-line {
+  stroke-dasharray: 1;
+  animation: draw 900ms cubic-bezier(0.4, 0, 0.2, 1) 250ms both;
+}
+.spark-area {
+  animation: fade 700ms ease-out 500ms both;
+}
+
+/* The court lines in the background draw themselves in when the page opens or the team changes, then breathe. */
+.court-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: draw 2400ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+.court-line:nth-child(2) { animation-delay: 150ms; }
+.court-line:nth-child(3) { animation-delay: 300ms; }
+.court-line:nth-child(4) { animation-delay: 450ms; }
+.court-line:nth-child(5) { animation-delay: 600ms; }
+.court-line:nth-child(6) { animation-delay: 750ms; }
+.court-line:nth-child(7) { animation-delay: 900ms; }
+@keyframes breathe {
+  from { transform: scale(1) translateY(0); }
+  to { transform: scale(1.04) translateY(-8px); }
+}
+.court-drift {
+  transform-origin: 50% 40%;
+  animation: breathe 24s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger > *,
+  .cards > *,
+  .spark-line,
+  .spark-area,
+  .court-line,
+  .court-drift {
+    animation: none !important;
+  }
+}

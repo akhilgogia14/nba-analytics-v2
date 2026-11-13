@@ -56,8 +56,8 @@ export function Sparkline({ games, stat, seasonAvg }: { games: RecentGame[]; sta
         {L.baseline !== null && (
           <line x1={0} x2={SPARK_W} y1={L.baseline} y2={L.baseline} stroke="var(--whisker)" strokeWidth={1} strokeDasharray="4 4" />
         )}
-        <path d={L.area} fill={`url(#${gradient})`} />
-        <path d={L.line} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 4px var(--accent))' }} />
+        <path className="spark-area" d={L.area} fill={`url(#${gradient})`} />
+        <path className="spark-line" pathLength={1} d={L.line} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 4px var(--accent))' }} />
         <circle cx={last.x} cy={last.y} r={3.5} fill="var(--dot)" stroke="var(--accent)" strokeWidth={1.5} />
         {L.points.map((p, i) => (
           <g

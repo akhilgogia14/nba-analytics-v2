@@ -7,6 +7,7 @@ import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
 import { GAME_TYPE_OPTIONS, formNotices, gamesWord } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
+import { CourtBackground } from './components/CourtBackground.tsx'
 import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
@@ -168,6 +169,7 @@ export default function App() {
       {look.wash !== 'none' && (
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10" style={{ backgroundImage: look.wash }} />
       )}
+      <CourtBackground key={team} />
       <div className="mx-auto flex max-w-[1200px] flex-col gap-[26px]">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-col gap-0.5">
@@ -254,7 +256,7 @@ export default function App() {
         )}
 
         {p && data && (
-          <>
+          <div key={`${playerId}-${gameType}`} className="stagger contents">
             <section className="flex flex-col gap-2">
               <div className="text-xs font-semibold tracking-widest text-(--accent) uppercase">
                 Player level · last {p.l10Games} {words}
@@ -287,7 +289,7 @@ export default function App() {
               ))}
             </section>
 
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
+            <div className="cards grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
               {CARD_STATS.map((key) => (
                 <Scorecard key={key} label={LABELS[key]} stat={data.stats[key]} statKey={key} games={p.l10Games} seasonLabel={p.seasonLabel} recent={recent?.games ?? null} />
               ))}
@@ -321,7 +323,7 @@ export default function App() {
             )}
 
             <CombosTable stats={data.stats} />
-          </>
+          </div>
         )}
 
         <p className="max-w-3xl text-xs leading-normal text-(--muted)">
