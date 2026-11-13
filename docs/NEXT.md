@@ -48,7 +48,8 @@ Written by Claude Code, refreshed 2026-11-07. Do these in order, one step at a t
 - Owner decisions (2026-11-12): first pass as a Databricks App, then an always-on host (Cloudflare D1 with Pages and Workers); the app never queries Databricks in the long run. Design idea: the Scorecards mock-up (team, player, opponent selectors, switchable themes).
 - **13a. Scaffold and health check: DONE** (release note 013, `app/`). Builds, and the server reads `player_form` through the warehouse locally.
 - **13b. Deploy to Databricks Apps: DONE 2026-11-13** (release note 014). App `nba-player-form` is running and reads `player_form`; the app identity has four approved grants. It is not public and stops after about 24 hours (restart: `databricks apps start nba-player-form`).
-- **13c. The real Player form page** (next): the Scorecards design on real data. Open: default colour theme; whether team and opponent views get their own gold tables first; whether to deploy from GitHub with auto-deploy.
+- **13c. The Player form page: DONE 2026-11-13** (release note 015). Team and Player dropdowns, six scorecards with range bars, combined-stats table, four themes (Paper default). Reads only `player_form`. Deployed; not yet looked at in a browser by anyone (owner's first look is the real test).
+- **13d. Team form and player vs opponent** (next, after the owner's feedback): new gold tables (PySpark, with gates and tests) to bring back the Opponent dropdown and the team-level view from the mock-up. Also open: reach players who have not played this season; auto-deploy from GitHub.
 - Later: the real Player form page from the Scorecards design; team form and player-vs-opponent gold tables; D1 export and the always-on host.
 
 

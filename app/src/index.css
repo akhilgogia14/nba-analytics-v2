@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+body {
+  margin: 0;
+}
+
+button,
+select {
+  font-family: inherit;
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

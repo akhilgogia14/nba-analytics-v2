@@ -55,15 +55,23 @@ async function api(path, init = {}) {
   return res.json()
 }
 
-// Run one fixed SQL statement and return its rows as arrays of strings.
-// Never build `statement` from user input.
-export async function sql(statement) {
+// Run one SQL statement and return its rows as arrays of strings (NULL stays null).
+// Never build `statement` from user input. Values from the outside go in `parameters`,
+// as [{ name, value, type }], and the statement refers to them as :name.
+export async function sql(statement, parameters = []) {
   const warehouse_id = process.env.DATABRICKS_WAREHOUSE_ID
   if (!warehouse_id) throw new Error('DATABRICKS_WAREHOUSE_ID is not set')
 
   let r = await api('/api/2.0/sql/statements', {
     method: 'POST',
-    body: JSON.stringify({ warehouse_id, statement, wait_timeout: '30s', on_wait_timeout: 'CONTINUE', format: 'JSON_ARRAY' }),
+    body: JSON.stringify({
+      warehouse_id,
+      statement,
+      parameters,
+      wait_timeout: '30s',
+      on_wait_timeout: 'CONTINUE',
+      format: 'JSON_ARRAY',
+    }),
   })
   // A stopped warehouse takes a while to start, so keep asking until it finishes (max ~3 min).
   for (let i = 0; i < 36 && (r.status.state === 'PENDING' || r.status.state === 'RUNNING'); i++) {
