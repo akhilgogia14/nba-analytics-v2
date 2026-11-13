@@ -1,26 +1,23 @@
 import { contrast, teamStyle } from './teams.ts'
-import type { ThemeKey } from './themes.ts'
+import { THEME } from './themes.ts'
 
 /**
- * Sample colours of each theme, used only for the readability maths below. The page itself keeps using the theme's
- * CSS variables; a test checks that the text and muted colours here still match themes.ts.
- * bg and panel are solid stand-ins for the gradients and see-through panels some themes use.
+ * Sample colours of the dark theme, used only for the readability maths below. The page itself keeps using the
+ * theme's CSS variables; a test checks that the text and muted colours here still match themes.ts.
+ * bg and panel are solid stand-ins (the real panel is see-through).
  */
-export const THEME_BASE: Record<ThemeKey, { bg: string; panel: string; text: string; muted: string }> = {
-  paper: { bg: '#F6F5F1', panel: '#FFFFFF', text: '#1B1F24', muted: '#5B6470' },
-  midnight: { bg: '#070A12', panel: '#10131B', text: '#EAF0FF', muted: '#9FB0CC' },
-  graphite: { bg: '#111111', panel: '#1A1A19', text: '#F3EEE4', muted: '#A8A093' },
-  aurora: { bg: '#EEF2FF', panel: '#F4F5FD', text: '#111827', muted: '#4B5563' },
-}
+export const THEME_BASE = { bg: '#070A12', panel: '#10131B', text: '#EAF0FF', muted: '#9FB0CC' }
 
-/** The tint strength we would like (0 to 1). Dark themes need more to show at all. Teams that cannot take it are lowered. */
-export const WASH_TARGET: Record<ThemeKey, number> = { paper: 0.22, aurora: 0.22, midnight: 0.32, graphite: 0.3 }
-/** Normal and muted text must keep at least this contrast on the tinted page (4.5 is the usual rule). */
-export const MIN_TEXT_CONTRAST = 4.5
+/** How strongly the team colour tints the top of the page (0 to 1). Teams that cannot take it are lowered. */
+export const WASH_TARGET = 0.32
 /** The tint fades out over this many pixels. */
 export const WASH_HEIGHT = 560
+/** Normal and muted text must keep at least this contrast on the tinted page (4.5 is the usual rule). */
+export const MIN_TEXT_CONTRAST = 4.5
 /** Smallest contrast an accent colour must have against both the page and the cards (normal text: 4.5). */
 export const MIN_ACCENT_CONTRAST = 4.5
+/** With a team look on, the grey "muted" text moves this share of the way toward the main text colour. */
+export const MUTED_TOWARD_TEXT = 0.5
 
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
 
@@ -31,13 +28,9 @@ export function blend(top: string, under: string, alpha: number): string {
   return '#' + a.map((v, i) => Math.round(v * alpha + b[i] * (1 - alpha)).toString(16).padStart(2, '0')).join('')
 }
 
-/** With a team look on, the grey "muted" text moves this share of the way toward the main text colour. */
-export const MUTED_TOWARD_TEXT = 0.5
-
-/** The muted text colour used under a team tint: darker on light themes, lighter on dark ones. A plain hex value. */
-export function mutedFor(theme: ThemeKey): string {
-  const base = THEME_BASE[theme]
-  return blend(base.text, base.muted, MUTED_TOWARD_TEXT)
+/** The muted text colour used under a team tint, lighter than the plain one. A plain hex value. */
+export function mutedUnderTint(): string {
+  return blend(THEME_BASE.text, THEME_BASE.muted, MUTED_TOWARD_TEXT)
 }
 
 /** The strongest tint (up to the target) under which both text colours keep the minimum contrast; 0 if none does. */
@@ -49,21 +42,24 @@ export function maxReadableAlpha(primary: string, bg: string, texts: string[], t
   return 0
 }
 
-/** The tint strength used for this team on this theme. */
-export function washAlphaFor(abbrev: string | null | undefined, theme: ThemeKey): number {
-  const base = THEME_BASE[theme]
-  return maxReadableAlpha(teamStyle(abbrev).primary, base.bg, [base.text, mutedFor(theme)], WASH_TARGET[theme])
+/** The tint strength used for this team. */
+export function washAlphaFor(abbrev: string | null | undefined): number {
+  return maxReadableAlpha(teamStyle(abbrev).primary, THEME_BASE.bg, [THEME_BASE.text, mutedUnderTint()], WASH_TARGET)
 }
 
-/** The team colour to use as accent text/marks on this theme: primary, else secondary, else the theme's own accent. */
-export function accentFor(abbrev: string | null | undefined, theme: ThemeKey, themeAccent: string): string {
-  if (!abbrev || !(abbrev.toUpperCase() in LOOKUP)) return themeAccent
-  const base = THEME_BASE[theme]
+const KNOWN = new Set(
+  'ATL BKN BOS CHA CHI CLE DAL DEN DET GSW HOU IND LAC LAL MEM MIA MIL MIN NOP NYK OKC ORL PHI PHX POR SAC SAS TOR UTA WAS'.split(' '),
+)
+const isKnown = (abbrev: string | null | undefined): abbrev is string => !!abbrev && KNOWN.has(abbrev.toUpperCase())
+
+/** The team colour to use as accent text/marks: primary, else secondary, else the theme's own accent. */
+export function accentFor(abbrev: string | null | undefined): string {
+  if (!isKnown(abbrev)) return THEME['--accent']
   const s = teamStyle(abbrev)
   for (const c of [s.primary, s.secondary]) {
-    if (contrast(c, base.bg) >= MIN_ACCENT_CONTRAST && contrast(c, base.panel) >= MIN_ACCENT_CONTRAST) return c
+    if (contrast(c, THEME_BASE.bg) >= MIN_ACCENT_CONTRAST && contrast(c, THEME_BASE.panel) >= MIN_ACCENT_CONTRAST) return c
   }
-  return themeAccent
+  return THEME['--accent']
 }
 
 export type TeamLook = {
@@ -76,15 +72,14 @@ export type TeamLook = {
 /** No team chosen yet (or an unknown one): nothing changes, the theme looks exactly as it did. */
 export const NO_LOOK: TeamLook = { wash: 'none', vars: {} }
 
-export function teamLook(abbrev: string | null | undefined, theme: ThemeKey, themeAccent: string): TeamLook {
-  if (!abbrev || !(abbrev.toUpperCase() in LOOKUP)) return NO_LOOK
-  const s = teamStyle(abbrev)
-  const [r, g, b] = rgb(s.primary)
-  const accent = accentFor(abbrev, theme, themeAccent)
+export function teamLook(abbrev: string | null | undefined): TeamLook {
+  if (!isKnown(abbrev)) return NO_LOOK
+  const [r, g, b] = rgb(teamStyle(abbrev).primary)
+  const accent = accentFor(abbrev)
   return {
-    wash: `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, ${washAlphaFor(abbrev, theme)}) 0px, rgba(${r}, ${g}, ${b}, 0) ${WASH_HEIGHT}px)`,
+    wash: `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, ${washAlphaFor(abbrev)}) 0px, rgba(${r}, ${g}, ${b}, 0) ${WASH_HEIGHT}px)`,
     vars: {
-      '--muted': mutedFor(theme),
+      '--muted': mutedUnderTint(),
       '--accent': accent,
       '--median': accent,
       '--band': `color-mix(in srgb, ${accent} 38%, transparent)`,
@@ -92,10 +87,3 @@ export function teamLook(abbrev: string | null | undefined, theme: ThemeKey, the
     },
   }
 }
-
-// The known teams (so an unknown abbreviation gets no tint instead of the grey fallback).
-const LOOKUP: Record<string, true> = Object.fromEntries(
-  'ATL BKN BOS CHA CHI CLE DAL DEN DET GSW HOU IND LAC LAL MEM MIA MIL MIN NOP NYK OKC ORL PHI PHX POR SAC SAS TOR UTA WAS'
-    .split(' ')
-    .map((t) => [t, true as const]),
-)
