@@ -31,7 +31,7 @@ def make_players(spark, rows):
         if "minutes_seconds" not in r and "mins" in r:
             stats["minutes_seconds"] = None if r["mins"] is None else r["mins"] * 60
             stats["minutes"] = None if r["mins"] is None else float(r["mins"])
-        out.append((r["person_id"], r["team_id"], r["game"], r["name"], *[stats[c] for c in PLAYER_COLS]))
+        out.append((r["person_id"], r["team_id"], r["game"], r["name"], *[stats[c] for c in PLAYER_COLS], r.get("started", False)))
     return out
 
 
@@ -42,10 +42,10 @@ def run(spark, teams, player_rows):
     rows = []
     for p in make_players(spark, player_rows):
         s = sched[p[2]]
-        rows.append((p[2], p[0], p[1], s["game_date"], s["season"], s["season_type"], p[3], *p[4:]))
+        rows.append((p[2], p[0], p[1], s["game_date"], s["season"], s["season_type"], p[3], *p[4:]))  # p ends with `started`
     schema = ("game_id string, person_id int, team_id int, game_date date, season int, season_type string, player_name string, "
               "minutes_seconds int, minutes double, pts int, reb int, ast int, fg3m int, blk int, stl int, tov int, pf int, "
-              "fgm int, fga int, fg3a int, ftm int, fta int, oreb int, dreb int, plus_minus double")
+              "fgm int, fga int, fg3a int, ftm int, fta int, oreb int, dreb int, plus_minus double, started boolean")
     players = spark.createDataFrame(rows, schema)
     out = g.transform(players, team_df).collect()
     return {(r["person_id"], r["team_id"], r["game_id"]): r.asDict() for r in out}
@@ -74,6 +74,29 @@ def test_missed_games_are_filled_in_from_the_team_schedule(spark):
     assert (first["season_label"], first["game_type"], first["team_tricode"], first["opponent_tricode"]) == ("2025-26", REG, "AAA", "OPP")
     assert (first["opponent_team_id"], first["is_home"], out[(7, 1, "1-2")]["is_home"], first["game_date"]) == (99, False, True, date(2026, 1, 2))
     assert first["other_teams"] is None
+
+
+BOX = ["started", "fgm", "fga", "fg3a", "ftm", "fta", "oreb", "dreb", "tov", "pf", "plus_minus"]
+
+
+def test_the_rest_of_the_box_score_comes_through_for_played_games_and_is_empty_for_missed_ones(spark):
+    teams = {1: ("AAA", [(2026, REG)] * 3)}
+    rows = [dict(person_id=7, team_id=1, game="1-1", name="P", mins=30, pts=21, reb=7, fgm=7, fga=15, fg3m=3, fg3a=8, ftm=4, fta=5,
+                 oreb=2, dreb=5, tov=3, pf=2, plus_minus=-6.0, started=True),
+            dict(person_id=7, team_id=1, game="1-3", name="P", mins=12, pts=2, fgm=1, fga=4, ftm=0, fta=0, pf=5, plus_minus=4.0)]
+    out = run(spark, teams, rows)
+    g = out[(7, 1, "1-1")]
+    assert (g["started"], g["fgm"], g["fga"], g["fg3a"], g["ftm"], g["fta"], g["oreb"], g["dreb"], g["tov"], g["pf"], g["plus_minus"]) == (True, 7, 15, 8, 4, 5, 2, 5, 3, 2, -6.0)
+    assert out[(7, 1, "1-3")]["started"] is False  # came off the bench
+    assert out[(7, 1, "1-3")]["pf"] == 5 and out[(7, 1, "1-3")]["plus_minus"] == 4.0
+    missed = out[(7, 1, "1-2")]
+    assert missed["played"] is False and all(missed[c] is None for c in BOX)
+
+
+def test_the_new_columns_are_appended_in_the_tables_own_order():
+    g = pytest.importorskip("gold_player_season_games")
+    assert g.BOX_COLUMNS == BOX
+    assert g.OUTPUT_COLUMNS[-len(BOX):] == BOX  # appended after the existing columns, in the table's own order
 
 
 def test_a_player_with_one_game_gets_the_whole_team_season(spark):
