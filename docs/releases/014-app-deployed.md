@@ -1,7 +1,7 @@
 # Release 014: the app is deployed on Databricks Apps
 
 Date: 2026-11-13 (UTC; the deploy ran at 00:21 UTC; all times below are UTC)
-Branch / PR: `docs/release-014-app-deploy` (docs only; PR number added when opened)
+Branch / PR: `docs/release-014-app-deploy`, PR #21 (docs only)
 Author: (Claude Code)
 
 ## What changed
