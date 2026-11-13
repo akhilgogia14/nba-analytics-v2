@@ -15,7 +15,11 @@ The owner asked for a fuller box score (field goals, free throws, turnovers, fou
 ## How to verify
 - `.venv/bin/python -m pytest tests -q`: **98 passed** (96 before; 2 new: the new columns come through for played games and are empty for missed ones, and the column order). Local Spark, so the real Databricks run is still the final check.
 - New gate SQL run read-only against the real table while the new columns were still empty: it ran, only `stats_differ_from_silver` and `played_row_missing_box_score` fired (144,826 played rows each, as they should), and the other 14 gates passed.
-- **Not done yet:** the real job run that fills the columns (needs the owner's yes), the corrupted-copy checks on the filled output, and the app change that shows the columns.
+- **Not done yet:** the app change that shows the columns.
+
+## Real job run and corrupted-copy checks (2026-11-13, after the merge)
+- **Real job run** (`databricks bundle deploy` then `databricks bundle run silver_build` from `main`, owner's yes, 19:21 UTC): gates on the source and on the table pass; `player_season_games` **inserted 0, updated 144,826, deleted 0** (every played game filled in; the 143,317 missed-game rows stay empty), table rows 288,143 = source 288,143, no new oddities logged, run_id `2026-11-13T192114Z`. Silver and the other four gold tables: 0 inserted, 0 updated, 0 deleted.
+- **12 corrupted copies of the real output** (read-only `WITH` copies, one number broken at a time on a real Brunson game, plus a missed game): the untouched copy fires no gate; `fgm + 1`, `oreb + 1`, `fga` below `fgm`, `fg3a` and `fta` swapped, `ftm + 1` with `pts + 1` each fire `stats_differ_from_silver` and `box_score_arithmetic_wrong`; `plus_minus + 1`, `started` flipped and `tov + 1` fire `stats_differ_from_silver`; emptying `pf` on a played row fires `stats_differ_from_silver` and `played_row_missing_box_score`; giving a missed game `fgm = 1` or a plus/minus fires `stats_differ_from_silver`. (The `ftm + 1` with `pts + 1` case also tripped the arithmetic gate, probably because makes then exceeded attempts, so it does not on its own show the arithmetic gate catching a balanced change.)
 
 ## Files added or changed
 - `scripts/gold_player_season_games.py`: carries the 11 columns through. `sql/gold/player_season_games_gates.sql`: the extended and the two new gates. `tests/test_gold_player_season_games.py`: the new tests.
