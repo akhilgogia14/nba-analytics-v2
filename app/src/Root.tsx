@@ -3,7 +3,7 @@ import App from './App.tsx'
 import { pageFromHash } from './lib/pages.ts'
 import TeamsPage from './TeamsPage.tsx'
 
-/** Shows the Player page or the Teams page, by the address ("#/teams" = Teams; anything else = Players). */
+/** Shows the Teams page (the default) or the Player page ("#/players"), by the address. */
 export default function Root() {
   const [page, setPage] = useState(() => pageFromHash(window.location.hash))
   useEffect(() => {

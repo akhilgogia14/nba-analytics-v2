@@ -3,6 +3,7 @@ import { fetchLeagueAverages, fetchTeamForm, fetchTeamGames, fetchTeamLog, fetch
 import { TeamBadge } from './components/Avatar.tsx'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
+import { parseHash, rememberTeam } from './lib/pages.ts'
 import { Scorecard } from './components/Scorecard.tsx'
 import { TeamGameLog } from './components/TeamGameLog.tsx'
 import { TeamMeetingsPanel } from './components/TeamMeetings.tsx'
@@ -34,7 +35,7 @@ function errorText(e: unknown): string {
  */
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[] | null>(null)
-  const [team, setTeam] = useState('')
+  const [team, setTeam] = useState(() => parseHash(window.location.hash).team) // the team carried over from the other page, if any
   const [gameType, setGameType] = useState<GameType>('regular-season')
   const [form, setForm] = useState<TeamFormResult | null>(null)
   const [recent, setRecent] = useState<TeamGame[] | null>(null) // the games behind the lines under the scorecards
@@ -105,6 +106,9 @@ export default function TeamsPage() {
       cancelled = true
     }
   }, [gameType, attempt])
+
+  // The chosen team goes into the address, so the Players link (and a bookmark) carry it.
+  useEffect(() => rememberTeam('teams', team), [team])
 
   const listed = !!team && !!teams?.some((t) => t.team === team)
 
@@ -188,7 +192,7 @@ export default function TeamsPage() {
             </div>
             <div className="text-[13px] text-(--muted)">How a team's offense has looked over its recent games, as a range</div>
           </div>
-          <PageSwitch page="teams" />
+          <PageSwitch page="teams" team={team} />
         </header>
 
         <div className="flex flex-wrap items-end gap-4">

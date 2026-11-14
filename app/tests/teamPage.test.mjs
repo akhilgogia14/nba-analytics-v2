@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { pageFromHash } from '../src/lib/pages.ts'
+import { hashFor, pageFromHash, parseHash } from '../src/lib/pages.ts'
 import { sparkLayout, sparkTip } from '../src/lib/spark.ts'
 import { TEAM_CARDS, cardFormat, leagueNote, pctText, pointFormat, resultText, teamAverageRow, teamLogNote, teamMeetingsNote, teamNotices } from '../src/lib/teamPage.ts'
 
@@ -14,10 +14,25 @@ const info = (o = {}) => ({
   seasonGames: 11, l10Games: 10, l10FirstDate: '2026-10-23', l10GamesBeforeCurrentSeason: 0, l10Wins: 6, ...o,
 })
 
-test('the address picks the page: #/teams is Teams, anything else is Players', () => {
+test('the address picks the page and the team: Teams is the default', () => {
   assert.equal(pageFromHash('#/teams'), 'teams')
-  assert.equal(pageFromHash('#/teams?x=1'), 'teams')
-  for (const h of ['', '#', '#/players', '#/team', '#/other']) assert.equal(pageFromHash(h), 'players')
+  assert.equal(pageFromHash('#/players'), 'players')
+  assert.equal(pageFromHash('#/players?team=BOS'), 'players')
+  for (const h of ['', '#', '#/', '#/team', '#/other', '#/teams?x=1']) assert.equal(pageFromHash(h), 'teams')
+})
+
+test('the chosen team travels in the address, and only a valid team is accepted', () => {
+  assert.deepEqual(parseHash('#/teams?team=BOS'), { page: 'teams', team: 'BOS' })
+  assert.deepEqual(parseHash('#/players?team=NYK'), { page: 'players', team: 'NYK' })
+  assert.deepEqual(parseHash(''), { page: 'teams', team: '' })
+  for (const bad of ['#/teams?team=bos', '#/teams?team=BOSS', '#/teams?team=B1S', "#/teams?team='%20OR%201=1", '#/teams?team=', '#/teams?team=NY']) {
+    assert.equal(parseHash(bad).team, '', bad)
+  }
+  assert.equal(hashFor('players', 'BOS'), '#/players?team=BOS')
+  assert.equal(hashFor('teams', ''), '#/teams')
+  assert.equal(hashFor('teams', 'nope'), '#/teams')
+  // a link built from the address, followed, gives the same team and the other page
+  assert.deepEqual(parseHash(hashFor('players', parseHash('#/teams?team=BOS').team)), { page: 'players', team: 'BOS' })
 })
 
 test('the six cards are offense first and turnovers count lower as better', () => {

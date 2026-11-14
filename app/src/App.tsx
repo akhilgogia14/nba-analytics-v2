@@ -5,6 +5,7 @@ import { CombosTable } from './components/CombosTable.tsx'
 import { GameLog } from './components/GameLog.tsx'
 import { MeetingsPanel } from './components/Meetings.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
+import { parseHash, rememberTeam } from './lib/pages.ts'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
@@ -30,7 +31,7 @@ function errorText(e: unknown): string {
 
 export default function App() {
   const [teams, setTeams] = useState<Team[] | null>(null)
-  const [team, setTeam] = useState('')
+  const [team, setTeam] = useState(() => parseHash(window.location.hash).team) // the team carried over from the other page, if any
   const [players, setPlayers] = useState<PlayerOption[] | null>(null)
   const [playerId, setPlayerId] = useState('')
   const [form, setForm] = useState<FormResult | null>(null)
@@ -117,6 +118,9 @@ export default function App() {
       cancelled = true
     }
   }, [gameType, attempt])
+
+  // The chosen team goes into the address, so the Teams link (and a bookmark) carry it.
+  useEffect(() => rememberTeam('players', team), [team])
 
   // 2. The players on the chosen team, most minutes first. The current player stays if he is in the list; otherwise the
   // first one is picked. (Waits for the team list, so a team that is not in the new list is never asked for.)
@@ -231,7 +235,7 @@ export default function App() {
             </div>
             <div className="text-[13px] text-(--muted)">Recent games as a range, not a single number</div>
           </div>
-          <PageSwitch page="players" />
+          <PageSwitch page="players" team={team} />
         </header>
 
         <div className="flex flex-wrap items-end gap-4">
