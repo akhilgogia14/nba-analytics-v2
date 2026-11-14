@@ -4,8 +4,11 @@ key (team_id, game_type, stat).
 Source: silver team_game (one row per team per game). A team gets rows for every game type it has played:
 game_type is 'regular-season', 'playoffs', 'play-in' or 'nba-cup'. Regular season and playoffs are never mixed.
 
-Per team, game type and stat (pts, reb, ast, fg3m, blk, stl, allowed, margin), where allowed = points the opponent
-scored and margin = pts - allowed:
+Per team, game type and stat, where allowed = points the opponent scored and margin = pts - allowed. 15 stats:
+the first eight (pts, reb, ast, fg3m, blk, stl, allowed, margin) and seven offense stats added in release 038 (fg_pct,
+fg3_pct, ft_pct, tov, oreb, fga, fta). A percentage stat is on a 0-100 scale: per game it is made / attempts x 100
+(empty when there were no attempts); its l10_mean and season_mean are POOLED (total made / total attempts x 100, not an
+average of per-game percentages); its median, p10, p90, min and max are per game.
   * last-10 window = the team's 10 most recent games OF THAT TYPE, crossing into earlier seasons if needed.
     l10_games, l10_first_date, l10_games_before_current_season (window games from before the latest season in the
     data) and l10_wins label what the window is made of. A playoff window can reach back years: last_game_date and
@@ -23,7 +26,11 @@ from pyspark.sql import functions as F
 
 SOURCE_TABLE = "workspace.nba_v2_silver.team_game"
 WINDOW_GAMES = 10
-STATS = ["pts", "reb", "ast", "fg3m", "blk", "stl", "allowed", "margin"]
+STATS = ["pts", "reb", "ast", "fg3m", "blk", "stl", "allowed", "margin"]  # also what gold team_vs_opponent uses
+OFFENSE_STATS = ["fg_pct", "fg3_pct", "ft_pct", "tov", "oreb", "fga", "fta"]
+FORM_STATS = STATS + OFFENSE_STATS
+# percentage stat -> (made column, attempts column)
+PCT_STATS = {"fg_pct": ("fgm", "fga"), "fg3_pct": ("fg3m", "fg3a"), "ft_pct": ("ftm", "fta")}
 QUANTILES = (0.1, 0.5, 0.9)
 GROUP = ["team_id", "game_type"]
 OUTPUT_COLUMNS = [
@@ -44,6 +51,8 @@ def transform(games: DataFrame) -> DataFrame:
     latest_season = games.agg(F.max("season")).collect()[0][0]
     games = (games.withColumn("allowed", F.col("opp_pts")).withColumn("margin", F.col("pts") - F.col("opp_pts"))
              .withColumn("game_type", F.col("season_type")))
+    for stat, (made, att) in PCT_STATS.items():
+        games = games.withColumn(stat, F.when(F.col(att) > 0, F.col(made) / F.col(att) * 100))
     newest_first = Window.partitionBy(*GROUP).orderBy(F.col("game_date").desc(), F.col("game_id").desc())
     ranked = games.withColumn("rn", F.row_number().over(newest_first))
     window_rows = ranked.filter(F.col("rn") <= WINDOW_GAMES)
@@ -67,16 +76,21 @@ def transform(games: DataFrame) -> DataFrame:
              .withColumn("season_label", season_label_col(F.lit(latest_season))))
 
     parts = []
-    for stat in STATS:  # the same block for every stat: this loop is what a new stat extends
+    for stat in FORM_STATS:  # the same block for every stat: this loop is what a new stat extends
         x = F.col(stat).cast("double")
+        if stat in PCT_STATS:  # pooled mean: total made / total attempts
+            made, att = (F.col(c).cast("double") for c in PCT_STATS[stat])
+            mean = lambda: F.round(F.try_divide(F.sum(made), F.sum(att)) * 100, 3)  # noqa: E731
+        else:
+            mean = lambda: F.round(F.avg(x), 3)  # noqa: E731
         quantiles = F.expr(f"percentile(CAST({stat} AS DOUBLE), array({', '.join(str(q) for q in QUANTILES)}))")
         part = (window_rows.groupBy(*GROUP)
-                .agg(F.round(F.avg(x), 3).alias("l10_mean"), quantiles.alias("_q"),
+                .agg(mean().alias("l10_mean"), quantiles.alias("_q"),
                      F.min(x).alias("l10_min"), F.max(x).alias("l10_max"))
                 .withColumn("l10_p10", F.round(F.col("_q")[0], 3))
                 .withColumn("l10_median", F.round(F.col("_q")[1], 3))
                 .withColumn("l10_p90", F.round(F.col("_q")[2], 3)).drop("_q"))
-        season_mean = this_season.groupBy(*GROUP).agg(F.round(F.avg(x), 3).alias("season_mean"))
+        season_mean = this_season.groupBy(*GROUP).agg(mean().alias("season_mean"))
         parts.append(part.join(season_mean, GROUP, "left").withColumn("stat", F.lit(stat)))
 
     stats_df = reduce(lambda a, b: a.unionByName(b), parts)
