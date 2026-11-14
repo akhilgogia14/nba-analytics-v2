@@ -11,7 +11,7 @@ const head = 'py-1.5 pr-3 text-right font-semibold'
 /**
  * The team's box-score table: its last 15 games played of the page's game type (regular season or playoffs, never both),
  * newest first, whatever the opponent. Date, game, result, then the offense: points, field goals with percentage, threes with
- * percentage, free throws, offensive and total rebounds, assists and turnovers, with an average row at the bottom. A game
+ * percentage, free throws, offensive and total rebounds, assists, turnovers, steals, blocks and fouls, with an average row at the bottom. A game
  * from an earlier season shows its year. The table scrolls sideways on a narrow screen.
  */
 export function TeamGameLog({ games, error, gamesWord }: { games: TeamGame[] | null; error: string; gamesWord: string }) {
@@ -56,6 +56,9 @@ export function TeamGameLog({ games, error, gamesWord }: { games: TeamGame[] | n
                 <th className={head}>REB</th>
                 <th className={head}>AST</th>
                 <th className={head}>TOV</th>
+                <th className={head}>STL</th>
+                <th className={head}>BLK</th>
+                <th className={head}>PF</th>
               </tr>
             </thead>
             <tbody>
@@ -79,6 +82,9 @@ export function TeamGameLog({ games, error, gamesWord }: { games: TeamGame[] | n
                   <td className={cell}>{num(g.box.reb)}</td>
                   <td className={cell}>{num(g.box.ast)}</td>
                   <td className={cell}>{num(g.box.tov)}</td>
+                  <td className={cell}>{num(g.box.stl)}</td>
+                  <td className={cell}>{num(g.box.blk)}</td>
+                  <td className={cell}>{num(g.box.pf)}</td>
                 </tr>
               ))}
               <tr className="border-t-2 border-(--whisker) font-semibold">
@@ -94,6 +100,9 @@ export function TeamGameLog({ games, error, gamesWord }: { games: TeamGame[] | n
                 <td className={cell}>{num(avg.reb)}</td>
                 <td className={cell}>{num(avg.ast)}</td>
                 <td className={cell}>{num(avg.tov)}</td>
+                <td className={cell}>{num(avg.stl)}</td>
+                <td className={cell}>{num(avg.blk)}</td>
+                <td className={cell}>{num(avg.pf)}</td>
               </tr>
             </tbody>
           </table>

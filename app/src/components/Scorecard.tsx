@@ -28,7 +28,7 @@ function Bubble({ tip }: { tip: Tip }) {
 const hitClass = 'absolute block cursor-help rounded-sm bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-(--accent)'
 
 export function Scorecard({
-  label, stat, statKey, games, seasonLabel, recent, fmt = f1, names, lowerIsBetter = false,
+  label, stat, statKey, games, seasonLabel, recent, fmt = f1, names, lowerIsBetter = false, leagueAvg = null,
 }: {
   label: string
   stat: ApiStat | undefined
@@ -43,6 +43,8 @@ export function Scorecard({
   names?: SparkNames
   /** True when a lower number is better (turnovers): the "vs season avg" chip then shows down in green and up in red. */
   lowerIsBetter?: boolean
+  /** The league average of this stat (team page): shown as text and as a dotted line on the sparkline. */
+  leagueAvg?: number | null
 }) {
   const d = complete(stat)
   const season = stat?.seasonMean ?? null
@@ -89,9 +91,11 @@ export function Scorecard({
     <div className="flex flex-col gap-3.5 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold">{label}</span>
-        {season !== null && (
-          <span className="text-xs text-(--muted)">
-            {seasonLabel} season avg {fmt(season)}
+        {(season !== null || leagueAvg !== null) && (
+          <span className="text-right text-xs text-(--muted)">
+            {season !== null && `${seasonLabel} season avg ${fmt(season)}`}
+            {season !== null && leagueAvg !== null && ' · '}
+            {leagueAvg !== null && `league avg ${fmt(leagueAvg)}`}
           </span>
         )}
       </div>
@@ -116,7 +120,7 @@ export function Scorecard({
         )}
       </div>
 
-      {recent && <Sparkline games={recent} stat={statKey} seasonAvg={season} names={names} fmt={fmt} />}
+      {recent && <Sparkline games={recent} stat={statKey} seasonAvg={season} leagueAvg={leagueAvg} names={names} fmt={fmt} />}
 
       <div ref={box} className="relative flex flex-col gap-1.5">
         {tip && <Bubble tip={tip} />}

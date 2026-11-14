@@ -67,3 +67,14 @@ test('sparkTip: the number and opponent on top, date and home or away underneath
   assert.equal(away.title, '8 REB · @ LAC')
   assert.equal(away.detail, 'Oct 28 · away')
 })
+
+test('sparkLayout: the league average gets its own dotted line and the scale includes it', () => {
+  // values 20 and 22, season average 21, league average 30: range 20..30 -> league line y(30) = 8, y(20) = 48, y(22) = 40
+  const L = sparkLayout([game('a', 20), game('b', 22)], 'pts', 21, 30)
+  assert.equal(L.leagueBaseline, 8)
+  assert.deepEqual(L.points.map((p) => p.y), [48, 40])
+  assert.equal(L.baseline, 44)
+  // without a league figure there is no line, and the layout is what it was before
+  assert.equal(sparkLayout([game('a', 20), game('b', 22)], 'pts', 21).leagueBaseline, null)
+  assert.deepEqual(sparkLayout([game('a', 20), game('b', 22)], 'pts', 21, null).points, sparkLayout([game('a', 20), game('b', 22)], 'pts', 21).points)
+})

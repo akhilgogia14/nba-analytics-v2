@@ -146,3 +146,6 @@ export type TeamGame = {
 }
 export type TeamMeetingGame = TeamGame & { kind: 'this' | 'last' }
 export type TeamMeetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; currentSeason: string | null; games: TeamMeetingGame[] }
+
+/** The league average of each team stat, per team game, for one game type in the latest season that has games of it. */
+export type LeagueAverages = { seasonLabel: string | null; games: number; stats: Record<string, number | null> }

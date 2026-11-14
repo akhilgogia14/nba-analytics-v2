@@ -1,7 +1,7 @@
 import { daysSince, shortDate } from './format.ts'
 import { f1 } from './geom.ts'
 import { gamesWord } from './gameType.ts'
-import type { GameType, TeamGame, TeamInfo, TeamMeetings } from '../types.ts'
+import type { GameType, LeagueAverages, TeamGame, TeamInfo, TeamMeetings } from '../types.ts'
 
 /** The Teams page's six scorecards, offense first (defense comes later). `pct` stats are written with a % sign. */
 export type TeamCard = { key: string; label: string; short: string; pct: boolean; lowerIsBetter: boolean }
@@ -68,6 +68,7 @@ export function teamAverageRow(games: TeamGame[]) {
     fg3: madeAtt(col((g) => g.box.fg3m), col((g) => g.box.fg3a)), fg3Pct: pctText(tot((g) => g.box.fg3m), tot((g) => g.box.fg3a)),
     ft: madeAtt(col((g) => g.box.ftm), col((g) => g.box.fta)),
     oreb: col((g) => g.box.oreb), reb: col((g) => g.box.reb), ast: col((g) => g.box.ast), tov: col((g) => g.box.tov),
+    stl: col((g) => g.box.stl), blk: col((g) => g.box.blk), pf: col((g) => g.box.pf),
   }
 }
 
@@ -95,4 +96,11 @@ export function teamMeetingsNote(m: TeamMeetings, opp: string, gamesWordText: st
     default:
       return m.currentSeason ? `No ${gamesWordText} against ${opp} in ${m.currentSeason} or last season.` : `No ${gamesWordText} against ${opp} on record for this team.`
   }
+}
+
+/** The sentence that explains the dotted line (null when there is no league figure to explain). */
+export function leagueNote(league: LeagueAverages | null, gameType: GameType): string | null {
+  if (!league || league.games === 0 || !league.seasonLabel) return null
+  const type = gameType === 'playoffs' ? 'playoff' : 'regular-season'
+  return `Dashed line: the team's season average. Dotted line: the league average per team game (${league.seasonLabel} ${type}, ${league.games} team games); percentages are total made over total attempted.`
 }

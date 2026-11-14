@@ -46,6 +46,18 @@ export const TEAM_MEETINGS_SQL = `
   ORDER BY game_date DESC, game_id DESC
   LIMIT ${TEAM_MEETINGS_LIMIT}`
 
+// The league average of each stat, per team game, for the latest season that has games of this type (so the playoffs figure is
+// the latest playoffs'). Percentages are pooled (total made over total attempted), like the team's own season figure. It is
+// worked out from team_game_log, so it needs no other table and no other grant; the answer is cached for a few minutes.
+export const LEAGUE_STATS = ['pts', 'fg_pct', 'fg3m', 'fg3_pct', 'ft_pct', 'ast', 'tov', 'reb', 'oreb', 'fga', 'fta', 'margin', 'allowed', 'blk', 'stl']
+export const LEAGUE_SQL = `
+  SELECT count(*) AS games, max(season_label) AS season_label,
+         avg(pts), try_divide(sum(fgm), sum(fga)) * 100, avg(fg3m), try_divide(sum(fg3m), sum(fg3a)) * 100,
+         try_divide(sum(ftm), sum(fta)) * 100, avg(ast), avg(tov), avg(reb), avg(oreb), avg(fga), avg(fta),
+         avg(pts - opp_pts), avg(opp_pts), avg(blk), avg(stl)
+  FROM ${LOG_TABLE}
+  WHERE game_type = :gt AND season = (SELECT max(season) FROM ${LOG_TABLE} WHERE game_type = :gt)`
+
 // ---- row mapping (the warehouse returns every value as a string or null) ----
 const num = (v) => (v === null || v === undefined ? null : Number(v))
 const bool = (v) => v === true || v === 'true'
@@ -121,4 +133,15 @@ export function mapTeamMeetings(rows) {
   const currentSeason = rows.length > 0 ? rows[0][24] : null
   const games = rows.map((r) => ({ ...mapTeamGame(r), isCurrent: bool(r[23]) }))
   return pickMeetings(games, currentSeason)
+}
+
+// One row in LEAGUE_SQL's order -> { seasonLabel, games, stats }. No games of this type gives games 0 and no stats.
+export function mapLeague(rows) {
+  const r = rows[0]
+  if (!r || num(r[0]) === 0) return { seasonLabel: null, games: 0, stats: {} }
+  const stats = {}
+  LEAGUE_STATS.forEach((k, i) => {
+    stats[k] = num(r[i + 2])
+  })
+  return { seasonLabel: r[1], games: num(r[0]), stats }
 }

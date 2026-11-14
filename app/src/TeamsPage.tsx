@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchTeamForm, fetchTeamGames, fetchTeamLog, fetchTeamMeetings, fetchTeams } from './api.ts'
+import { fetchLeagueAverages, fetchTeamForm, fetchTeamGames, fetchTeamLog, fetchTeamMeetings, fetchTeams } from './api.ts'
 import { TeamBadge } from './components/Avatar.tsx'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
@@ -12,10 +12,10 @@ import { GAME_TYPE_OPTIONS, gamesWord } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { TEAM_IDS, readableOn } from './lib/teams.ts'
-import { TEAM_CARDS, cardFormat, teamNotices } from './lib/teamPage.ts'
+import { TEAM_CARDS, cardFormat, leagueNote, teamNotices } from './lib/teamPage.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { GameType, Team, TeamFormResult, TeamGame, TeamMeetings } from './types.ts'
+import type { GameType, LeagueAverages, Team, TeamFormResult, TeamGame, TeamMeetings } from './types.ts'
 
 const ALL_TEAMS = Object.keys(TEAM_IDS).sort()
 
@@ -38,6 +38,7 @@ export default function TeamsPage() {
   const [gameType, setGameType] = useState<GameType>('regular-season')
   const [form, setForm] = useState<TeamFormResult | null>(null)
   const [recent, setRecent] = useState<TeamGame[] | null>(null) // the games behind the lines under the scorecards
+  const [league, setLeague] = useState<LeagueAverages | null>(null) // the league average of each stat, for the dotted line
   const [view, setView] = useState<LogView>(DEFAULT_VIEW)
   const [log, setLog] = useState<TeamGame[] | null>(null)
   const [logError, setLogError] = useState('')
@@ -89,6 +90,17 @@ export default function TeamsPage() {
         )
       })
       .catch((e) => !cancelled && setError(errorText(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [gameType, attempt])
+
+  // 1b. The league averages for the game type. They are an extra (the dotted line): if this fails the cards still show.
+  useEffect(() => {
+    let cancelled = false
+    fetchLeagueAverages(gameType)
+      .then((l) => !cancelled && setLeague(l))
+      .catch(() => !cancelled && setLeague(null))
     return () => {
       cancelled = true
     }
@@ -288,9 +300,14 @@ export default function TeamsPage() {
                     fmt={cardFormat(c)}
                     names={{ short: c.short, name: c.label }}
                     lowerIsBetter={c.lowerIsBetter}
+                    leagueAvg={league?.stats[c.key] ?? null}
                   />
                 ))}
               </div>
+            )}
+
+            {view === 'cards' && leagueNote(league, gameType) && (
+              <div className="max-w-3xl text-xs text-(--muted)">{leagueNote(league, gameType)}</div>
             )}
 
             {view === 'cards' && (
