@@ -3,13 +3,13 @@ export type Route = { page: Page; team: string }
 
 /**
  * The address says which page to show and which team is chosen: "#/teams", "#/teams?team=BOS", "#/players?team=BOS".
- * "#/today" is the Today's games page. The Teams page is the default (an empty or unknown address opens it). A team is three
- * capital letters; anything else is ignored.
+ * Today's games is the default (an empty or unknown address opens it); "#/teams" and "#/players" open the other two. A team is
+ * three capital letters; anything else is ignored.
  */
 export function parseHash(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   const team = new URLSearchParams(query).get('team') ?? ''
-  const page: Page = path === '/players' ? 'players' : path === '/today' ? 'today' : 'teams'
+  const page: Page = path === '/players' ? 'players' : path === '/teams' ? 'teams' : 'today'
   return { page, team: /^[A-Z]{3}$/.test(team) ? team : '' }
 }
 

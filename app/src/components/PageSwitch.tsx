@@ -15,9 +15,9 @@ export function PageSwitch({ page, team }: { page: Page; team: string }) {
   )
   return (
     <nav aria-label="Page" className="flex items-center gap-2">
-      {link('players', 'Players')}
-      {link('teams', 'Teams')}
       {link('today', "Today's games")}
+      {link('teams', 'Teams')}
+      {link('players', 'Players')}
     </nav>
   )
 }

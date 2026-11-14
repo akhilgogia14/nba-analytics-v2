@@ -78,12 +78,12 @@ test('the empty message names the game type and the day', () => {
   assert.match(emptyText('2026-11-14', '2026-11-14', false), /^No playoff games on Sat, Nov 14\./)
 })
 
-test('"#/today" opens Today\'s games; every other address still works as before', () => {
+test('an empty address opens Today\'s games; "#/teams" and "#/players" still open their own pages', () => {
   assert.equal(pageFromHash('#/today'), 'today')
   assert.equal(hashFor('today', ''), '#/today')
   assert.equal(parseHash('#/today').team, '')
-  assert.equal(pageFromHash(''), 'teams')
+  assert.equal(pageFromHash(''), 'today')
   assert.equal(pageFromHash('#/players?team=BOS'), 'players')
   assert.deepEqual(parseHash('#/teams?team=BOS'), { page: 'teams', team: 'BOS' })
-  assert.equal(pageFromHash('#/todayy'), 'teams')
+  assert.equal(pageFromHash('#/todayy'), 'today')
 })
