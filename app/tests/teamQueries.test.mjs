@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { MEETINGS_MIN } from '../server/queries.mjs'
 import {
-  TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, TEAM_STATS, mapTeamForm, mapTeamGame, mapTeamGames,
+  LEAGUE_SQL, LEAGUE_STATS, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, TEAM_STATS, mapLeague, mapTeamForm, mapTeamGame, mapTeamGames,
   mapTeamLog, mapTeamMeetings, pickMeetings,
 } from '../server/teamQueries.mjs'
 
@@ -109,4 +109,29 @@ test('pickMeetings is the same rule the player page uses', () => {
   assert.equal(m.scope, 'filled')
   assert.deepEqual(m.games.map((g) => g.id), ['a', 'b'])
   assert.equal(pickMeetings([games[0]], '2026-27').scope, 'season')
+})
+
+test('league averages: the game type is the only input, one table is read, and every stat team_form has is covered', () => {
+  assert.match(LEAGUE_SQL, /game_type = :gt\b/)
+  assert.deepEqual([...LEAGUE_SQL.matchAll(/:\w+/g)].map((m) => m[0]).filter((v, i, a) => a.indexOf(v) === i), [':gt'])
+  assert.doesNotMatch(LEAGUE_SQL, /\$\{/)
+  assert.deepEqual([...LEAGUE_SQL.matchAll(/workspace\.nba_v2_\w+\.\w+/g)].map((m) => m[0]).filter((v, i, a) => a.indexOf(v) === i), ['workspace.nba_v2_gold.team_game_log'])
+  assert.deepEqual([...LEAGUE_STATS].sort(), [...TEAM_STATS].sort())
+  assert.match(LEAGUE_SQL, /try_divide\(sum\(fgm\), sum\(fga\)\)/) // percentages are pooled, and safe with no attempts
+})
+
+test('mapLeague turns one row into the league figures by stat name', () => {
+  const row = ['300', '2026-27', '112.5', '47.1', '14.2', '36.4', '78.2', '26.1', '13.8', '44.5', '10.9', '89.3', '22.4', '0', '112.5', '4.9', '7.3']
+  const m = mapLeague([row])
+  assert.equal(m.seasonLabel, '2026-27')
+  assert.equal(m.games, 300)
+  assert.deepEqual(m.stats, {
+    pts: 112.5, fg_pct: 47.1, fg3m: 14.2, fg3_pct: 36.4, ft_pct: 78.2, ast: 26.1, tov: 13.8, reb: 44.5, oreb: 10.9, fga: 89.3,
+    fta: 22.4, margin: 0, allowed: 112.5, blk: 4.9, stl: 7.3,
+  })
+})
+
+test('mapLeague: no games of the type gives games 0 and no figures', () => {
+  assert.deepEqual(mapLeague([]), { seasonLabel: null, games: 0, stats: {} })
+  assert.deepEqual(mapLeague([['0', null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]]), { seasonLabel: null, games: 0, stats: {} })
 })

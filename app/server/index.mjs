@@ -7,7 +7,7 @@ import {
   validPlayerId, validTeam,
 } from './queries.mjs'
 import {
-  TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
+  LEAGUE_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
 } from './teamQueries.mjs'
 
 const app = express()
@@ -217,6 +217,17 @@ teamRoute('/api/teams/:team/meetings', 'team meetings', async (req, res, team, t
       mapTeamMeetings(await sql(TEAM_MEETINGS_SQL, [...teamParams(team, type), { name: 'opp', value: opp, type: 'STRING' }])),
     ),
   )
+})
+
+// The league average of every team stat (per team game) for one game type, for the dotted line on the sparklines.
+app.get('/api/league/team-averages', async (req, res) => {
+  const type = req.query.type ?? 'regular-season'
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+  try {
+    res.json(await cached(`league:${type}`, FIVE_MINUTES, async () => mapLeague(await sql(LEAGUE_SQL, [{ name: 'gt', value: type, type: 'STRING' }]))))
+  } catch (err) {
+    fail(res, 'league averages', err)
+  }
 })
 
 // The built React page.

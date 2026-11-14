@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { pageFromHash } from '../src/lib/pages.ts'
 import { sparkLayout, sparkTip } from '../src/lib/spark.ts'
-import { TEAM_CARDS, cardFormat, pctText, resultText, teamAverageRow, teamLogNote, teamMeetingsNote, teamNotices } from '../src/lib/teamPage.ts'
+import { TEAM_CARDS, cardFormat, leagueNote, pctText, resultText, teamAverageRow, teamLogNote, teamMeetingsNote, teamNotices } from '../src/lib/teamPage.ts'
 
 const game = (id, date, o = {}) => ({
   id, date, opp: o.opp ?? 'CLE', isHome: o.home ?? true, seasonLabel: o.season ?? '2026-27', won: o.won ?? true,
@@ -87,4 +87,20 @@ test('a sparkline works for team stats, with their own names and number format',
   assert.match(tip.label, /50\.0% field goal %, vs CLE/)
   // the player page's own stats still work without names
   assert.equal(sparkTip(games[1], 'pts', 22).title, '22 PTS · vs CLE')
+})
+
+test('the average row also averages steals, blocks and fouls', () => {
+  const games = [game('a', '2026-11-02', { box: { stl: 6, blk: 3, pf: 20 } }), game('b', '2026-11-01', { box: { stl: 9, blk: 6, pf: 17 } })]
+  const avg = teamAverageRow(games)
+  assert.equal(avg.stl, 7.5)
+  assert.equal(avg.blk, 4.5)
+  assert.equal(avg.pf, 18.5)
+})
+
+test('the note under the cards explains both lines, or is absent without a league figure', () => {
+  const league = { seasonLabel: '2026-27', games: 300, stats: { pts: 112 } }
+  assert.match(leagueNote(league, 'regular-season'), /Dashed line: the team's season average\. Dotted line: the league average per team game \(2026-27 regular-season, 300 team games\)/)
+  assert.match(leagueNote({ ...league, seasonLabel: '2025-26' }, 'playoffs'), /2025-26 playoff, 300 team games/)
+  assert.equal(leagueNote(null, 'regular-season'), null)
+  assert.equal(leagueNote({ seasonLabel: null, games: 0, stats: {} }, 'playoffs'), null)
 })

@@ -13,6 +13,8 @@ export type SparkLayout = {
   points: SparkPoint[]
   /** Height of the dashed line for the season average, or null if there is none. */
   baseline: number | null
+  /** Height of the dotted line for the league average, or null if there is none. */
+  leagueBaseline: number | null
   /** The line, as an SVG path; and the same line closed down to the bottom, for the soft fill under it. */
   line: string
   area: string
@@ -22,12 +24,12 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 
 /**
  * Where each game's point sits. Games run left to right in the order given (oldest first), evenly spaced. Higher is
- * higher on screen. The scale always includes the season average (when given) so its dashed line is always inside the box;
+ * higher on screen. The scale always includes the season average and the league average (when given) so their lines are always inside the box;
  * if every value is the same the line runs flat through the middle. A game with no figure for the stat is left out.
  */
-export function sparkLayout(games: SparkGame[], stat: string, seasonAvg: number | null): SparkLayout {
+export function sparkLayout(games: SparkGame[], stat: string, seasonAvg: number | null, leagueAvg: number | null = null): SparkLayout {
   const known = games.flatMap((g) => (g.stats[stat] === null ? [] : [{ game: g, value: g.stats[stat] as number }]))
-  const all = seasonAvg === null ? known.map((k) => k.value) : [...known.map((k) => k.value), seasonAvg]
+  const all = [...known.map((k) => k.value), ...(seasonAvg === null ? [] : [seasonAvg]), ...(leagueAvg === null ? [] : [leagueAvg])]
   let lo = Math.min(...all)
   let hi = Math.max(...all)
   if (all.length === 0) lo = hi = 0
@@ -38,7 +40,7 @@ export function sparkLayout(games: SparkGame[], stat: string, seasonAvg: number 
   const points = known.map((k, i) => ({ x: r2(x(i)), y: r2(y(k.value)), value: k.value, game: k.game }))
   const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
   const area = points.length ? `${line} L${points[points.length - 1].x},${SPARK_H} L${points[0].x},${SPARK_H} Z` : ''
-  return { points, baseline: seasonAvg === null ? null : r2(y(seasonAvg)), line, area }
+  return { points, baseline: seasonAvg === null ? null : r2(y(seasonAvg)), leagueBaseline: leagueAvg === null ? null : r2(y(leagueAvg)), line, area }
 }
 
 export type Change = { dir: 'up' | 'down' | 'flat'; text: string }

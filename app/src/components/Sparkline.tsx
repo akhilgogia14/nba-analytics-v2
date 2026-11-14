@@ -9,11 +9,13 @@ import type { SparkGame } from '../types.ts'
  * value, opponent and date. Drawn in the team's accent colour.
  */
 export function Sparkline({
-  games, stat, seasonAvg, names, fmt,
+  games, stat, seasonAvg, leagueAvg = null, names, fmt,
 }: {
   games: SparkGame[]
   stat: string
   seasonAvg: number | null
+  /** The league average of this stat (the team page): drawn as a dotted line. */
+  leagueAvg?: number | null
   /** Short and long name of the stat for the bubble; players' six stats have defaults. */
   names?: SparkNames
   /** How a value is written in the bubble (default: as is). */
@@ -32,7 +34,7 @@ export function Sparkline({
     return () => document.removeEventListener('pointerdown', away)
   }, [tip])
 
-  const L = sparkLayout(games, stat, seasonAvg)
+  const L = sparkLayout(games, stat, seasonAvg, leagueAvg)
   if (L.points.length < 2) return null // one game is not a line
   const active = tip === null ? null : L.points[tip]
   const activeTip = active ? sparkTip(active.game, stat, active.value, names, fmt) : null
@@ -56,7 +58,7 @@ export function Sparkline({
           <div className="opacity-80">{activeTip.detail}</div>
         </div>
       )}
-      <svg viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} className="block h-14 w-full overflow-visible" role="group" aria-label={`Last ${L.points.length} games of ${stat}, oldest to newest`}>
+      <svg viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} className="block h-14 w-full overflow-visible" role="group" aria-label={`Last ${L.points.length} games of ${stat}, oldest to newest${L.leagueBaseline !== null ? ', with the league average as a dotted line' : ''}`}>
         <defs>
           <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.35" />
@@ -65,6 +67,9 @@ export function Sparkline({
         </defs>
         {L.baseline !== null && (
           <line x1={0} x2={SPARK_W} y1={L.baseline} y2={L.baseline} stroke="var(--whisker)" strokeWidth={1} strokeDasharray="4 4" />
+        )}
+        {L.leagueBaseline !== null && (
+          <line x1={0} x2={SPARK_W} y1={L.leagueBaseline} y2={L.leagueBaseline} stroke="var(--muted)" strokeWidth={1.5} strokeDasharray="1.5 4" strokeLinecap="round" />
         )}
         <path className="spark-area" d={L.area} fill={`url(#${gradient})`} />
         <path className="spark-line" pathLength={1} d={L.line} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 4px var(--accent))' }} />

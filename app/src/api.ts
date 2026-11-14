@@ -1,5 +1,5 @@
 import type {
-  FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, Season, Team, TeamFormResult, TeamGame, TeamMeetings,
+  FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, LeagueAverages, Season, Team, TeamFormResult, TeamGame, TeamMeetings,
 } from './types.ts'
 
 async function getJson<T>(url: string): Promise<T> {
@@ -31,3 +31,4 @@ export const fetchTeamLog = (team: string, type: GameType) =>
   getJson<{ games: TeamGame[] }>(`/api/teams/${encodeURIComponent(team)}/log?type=${type}`)
 export const fetchTeamMeetings = (team: string, type: GameType, opp: string) =>
   getJson<TeamMeetings>(`/api/teams/${encodeURIComponent(team)}/meetings?type=${type}&opp=${encodeURIComponent(opp)}`)
+export const fetchLeagueAverages = (type: GameType) => getJson<LeagueAverages>(`/api/league/team-averages?type=${type}`)
