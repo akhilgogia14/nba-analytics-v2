@@ -4,7 +4,7 @@ import { pageFromHash } from './lib/pages.ts'
 import TeamsPage from './TeamsPage.tsx'
 import TodayPage from './TodayPage.tsx'
 
-/** Shows the Teams page (the default), the Player page ("#/players") or Today's games ("#/today"), by the address. */
+/** Shows Today's games (the default), the Teams page ("#/teams") or the Player page ("#/players"), by the address. */
 export default function Root() {
   const [page, setPage] = useState(() => pageFromHash(window.location.hash))
   useEffect(() => {
