@@ -7,9 +7,9 @@ SELECT 'key_not_unique' AS gate, count(*) - count(DISTINCT team_id, game_type, s
 UNION ALL SELECT 'key_has_null', count_if(team_id IS NULL OR game_type IS NULL OR stat IS NULL) FROM {T}
 UNION ALL SELECT 'teams_differ_from_source',
   abs((SELECT count(DISTINCT team_id) FROM workspace.nba_v2_silver.team_game) - (SELECT count(DISTINCT team_id) FROM {T}))
-UNION ALL SELECT 'groups_without_8_stats', count(*) FROM (
-  SELECT 1 FROM {T} GROUP BY team_id, game_type HAVING count(*) <> 8 OR count(DISTINCT stat) <> 8)
-UNION ALL SELECT 'stat_names_wrong', count_if(stat NOT IN ('pts', 'reb', 'ast', 'fg3m', 'blk', 'stl', 'allowed', 'margin')) FROM {T}
+UNION ALL SELECT 'groups_without_15_stats', count(*) FROM (
+  SELECT 1 FROM {T} GROUP BY team_id, game_type HAVING count(*) <> 15 OR count(DISTINCT stat) <> 15)
+UNION ALL SELECT 'stat_names_wrong', count_if(stat NOT IN ('pts', 'reb', 'ast', 'fg3m', 'blk', 'stl', 'allowed', 'margin', 'fg_pct', 'fg3_pct', 'ft_pct', 'tov', 'oreb', 'fga', 'fta')) FROM {T}
 UNION ALL SELECT 'game_types_wrong', count_if(game_type NOT IN ('regular-season', 'playoffs', 'play-in', 'nba-cup')) FROM {T}
 UNION ALL SELECT 'season_label_wrong', count(*) FROM {T}
   WHERE season_label <> (SELECT concat(CAST(max(season) - 1 AS STRING), '-', right(CAST(max(season) AS STRING), 2))
@@ -43,12 +43,18 @@ UNION ALL SELECT 'l10_stats_differ_from_recompute', count(*) FROM (
         arr[CAST(floor(0.1 * (n - 1)) AS INT)] + (0.1 * (n - 1) - floor(0.1 * (n - 1))) * (arr[least(CAST(floor(0.1 * (n - 1)) AS INT) + 1, n - 1)] - arr[CAST(floor(0.1 * (n - 1)) AS INT)]) AS p10,
         arr[CAST(floor(0.5 * (n - 1)) AS INT)] + (0.5 * (n - 1) - floor(0.5 * (n - 1))) * (arr[least(CAST(floor(0.5 * (n - 1)) AS INT) + 1, n - 1)] - arr[CAST(floor(0.5 * (n - 1)) AS INT)]) AS p50,
         arr[CAST(floor(0.9 * (n - 1)) AS INT)] + (0.9 * (n - 1) - floor(0.9 * (n - 1))) * (arr[least(CAST(floor(0.9 * (n - 1)) AS INT) + 1, n - 1)] - arr[CAST(floor(0.9 * (n - 1)) AS INT)]) AS p90
-      FROM (SELECT team_id, game_type, stat, CAST(count(*) AS INT) AS n, avg(v) AS mean, min(v) AS mn, max(v) AS mx,
+      FROM (SELECT team_id, game_type, stat, CAST(count(*) AS INT) AS n, CASE WHEN stat IN ('fg_pct', 'fg3_pct', 'ft_pct') THEN try_divide(sum(m), sum(a)) * 100 ELSE avg(v) END AS mean, min(v) AS mn, max(v) AS mx,
                    sort_array(collect_list(v)) AS arr
-            FROM (SELECT team_id, season_type AS game_type, stack(8, 'pts', CAST(pts AS DOUBLE), 'reb', CAST(reb AS DOUBLE),
-                         'ast', CAST(ast AS DOUBLE), 'fg3m', CAST(fg3m AS DOUBLE), 'blk', CAST(blk AS DOUBLE),
-                         'stl', CAST(stl AS DOUBLE), 'allowed', CAST(opp_pts AS DOUBLE),
-                         'margin', CAST(pts - opp_pts AS DOUBLE)) AS (stat, v)
+            FROM (SELECT team_id, season_type AS game_type, stack(15, 'pts', CAST(pts AS DOUBLE), CAST(NULL AS DOUBLE), CAST(NULL AS DOUBLE),
+                         'reb', CAST(reb AS DOUBLE), NULL, NULL, 'ast', CAST(ast AS DOUBLE), NULL, NULL,
+                         'fg3m', CAST(fg3m AS DOUBLE), NULL, NULL, 'blk', CAST(blk AS DOUBLE), NULL, NULL,
+                         'stl', CAST(stl AS DOUBLE), NULL, NULL, 'allowed', CAST(opp_pts AS DOUBLE), NULL, NULL,
+                         'margin', CAST(pts - opp_pts AS DOUBLE), NULL, NULL,
+                         'fg_pct', try_divide(CAST(fgm AS DOUBLE), fga) * 100, CAST(fgm AS DOUBLE), CAST(fga AS DOUBLE),
+                         'fg3_pct', try_divide(CAST(fg3m AS DOUBLE), fg3a) * 100, CAST(fg3m AS DOUBLE), CAST(fg3a AS DOUBLE),
+                         'ft_pct', try_divide(CAST(ftm AS DOUBLE), fta) * 100, CAST(ftm AS DOUBLE), CAST(fta AS DOUBLE),
+                         'tov', CAST(tov AS DOUBLE), NULL, NULL, 'oreb', CAST(oreb AS DOUBLE), NULL, NULL,
+                         'fga', CAST(fga AS DOUBLE), NULL, NULL, 'fta', CAST(fta AS DOUBLE), NULL, NULL) AS (stat, v, m, a)
                   FROM (SELECT *, row_number() OVER (PARTITION BY team_id, season_type ORDER BY game_date DESC, game_id DESC) AS rn
                         FROM workspace.nba_v2_silver.team_game) WHERE rn <= 10)
             GROUP BY team_id, game_type, stat)) r ON r.team_id = t.team_id AND r.game_type = t.game_type AND r.stat = t.stat
@@ -57,11 +63,17 @@ UNION ALL SELECT 'l10_stats_differ_from_recompute', count(*) FROM (
      OR abs(t.l10_median - r.p50) > 0.0015 OR abs(t.l10_p10 - r.p10) > 0.0015 OR abs(t.l10_p90 - r.p90) > 0.0015)
 UNION ALL SELECT 'season_mean_differs_from_recompute', count(*) FROM (
   SELECT 1 FROM {T} t LEFT JOIN (
-      SELECT team_id, game_type, stat, avg(v) AS mean
-      FROM (SELECT team_id, season_type AS game_type, stack(8, 'pts', CAST(pts AS DOUBLE), 'reb', CAST(reb AS DOUBLE),
-                         'ast', CAST(ast AS DOUBLE), 'fg3m', CAST(fg3m AS DOUBLE), 'blk', CAST(blk AS DOUBLE),
-                         'stl', CAST(stl AS DOUBLE), 'allowed', CAST(opp_pts AS DOUBLE),
-                         'margin', CAST(pts - opp_pts AS DOUBLE)) AS (stat, v)
+      SELECT team_id, game_type, stat, CASE WHEN stat IN ('fg_pct', 'fg3_pct', 'ft_pct') THEN try_divide(sum(m), sum(a)) * 100 ELSE avg(v) END AS mean
+      FROM (SELECT team_id, season_type AS game_type, stack(15, 'pts', CAST(pts AS DOUBLE), CAST(NULL AS DOUBLE), CAST(NULL AS DOUBLE),
+                         'reb', CAST(reb AS DOUBLE), NULL, NULL, 'ast', CAST(ast AS DOUBLE), NULL, NULL,
+                         'fg3m', CAST(fg3m AS DOUBLE), NULL, NULL, 'blk', CAST(blk AS DOUBLE), NULL, NULL,
+                         'stl', CAST(stl AS DOUBLE), NULL, NULL, 'allowed', CAST(opp_pts AS DOUBLE), NULL, NULL,
+                         'margin', CAST(pts - opp_pts AS DOUBLE), NULL, NULL,
+                         'fg_pct', try_divide(CAST(fgm AS DOUBLE), fga) * 100, CAST(fgm AS DOUBLE), CAST(fga AS DOUBLE),
+                         'fg3_pct', try_divide(CAST(fg3m AS DOUBLE), fg3a) * 100, CAST(fg3m AS DOUBLE), CAST(fg3a AS DOUBLE),
+                         'ft_pct', try_divide(CAST(ftm AS DOUBLE), fta) * 100, CAST(ftm AS DOUBLE), CAST(fta AS DOUBLE),
+                         'tov', CAST(tov AS DOUBLE), NULL, NULL, 'oreb', CAST(oreb AS DOUBLE), NULL, NULL,
+                         'fga', CAST(fga AS DOUBLE), NULL, NULL, 'fta', CAST(fta AS DOUBLE), NULL, NULL) AS (stat, v, m, a)
             FROM workspace.nba_v2_silver.team_game
             WHERE season = (SELECT max(season) FROM workspace.nba_v2_silver.team_game))
       GROUP BY team_id, game_type, stat) r ON r.team_id = t.team_id AND r.game_type = t.game_type AND r.stat = t.stat

@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-STATS = ["pts", "reb", "ast", "fg3m", "blk", "stl", "allowed", "margin"]
+STATS = ["pts", "reb", "ast", "fg3m", "blk", "stl", "allowed", "margin", "fg_pct", "fg3_pct", "ft_pct", "tov", "oreb", "fga", "fta"]
 
 
 def make_games(spark, teams):
@@ -19,7 +19,9 @@ def make_games(spark, teams):
                 season=g["season"], season_type=g.get("season_type", "regular-season"),
                 team_name=g.get("name", f"Team {tid}"), team_tricode=g.get("tri", f"T{tid:02d}"),
                 pts=g["pts"], opp_pts=g.get("opp", 100), won=g.get("won", g["pts"] > g.get("opp", 100)),
-                reb=40, ast=25, fg3m=12, blk=5, stl=7))
+                reb=40, ast=25, fg3m=12, blk=5, stl=7,
+                fgm=g.get("fgm", 40), fga=g.get("fga", 90), fg3a=g.get("fg3a", 30), ftm=g.get("ftm", 15), fta=g.get("fta", 20),
+                tov=g.get("tov", 13), oreb=g.get("oreb", 10)))
     return spark.createDataFrame(rows)
 
 
@@ -29,12 +31,12 @@ def run(spark, teams):
     return {(r["team_id"], r["game_type"], r["stat"]): r.asDict() for r in out}
 
 
-def test_every_team_gets_all_eight_stats_per_game_type_it_played(spark):
+def test_every_team_gets_all_fifteen_stats_per_game_type_it_played(spark):
     games = {1: [dict(season=2027, pts=100)] * 3 + [dict(season=2027, pts=90, season_type="playoffs")], 2: [dict(season=2027, pts=90)] * 2}
     out = run(spark, games)
     assert sorted({s for (_, _, s) in out}) == sorted(STATS)
     assert sorted({(t, g) for (t, g, _) in out}) == [(1, "playoffs"), (1, "regular-season"), (2, "regular-season")]
-    assert len(out) == 3 * 8
+    assert len(out) == 3 * 15
 
 
 def test_windows_never_mix_game_types(spark):
@@ -60,6 +62,20 @@ def test_windows_never_mix_game_types(spark):
     assert (a["l10_mean"], a["l10_p10"], a["l10_median"], a["l10_p90"], a["l10_min"], a["l10_max"]) == (95.5, 91.9, 95.5, 99.1, 91.0, 100.0)
     m = out[(1, "playoffs", "margin")]  # always 10
     assert (m["l10_mean"], m["l10_p10"], m["l10_median"], m["l10_p90"], m["l10_min"], m["l10_max"]) == (10.0,) * 6
+
+
+def test_percentages_are_pooled_for_the_mean_and_per_game_for_the_spread(spark):
+    # game 1: 10 of 20 (50%), game 2: 30 of 40 (75%). Pooled = 40 of 60 = 66.667; per-game average would be 62.5.
+    games = [dict(season=2027, pts=100, fgm=10, fga=20, fg3a=0, tov=10, oreb=8),
+             dict(season=2027, pts=100, fgm=30, fga=40, fg3a=0, tov=16, oreb=12)]
+    out = run(spark, {1: games})
+    f = out[(1, "regular-season", "fg_pct")]
+    assert (f["l10_mean"], f["season_mean"]) == (66.667, 66.667)
+    assert (f["l10_min"], f["l10_max"], f["l10_median"]) == (50.0, 75.0, 62.5)
+    t = out[(1, "regular-season", "fg3_pct")]  # no three-point attempts: empty, not zero
+    assert t["l10_mean"] is None and t["l10_min"] is None
+    assert out[(1, "regular-season", "tov")]["l10_mean"] == 13.0 and out[(1, "regular-season", "oreb")]["l10_max"] == 12.0
+    assert out[(1, "regular-season", "fga")]["l10_mean"] == 30.0 and out[(1, "regular-season", "ft_pct")]["l10_mean"] == 75.0
 
 
 def test_window_is_capped_at_ten_per_type(spark):
