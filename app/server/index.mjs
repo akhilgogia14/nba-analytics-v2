@@ -6,6 +6,9 @@ import {
   FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validPlayerId, validTeam,
 } from './queries.mjs'
+import {
+  TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
+} from './teamQueries.mjs'
 
 const app = express()
 const dist = fileURLToPath(new URL('../dist', import.meta.url))
@@ -165,6 +168,55 @@ app.get('/api/players/:id/season', async (req, res) => {
   } catch (err) {
     fail(res, 'season', err)
   }
+})
+
+// ---- Teams page (reads gold team_form and team_game_log). A team is named by its three-letter code. ----
+// Same checks as the player routes: a bad team or type is refused (400) before it reaches SQL.
+function teamRoute(path, label, work) {
+  app.get(path, async (req, res) => {
+    const { team } = req.params
+    const type = req.query.type ?? 'regular-season'
+    if (!validTeam(team)) return res.status(400).json({ ok: false, error: 'Team must be three capital letters.' })
+    if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+    try {
+      await work(req, res, team, type)
+    } catch (err) {
+      fail(res, label, err)
+    }
+  })
+}
+const teamParams = (team, type) => [{ name: 'team', value: team, type: 'STRING' }, { name: 'gt', value: type, type: 'STRING' }]
+
+// One team's last-10 form for every stat, for one game type. A team with no games of that type: 404 for the regular season,
+// {"none":true} for the playoffs (many teams have not played one).
+teamRoute('/api/teams/:team/form', 'team form', async (_req, res, team, type) => {
+  const form = await cached(`tform:${team}:${type}`, FIVE_MINUTES, async () => mapTeamForm(await sql(TEAM_FORM_SQL, teamParams(team, type))))
+  if (form === null) {
+    if (type === 'playoffs') return res.json({ none: true, gameType: type })
+    return res.status(404).json({ ok: false, error: 'No such team.' })
+  }
+  res.json(form)
+})
+
+// One team's last 10 games played of one game type, oldest first (the sparklines).
+teamRoute('/api/teams/:team/games', 'team games', async (_req, res, team, type) => {
+  res.json(await cached(`tgames:${team}:${type}`, FIVE_MINUTES, async () => mapTeamGames(await sql(TEAM_GAMES_SQL, teamParams(team, type)))))
+})
+
+// One team's last 15 games played of one game type, newest first (the box-score table).
+teamRoute('/api/teams/:team/log', 'team log', async (_req, res, team, type) => {
+  res.json(await cached(`tlog:${team}:${type}`, FIVE_MINUTES, async () => mapTeamLog(await sql(TEAM_LOG_SQL, teamParams(team, type)))))
+})
+
+// One team's games against one opponent (?opp=NYK): this season's meetings, else filled from last season only.
+teamRoute('/api/teams/:team/meetings', 'team meetings', async (req, res, team, type) => {
+  const opp = req.query.opp
+  if (!validTeam(opp)) return res.status(400).json({ ok: false, error: 'Opponent must be a team abbreviation.' })
+  res.json(
+    await cached(`tmeetings:${team}:${type}:${opp}`, FIVE_MINUTES, async () =>
+      mapTeamMeetings(await sql(TEAM_MEETINGS_SQL, [...teamParams(team, type), { name: 'opp', value: opp, type: 'STRING' }])),
+    ),
+  )
 })
 
 // The built React page.
