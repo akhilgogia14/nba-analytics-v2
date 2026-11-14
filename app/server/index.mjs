@@ -6,6 +6,7 @@ import {
   FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validPlayerId, validTeam,
 } from './queries.mjs'
+import { SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
 import {
   LEAGUE_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
 } from './teamQueries.mjs'
@@ -227,6 +228,23 @@ app.get('/api/league/team-averages', async (req, res) => {
     res.json(await cached(`league:${type}`, FIVE_MINUTES, async () => mapLeague(await sql(LEAGUE_SQL, [{ name: 'gt', value: type, type: 'STRING' }]))))
   } catch (err) {
     fail(res, 'league averages', err)
+  }
+})
+
+// The games on one date (?date=2026-11-14) of one game type, for the Today's games page. A bad date or type is refused (400).
+app.get('/api/games', async (req, res) => {
+  const { date } = req.query
+  const type = req.query.type ?? 'regular-season'
+  if (!validDate(date)) return res.status(400).json({ ok: false, error: 'Date must look like 2026-11-14.' })
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+  try {
+    res.json(
+      await cached(`slate:${date}:${type}`, FIVE_MINUTES, async () =>
+        mapSlate(await sql(SLATE_SQL, [{ name: 'date', value: date, type: 'STRING' }, { name: 'gt', value: type, type: 'STRING' }])),
+      ),
+    )
+  } catch (err) {
+    fail(res, 'games on a date', err)
   }
 })
 
