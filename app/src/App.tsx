@@ -4,6 +4,7 @@ import { PlayerAvatar, TeamBadge } from './components/Avatar.tsx'
 import { CombosTable } from './components/CombosTable.tsx'
 import { GameLog } from './components/GameLog.tsx'
 import { MeetingsPanel } from './components/Meetings.tsx'
+import { PageSwitch } from './components/PageSwitch.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
@@ -230,6 +231,7 @@ export default function App() {
             </div>
             <div className="text-[13px] text-(--muted)">Recent games as a range, not a single number</div>
           </div>
+          <PageSwitch page="players" />
         </header>
 
         <div className="flex flex-wrap items-end gap-4">

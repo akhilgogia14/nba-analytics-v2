@@ -1,14 +1,14 @@
 import { f1 } from './geom.ts'
 import { shortDate } from './format.ts'
 import { STAT_NAMES, STAT_SHORT } from './hex.ts'
-import type { GridStat, RecentGame } from '../types.ts'
+import type { GridStat, SparkGame } from '../types.ts'
 
 /** The sparkline is drawn in a box this wide and tall (it scales to the card's width); the line stays this far from the edges. */
 export const SPARK_W = 300
 export const SPARK_H = 56
 export const SPARK_PAD = 8
 
-export type SparkPoint = { x: number; y: number; value: number; game: RecentGame }
+export type SparkPoint = { x: number; y: number; value: number; game: SparkGame }
 export type SparkLayout = {
   points: SparkPoint[]
   /** Height of the dashed line for the season average, or null if there is none. */
@@ -25,7 +25,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100
  * higher on screen. The scale always includes the season average (when given) so its dashed line is always inside the box;
  * if every value is the same the line runs flat through the middle. A game with no figure for the stat is left out.
  */
-export function sparkLayout(games: RecentGame[], stat: GridStat, seasonAvg: number | null): SparkLayout {
+export function sparkLayout(games: SparkGame[], stat: string, seasonAvg: number | null): SparkLayout {
   const known = games.flatMap((g) => (g.stats[stat] === null ? [] : [{ game: g, value: g.stats[stat] as number }]))
   const all = seasonAvg === null ? known.map((k) => k.value) : [...known.map((k) => k.value), seasonAvg]
   let lo = Math.min(...all)
@@ -54,8 +54,12 @@ export function changeVsSeason(mean: number | null, seasonAvg: number | null): C
 export type SparkTip = { title: string; detail: string; label: string }
 
 /** The bubble over one point: the number and the opponent on top, the date and home or away underneath. */
-export function sparkTip(game: RecentGame, stat: GridStat, value: number): SparkTip {
+export type SparkNames = { short: string; name: string }
+export function sparkTip(game: SparkGame, stat: string, value: number, names?: SparkNames, fmt: (n: number) => string = String): SparkTip {
+  const short = names?.short ?? STAT_SHORT[stat as GridStat]
+  const long = names?.name ?? STAT_NAMES[stat as GridStat]
+  const shown = fmt(value)
   const versus = `${game.isHome ? 'vs' : '@'} ${game.opp}`
   const detail = `${shortDate(game.date)} · ${game.isHome ? 'home' : 'away'}`
-  return { title: `${value} ${STAT_SHORT[stat]} · ${versus}`, detail, label: `${value} ${STAT_NAMES[stat].toLowerCase()}, ${versus}. ${detail}.` }
+  return { title: `${shown} ${short} · ${versus}`, detail, label: `${shown} ${long.toLowerCase()}, ${versus}. ${detail}.` }
 }

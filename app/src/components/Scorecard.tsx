@@ -3,7 +3,8 @@ import { complete, f1, geometry, shareSegments } from '../lib/geom.ts'
 import { panelStyle } from '../lib/styles.ts'
 import { changeVsSeason } from '../lib/spark.ts'
 import { markTips, shareTips, type Tip } from '../lib/tips.ts'
-import type { ApiStat, GridStat, RecentGame } from '../types.ts'
+import type { SparkNames } from '../lib/spark.ts'
+import type { ApiStat, SparkGame } from '../types.ts'
 import { Sparkline } from './Sparkline.tsx'
 
 const pct = (n: number) => `${n}%`
@@ -27,15 +28,21 @@ function Bubble({ tip }: { tip: Tip }) {
 const hitClass = 'absolute block cursor-help rounded-sm bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-(--accent)'
 
 export function Scorecard({
-  label, stat, statKey, games, seasonLabel, recent,
+  label, stat, statKey, games, seasonLabel, recent, fmt = f1, names, lowerIsBetter = false,
 }: {
   label: string
   stat: ApiStat | undefined
-  statKey: GridStat
+  statKey: string
   games: number | null
   seasonLabel: string
   /** The games of the window, oldest first, for the line under the number (null while loading or if unavailable). */
-  recent: RecentGame[] | null
+  recent: SparkGame[] | null
+  /** How a number is written (default: one decimal; the team page writes percentages with a % sign). */
+  fmt?: (n: number) => string
+  /** Names for the line's bubble (the player page's six stats have defaults). */
+  names?: SparkNames
+  /** True when a lower number is better (turnovers): the "vs season avg" chip then shows down in green and up in red. */
+  lowerIsBetter?: boolean
 }) {
   const d = complete(stat)
   const season = stat?.seasonMean ?? null
@@ -75,7 +82,7 @@ export function Scorecard({
   const g = geometry(d)
   const change = changeVsSeason(d.mean, season)
   const segments = shareSegments(stat?.shares ?? null)
-  const [mean, median, band, range] = markTips(d, g, games)
+  const [mean, median, band, range] = markTips(d, g, games, fmt)
   const shares = shareTips(segments)
 
   return (
@@ -84,7 +91,7 @@ export function Scorecard({
         <span className="text-sm font-semibold">{label}</span>
         {season !== null && (
           <span className="text-xs text-(--muted)">
-            {seasonLabel} season avg {f1(season)}
+            {seasonLabel} season avg {fmt(season)}
           </span>
         )}
       </div>
@@ -94,22 +101,22 @@ export function Scorecard({
           className="text-[44px] leading-none font-semibold tracking-tight text-(--num)"
           style={{ fontFamily: 'var(--display)' }}
         >
-          {f1(d.mean)}
+          {fmt(d.mean)}
         </span>
         <span className="text-[13px] text-(--muted)">
-          {games ? `avg of last ${games} games` : 'avg of recent games'} · median {f1(d.median)}
+          {games ? `avg of last ${games} games` : 'avg of recent games'} · median {fmt(d.median)}
         </span>
         {change && (
           <span
             className="ml-auto text-xs font-semibold whitespace-nowrap"
-            style={{ color: change.dir === 'up' ? '#4ADE80' : change.dir === 'down' ? '#F87171' : 'var(--muted)' }}
+            style={{ color: change.dir === 'flat' ? 'var(--muted)' : (change.dir === 'up') !== lowerIsBetter ? '#4ADE80' : '#F87171' }}
           >
             {change.text}
           </span>
         )}
       </div>
 
-      {recent && <Sparkline games={recent} stat={statKey} seasonAvg={season} />}
+      {recent && <Sparkline games={recent} stat={statKey} seasonAvg={season} names={names} fmt={fmt} />}
 
       <div ref={box} className="relative flex flex-col gap-1.5">
         {tip && <Bubble tip={tip} />}
@@ -138,11 +145,11 @@ export function Scorecard({
           <button type="button" className={`${hitClass} top-0 h-7 z-[4] -ml-2 w-4`} style={{ left: pct(g.meanLeft) }} {...hit(mean)} />
         </div>
         <div className="flex justify-between gap-2 text-xs text-(--muted)">
-          <span>low {f1(d.min)}</span>
+          <span>low {fmt(d.min)}</span>
           <span>
-            middle 80%: {f1(d.p10)} to {f1(d.p90)}
+            middle 80%: {fmt(d.p10)} to {fmt(d.p90)}
           </span>
-          <span>high {f1(d.max)}</span>
+          <span>high {fmt(d.max)}</span>
         </div>
       </div>
 

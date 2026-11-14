@@ -1,14 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { SPARK_H, SPARK_W, sparkLayout, sparkTip } from '../lib/spark.ts'
+import { SPARK_H, SPARK_W, sparkLayout, sparkTip, type SparkNames } from '../lib/spark.ts'
 import { clampAnchor } from '../lib/tips.ts'
-import type { GridStat, RecentGame } from '../types.ts'
+import type { SparkGame } from '../types.ts'
 
 /**
  * The line under a scorecard's big number: one point per game of the window (oldest on the left), a soft fill under the
  * line, a dashed line at the season average and a dot on the latest game. Hover, focus (keyboard) or tap a point for its
  * value, opponent and date. Drawn in the team's accent colour.
  */
-export function Sparkline({ games, stat, seasonAvg }: { games: RecentGame[]; stat: GridStat; seasonAvg: number | null }) {
+export function Sparkline({
+  games, stat, seasonAvg, names, fmt,
+}: {
+  games: SparkGame[]
+  stat: string
+  seasonAvg: number | null
+  /** Short and long name of the stat for the bubble; players' six stats have defaults. */
+  names?: SparkNames
+  /** How a value is written in the bubble (default: as is). */
+  fmt?: (n: number) => string
+}) {
   const [tip, setTip] = useState<number | null>(null)
   const box = useRef<HTMLDivElement>(null)
 
@@ -25,7 +35,7 @@ export function Sparkline({ games, stat, seasonAvg }: { games: RecentGame[]; sta
   const L = sparkLayout(games, stat, seasonAvg)
   if (L.points.length < 2) return null // one game is not a line
   const active = tip === null ? null : L.points[tip]
-  const activeTip = active ? sparkTip(active.game, stat, active.value) : null
+  const activeTip = active ? sparkTip(active.game, stat, active.value, names, fmt) : null
   const last = L.points[L.points.length - 1]
   const gradient = `spark-${stat}`
 
@@ -64,7 +74,7 @@ export function Sparkline({ games, stat, seasonAvg }: { games: RecentGame[]; sta
             key={p.game.id}
             role="button"
             tabIndex={0}
-            aria-label={sparkTip(p.game, stat, p.value).label}
+            aria-label={sparkTip(p.game, stat, p.value, names, fmt).label}
             className="cursor-help outline-none focus-visible:[&>circle]:stroke-(--accent)"
             onMouseEnter={() => setTip(i)}
             onMouseLeave={() => setTip((cur) => (cur === i ? null : cur))}

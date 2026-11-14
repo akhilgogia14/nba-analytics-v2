@@ -21,31 +21,31 @@ export type Marks = {
 }
 
 /** The four tooltips of one bar: the average, the median, the middle 80% and the lowest-to-highest line. */
-export function markTips(d: Dist, g: Marks, games: number | null): Tip[] {
+export function markTips(d: Dist, g: Marks, games: number | null, fmt: (n: number) => string = f1): Tip[] {
   const window = games ? `the last ${games} games` : 'the recent games'
   return [
     {
       key: 'mean',
       left: clampAnchor(g.meanLeft),
-      title: `Average ${f1(d.mean)}`,
+      title: `Average ${fmt(d.mean)}`,
       text: `All of ${window} added up and divided by the number of games.`,
     },
     {
       key: 'median',
       left: clampAnchor(g.medianLeft),
-      title: `Median ${f1(d.median)}`,
+      title: `Median ${fmt(d.median)}`,
       text: `The middle game of ${window}: half were above this, half below.`,
     },
     {
       key: 'band',
       left: clampAnchor(g.bandLeft + g.bandWidth / 2),
-      title: `Middle 80%: ${f1(d.p10)} to ${f1(d.p90)}`,
+      title: `Middle 80%: ${fmt(d.p10)} to ${fmt(d.p90)}`,
       text: `About 8 of every 10 of ${window} landed in this range.`,
     },
     {
       key: 'range',
       left: clampAnchor(g.minLeft + g.minWidth / 2),
-      title: `Lowest ${f1(d.min)}, highest ${f1(d.max)}`,
+      title: `Lowest ${fmt(d.min)}, highest ${fmt(d.max)}`,
       text: `The worst and the best single game of ${window}.`,
     },
   ]
