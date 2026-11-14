@@ -1,4 +1,6 @@
-import type { FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, Season, Team } from './types.ts'
+import type {
+  FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, Season, Team, TeamFormResult, TeamGame, TeamMeetings,
+} from './types.ts'
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -19,3 +21,13 @@ export const fetchMeetings = (id: string, type: GameType, opp: string) =>
   getJson<Meetings>(`/api/players/${encodeURIComponent(id)}/meetings?type=${type}&opp=${encodeURIComponent(opp)}`)
 export const fetchLog = (id: string, type: GameType) =>
   getJson<{ games: LogGame[] }>(`/api/players/${encodeURIComponent(id)}/log?type=${type}`)
+
+// ---- Teams page ----
+export const fetchTeamForm = (team: string, type: GameType) =>
+  getJson<TeamFormResult>(`/api/teams/${encodeURIComponent(team)}/form?type=${type}`)
+export const fetchTeamGames = (team: string, type: GameType) =>
+  getJson<{ games: TeamGame[] }>(`/api/teams/${encodeURIComponent(team)}/games?type=${type}`)
+export const fetchTeamLog = (team: string, type: GameType) =>
+  getJson<{ games: TeamGame[] }>(`/api/teams/${encodeURIComponent(team)}/log?type=${type}`)
+export const fetchTeamMeetings = (team: string, type: GameType, opp: string) =>
+  getJson<TeamMeetings>(`/api/teams/${encodeURIComponent(team)}/meetings?type=${type}&opp=${encodeURIComponent(opp)}`)

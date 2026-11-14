@@ -101,3 +101,48 @@ export type Box = {
 }
 /** A game in the box-score table: the same as a RecentGame plus the fuller box score. */
 export type LogGame = RecentGame & { box: Box }
+
+/** What a sparkline needs from a game: the stats are keyed by name so the same line works for players and teams. */
+export type SparkGame = { id: string; date: string; opp: string; isHome: boolean; stats: Record<string, number | null> }
+
+// ---- Teams page ----
+/** The team's facts for its last-10 window (from team_form). */
+export type TeamInfo = {
+  name: string
+  tricode: string
+  lastGameDate: string
+  lastSeasonLabel: string
+  totalGames: number
+  seasonLabel: string
+  seasonGames: number
+  l10Games: number
+  l10FirstDate: string
+  l10GamesBeforeCurrentSeason: number
+  l10Wins: number
+}
+export type TeamForm = { team: TeamInfo; stats: Record<string, Omit<ApiStat, 'shares'>> }
+export type TeamFormResult = TeamForm | NoGames
+
+/** A team's box score for one game (any of these can be null if the source had a gap). */
+export type TeamBox = {
+  fgm: number | null; fga: number | null; fg3m: number | null; fg3a: number | null; ftm: number | null; fta: number | null
+  oreb: number | null; dreb: number | null; reb: number | null; ast: number | null; stl: number | null; blk: number | null
+  tov: number | null; pf: number | null
+}
+/** One team game. `stats` is keyed like team_form's stats (pts, fg_pct, fg3m, fg3_pct, ft_pct, ast, tov, ...). */
+export type TeamGame = {
+  id: string
+  date: string
+  opp: string
+  isHome: boolean
+  seasonLabel: string
+  won: boolean
+  pts: number | null
+  oppPts: number | null
+  margin: number | null
+  overtimes: number | null
+  stats: Record<string, number | null>
+  box: TeamBox
+}
+export type TeamMeetingGame = TeamGame & { kind: 'this' | 'last' }
+export type TeamMeetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; currentSeason: string | null; games: TeamMeetingGame[] }
