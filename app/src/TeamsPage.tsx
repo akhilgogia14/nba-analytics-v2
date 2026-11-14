@@ -12,7 +12,7 @@ import { GAME_TYPE_OPTIONS, gamesWord } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { TEAM_IDS, readableOn } from './lib/teams.ts'
-import { TEAM_CARDS, cardFormat, leagueNote, teamNotices } from './lib/teamPage.ts'
+import { TEAM_CARDS, cardFormat, leagueNote, pointFormat, teamNotices } from './lib/teamPage.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
 import type { GameType, LeagueAverages, Team, TeamFormResult, TeamGame, TeamMeetings } from './types.ts'
@@ -298,6 +298,7 @@ export default function TeamsPage() {
                     seasonLabel={t.seasonLabel}
                     recent={recent}
                     fmt={cardFormat(c)}
+                    pointFmt={pointFormat(c)}
                     names={{ short: c.short, name: c.label }}
                     lowerIsBetter={c.lowerIsBetter}
                     leagueAvg={league?.stats[c.key] ?? null}

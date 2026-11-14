@@ -17,6 +17,9 @@ export const TEAM_CARDS: TeamCard[] = [
 /** How a card's number is written: one decimal, with a % sign for the percentage cards. */
 export const cardFormat = (c: TeamCard) => (c.pct ? (n: number) => `${f1(n)}%` : f1)
 
+/** How ONE game's value is written in the line's bubble: whole numbers stay whole (111 points), percentages get a decimal and a % sign. */
+export const pointFormat = (c: TeamCard): ((n: number) => string) | undefined => (c.pct ? (n: number) => `${f1(n)}%` : undefined)
+
 /** The amber notes under the team's name. A playoff window is old by nature. */
 export function teamNotices(t: TeamInfo, gameType: GameType, now: Date = new Date()): string[] {
   const out: string[] = []

@@ -28,7 +28,7 @@ function Bubble({ tip }: { tip: Tip }) {
 const hitClass = 'absolute block cursor-help rounded-sm bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-(--accent)'
 
 export function Scorecard({
-  label, stat, statKey, games, seasonLabel, recent, fmt = f1, names, lowerIsBetter = false, leagueAvg = null,
+  label, stat, statKey, games, seasonLabel, recent, fmt = f1, pointFmt, names, lowerIsBetter = false, leagueAvg = null,
 }: {
   label: string
   stat: ApiStat | undefined
@@ -39,6 +39,8 @@ export function Scorecard({
   recent: SparkGame[] | null
   /** How a number is written (default: one decimal; the team page writes percentages with a % sign). */
   fmt?: (n: number) => string
+  /** How one game's value is written in the sparkline's bubble (default: as is, so a whole number stays whole). */
+  pointFmt?: (n: number) => string
   /** Names for the line's bubble (the player page's six stats have defaults). */
   names?: SparkNames
   /** True when a lower number is better (turnovers): the "vs season avg" chip then shows down in green and up in red. */
@@ -93,9 +95,17 @@ export function Scorecard({
         <span className="text-sm font-semibold">{label}</span>
         {(season !== null || leagueAvg !== null) && (
           <span className="text-right text-xs text-(--muted)">
-            {season !== null && `${seasonLabel} season avg ${fmt(season)}`}
+            {season !== null && (
+              <span title="Average of this season's games. The dashed line on the chart below." className="cursor-help">
+                {seasonLabel} season avg {fmt(season)}
+              </span>
+            )}
             {season !== null && leagueAvg !== null && ' · '}
-            {leagueAvg !== null && `league avg ${fmt(leagueAvg)}`}
+            {leagueAvg !== null && (
+              <span title="League average per team game. The dotted line on the chart below." className="cursor-help">
+                league avg {fmt(leagueAvg)}
+              </span>
+            )}
           </span>
         )}
       </div>
@@ -120,7 +130,7 @@ export function Scorecard({
         )}
       </div>
 
-      {recent && <Sparkline games={recent} stat={statKey} seasonAvg={season} leagueAvg={leagueAvg} names={names} fmt={fmt} />}
+      {recent && <Sparkline games={recent} stat={statKey} seasonAvg={season} leagueAvg={leagueAvg} names={names} fmt={pointFmt} avgFmt={fmt} />}
 
       <div ref={box} className="relative flex flex-col gap-1.5">
         {tip && <Bubble tip={tip} />}
