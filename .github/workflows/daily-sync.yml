@@ -1,14 +1,25 @@
-# Daily sync: copy new or changed source files into R2 (tiers 1 and 2), load them into Databricks bronze, build silver with a Databricks job, then tell Slack.
+# Sync: copy new or changed source files into R2 (tiers 1 and 2), load them into Databricks bronze, build silver with a
+# Databricks job (only when bronze loaded something new), redeploy the app so it shows the new data, then tell Slack.
+# It polls once an hour from 14:00 to 23:00 UTC, because the source publishes at a different time each day (seen 13:50 to
+# 15:50 UTC). Most polls find nothing new and stop after bronze (about 2 minutes). The 22:17 UTC run always builds silver, as a
+# safety net (it also retries a day when silver failed after bronze had already loaded).
 # Scheduled runs only work from the default branch (main).
 name: daily-sync
 
 on:
   schedule:
-    - cron: "17 16 * * *"   # 16:17 UTC; the source is done by about 15:17 UTC. Off the top of the hour because GitHub delays busy slots (seen: up to 4 hours)
-  workflow_dispatch:         # manual "Run workflow" button
+    - cron: "17 14-21,23 * * *"   # hourly at :17 UTC. Off the top of the hour because GitHub delays busy slots (seen: up to 4 hours)
+    - cron: "17 22 * * *"         # the daily safety-net run: always builds silver (see "Decide" below)
+  workflow_dispatch:               # manual "Run workflow" button
+    inputs:
+      force_silver:
+        description: "Build silver even if bronze loaded nothing new (untick to test the nothing-new path)"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
+  actions: write            # only so the last step can start the deploy-app workflow
 
 concurrency:
   group: daily-sync          # never two syncs at once
@@ -58,11 +69,33 @@ jobs:
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: python scripts/bronze_load.py --execute 2>&1 | tee bronze.log
 
-      # Silver runs only after bronze succeeded. Deploy first so the job always runs this commit's code,
-      # then run the job and wait for it; a failed gate fails the job and so this step.
+      # Did bronze load anything new? bronze_load.py prints "Files: N | CHANGED: x, UNCHANGED: y"; no CHANGED word means
+      # nothing changed. Silver is built when something changed, on the 22:17 UTC run, or on a manual run with force_silver on.
+      - name: Decide whether to build silver
+        id: decide
+        if: ${{ steps.bronze.outcome == 'success' }}
+        shell: bash
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force_silver }}
+        run: |
+          changed=$(grep -h '^Files:' bronze.log | grep -oE '\bCHANGED: [0-9]+' | grep -oE '[0-9]+' | head -n1 || true)
+          changed=${changed:-0}
+          build=false; why="bronze loaded nothing new"
+          if [ "$changed" -gt 0 ]; then build=true; why="bronze changed $changed file(s)"; fi
+          if [ "$SCHEDULE" = "17 22 * * *" ]; then build=true; why="the daily 22:17 UTC run always builds silver"; fi
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" = "true" ]; then build=true; why="manual run with force_silver on"; fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "Build silver: $build ($why)"
+          echo "$why" > decide.txt
+
+      # Silver runs only after bronze succeeded and the step above said yes. Deploy first so the job always runs this
+      # commit's code, then run the job and wait for it; a failed gate fails the job and so this step.
       - name: Build silver (Databricks job)
         id: silver
-        if: ${{ steps.bronze.outcome == 'success' }}
+        if: ${{ steps.decide.outputs.build == 'true' }}
         shell: bash
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
@@ -81,8 +114,24 @@ jobs:
               echo "- $t: $(grep -h '^Files:' $t.log 2>/dev/null || echo 'did not finish')"
             done
             echo "- bronze: $(grep -h '^Files:' bronze.log 2>/dev/null || echo 'did not run')"
-            echo "- silver: $(grep -h '^Changed this run' silver.log 2>/dev/null || echo 'did not run')"
+            if [ -f silver.log ]; then
+              echo "- silver: $(grep -h '^Changed this run' silver.log 2>/dev/null || echo 'did not finish')"
+            elif [ -f decide.txt ]; then
+              echo "- silver: skipped ($(cat decide.txt))"
+            else
+              echo "- silver: did not run"
+            fi
           } | tee -a "$GITHUB_STEP_SUMMARY" > summary.txt
+
+      # New data is in the gold tables, so redeploy the app now instead of waiting for its own 6-hourly run. Only when
+      # something changed and silver succeeded. A failure here must not turn a good sync red: the scheduled deploy is the backstop.
+      - name: Redeploy the app
+        if: ${{ steps.silver.outcome == 'success' && steps.decide.outputs.changed != '0' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-app.yml --ref main
 
       - name: Tell Slack
         if: ${{ !cancelled() }}
