@@ -29,7 +29,7 @@ This file is loaded automatically each session. Keep it short and current.
 - Every table, SQL or PySpark, ships with gates, warnings, tests, and corrupted-copy checks that prove the gates fire.
 
 ## Deploy
-- The app deploys itself: `.github/workflows/deploy-app.yml` runs on every merge to `main` that touches `app/`, twice a day (Free Edition stops an app ~24h after its last deploy), and on demand. Merging is the owner's approval to deploy. Check the run before saying the app is live.
+- The app deploys itself: `.github/workflows/deploy-app.yml` runs on every merge to `main` that touches `app/`, every 6 hours (Free Edition stops an app on its own, once after only ~8h), and on demand. It waits for a restarted app to settle before deploying. Merging is the owner's approval to deploy. Check the run before saying the app is live.
 
 ## Git
 - Work on a branch. Open a pull request. The owner merges. Never push directly to `main` (the first bootstrap commit is already done).

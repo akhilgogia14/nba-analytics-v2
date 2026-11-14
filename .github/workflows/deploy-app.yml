@@ -1,7 +1,8 @@
 # Deploy the "Player form" app (a Databricks App) from main. It runs:
 #   - when a change under app/ (or this file) lands on main, i.e. after the owner merges a pull request;
-#   - twice a day, because Databricks Free Edition stops an app about 24 hours after its last deploy and a fresh deploy
-#     keeps it running (GitHub may start scheduled runs hours late, so twice a day leaves a safe margin);
+#   - every 6 hours, because Databricks Free Edition stops an app on its own (seen once after only about 8 hours, so not a
+#     fixed 24) and a fresh deploy keeps it running; GitHub may start scheduled runs an hour or more late, so the schedule is
+#     frequent;
 #   - from the "Run workflow" button.
 # It only ever deploys main (scheduled runs use main by themselves; a button run from another branch is refused), and it
 # checks the app first: type check, lint, tests and the build must all pass or nothing is deployed.
@@ -13,7 +14,7 @@ on:
     branches: [main]
     paths: ["app/**", ".github/workflows/deploy-app.yml"]
   schedule:
-    - cron: "41 3,15 * * *"   # off the top of the hour; times in UTC
+    - cron: "41 3,9,15,21 * * *"   # off the top of the hour; times in UTC
   workflow_dispatch:
 
 permissions:
@@ -64,16 +65,41 @@ jobs:
           rsync -a --exclude node_modules --exclude dist --exclude .env app/ "$RUNNER_TEMP/appstage/"
           databricks workspace import-dir "$RUNNER_TEMP/appstage" "$APP_PATH" --overwrite
 
-      - name: Start the app if it is stopped
+      # Starting a stopped app makes Databricks begin a deployment of its own, and a second deploy while that one is pending
+      # is refused ("pending deployment in progress"). So after a start we wait until the app is running with nothing pending.
+      - name: Start the app if it is stopped, and wait until it has settled
         run: |
-          state=$(databricks apps get "$APP_NAME" -o json | python3 -c 'import sys,json; print(json.load(sys.stdin)["compute_status"]["state"])')
-          echo "App compute state: $state"
-          if [ "$state" != "ACTIVE" ]; then databricks apps start "$APP_NAME"; fi
+          state_of() {
+            databricks apps get "$APP_NAME" -o json | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["compute_status"]["state"], d["app_status"]["state"], "pending" if d.get("pending_deployment") else "none")'
+          }
+          read -r compute app pending <<< "$(state_of)"
+          echo "App compute state: $compute | app: $app | pending deployment: $pending"
+          if [ "$compute" != "ACTIVE" ]; then databricks apps start "$APP_NAME"; fi
+          for i in $(seq 1 60); do
+            read -r compute app pending <<< "$(state_of)"
+            echo "wait $i: compute $compute | app $app | pending deployment: $pending"
+            if [ "$compute" = "ACTIVE" ] && [ "$pending" = "none" ]; then echo "settled"; exit 0; fi
+            sleep 10
+          done
+          echo "The app did not settle within 10 minutes." >&2
+          exit 1
 
+      # Even then a deployment can still be pending for a moment, so a refusal for that reason is retried (up to 5 times, a
+      # minute apart). Any other failure stops at once.
       - name: Deploy
         run: |
-          set -o pipefail
-          databricks apps deploy "$APP_NAME" --source-code-path "$APP_PATH" -o json | tee deploy.json
+          for attempt in 1 2 3 4 5; do
+            if databricks apps deploy "$APP_NAME" --source-code-path "$APP_PATH" -o json > deploy.json 2> deploy.err; then
+              cat deploy.json
+              exit 0
+            fi
+            cat deploy.err >&2
+            if ! grep -q "pending deployment" deploy.err; then exit 1; fi
+            echo "Pending deployment (attempt $attempt of 5); waiting a minute."
+            sleep 60
+          done
+          echo "Still a pending deployment after 5 attempts." >&2
+          exit 1
 
       - name: Confirm the deploy worked
         run: |
