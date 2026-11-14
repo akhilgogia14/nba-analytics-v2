@@ -1,14 +1,16 @@
-export type Page = 'players' | 'teams'
+export type Page = 'players' | 'teams' | 'today'
 export type Route = { page: Page; team: string }
 
 /**
  * The address says which page to show and which team is chosen: "#/teams", "#/teams?team=BOS", "#/players?team=BOS".
- * The Teams page is the default (an empty or unknown address opens it). A team is three capital letters; anything else is ignored.
+ * "#/today" is the Today's games page. The Teams page is the default (an empty or unknown address opens it). A team is three
+ * capital letters; anything else is ignored.
  */
 export function parseHash(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   const team = new URLSearchParams(query).get('team') ?? ''
-  return { page: path === '/players' ? 'players' : 'teams', team: /^[A-Z]{3}$/.test(team) ? team : '' }
+  const page: Page = path === '/players' ? 'players' : path === '/today' ? 'today' : 'teams'
+  return { page, team: /^[A-Z]{3}$/.test(team) ? team : '' }
 }
 
 /** The address for a page, carrying the chosen team (if any). */

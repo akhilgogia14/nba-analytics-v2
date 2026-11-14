@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import App from './App.tsx'
 import { pageFromHash } from './lib/pages.ts'
 import TeamsPage from './TeamsPage.tsx'
+import TodayPage from './TodayPage.tsx'
 
-/** Shows the Teams page (the default) or the Player page ("#/players"), by the address. */
+/** Shows the Teams page (the default), the Player page ("#/players") or Today's games ("#/today"), by the address. */
 export default function Root() {
   const [page, setPage] = useState(() => pageFromHash(window.location.hash))
   useEffect(() => {
@@ -11,5 +12,6 @@ export default function Root() {
     window.addEventListener('hashchange', onChange)
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
+  if (page === 'today') return <TodayPage />
   return page === 'teams' ? <TeamsPage /> : <App />
 }

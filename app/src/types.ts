@@ -149,3 +149,18 @@ export type TeamMeetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; cu
 
 /** The league average of each team stat, per team game, for one game type in the latest season that has games of it. */
 export type LeagueAverages = { seasonLabel: string | null; games: number; stats: Record<string, number | null> }
+
+/** One game on the Today's games page. Scores and the winner are null until the game is final. */
+export type SlateGame = {
+  id: string
+  date: string
+  home: string
+  away: string
+  homeName: string
+  awayName: string
+  homePts: number | null
+  awayPts: number | null
+  isFinal: boolean
+  homeWon: boolean | null
+}
+export type Slate = { games: SlateGame[] }
