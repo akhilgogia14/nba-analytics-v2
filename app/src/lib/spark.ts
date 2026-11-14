@@ -65,3 +65,12 @@ export function sparkTip(game: SparkGame, stat: string, value: number, names?: S
   const detail = `${shortDate(game.date)} · ${game.isHome ? 'home' : 'away'}`
   return { title: `${shown} ${short} · ${versus}`, detail, label: `${shown} ${long.toLowerCase()}, ${versus}. ${detail}.` }
 }
+
+export type LineKind = 'season' | 'league'
+
+/** The bubble over an average line: "Season avg 110.3" or "League avg 113.3", with a line of explanation under it. */
+export function lineTip(kind: LineKind, value: number, fmt: (n: number) => string = f1): SparkTip {
+  const title = `${kind === 'league' ? 'League avg' : 'Season avg'} ${fmt(value)}`
+  const detail = kind === 'league' ? 'League average per team game' : "Average of this season's games"
+  return { title, detail, label: `${title}. ${detail}.` }
+}

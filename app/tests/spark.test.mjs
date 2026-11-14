@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { SPARK_H, SPARK_PAD, SPARK_W, changeVsSeason, sparkLayout, sparkTip } from '../src/lib/spark.ts'
+import { SPARK_H, SPARK_PAD, SPARK_W, changeVsSeason, lineTip, sparkLayout, sparkTip } from '../src/lib/spark.ts'
 
 const game = (id, pts, over = {}) => ({
   id, date: '2026-10-21', opp: 'GSW', isHome: true, seasonLabel: '2026-27', minutes: 30,
@@ -77,4 +77,10 @@ test('sparkLayout: the league average gets its own dotted line and the scale inc
   // without a league figure there is no line, and the layout is what it was before
   assert.equal(sparkLayout([game('a', 20), game('b', 22)], 'pts', 21).leagueBaseline, null)
   assert.deepEqual(sparkLayout([game('a', 20), game('b', 22)], 'pts', 21, null).points, sparkLayout([game('a', 20), game('b', 22)], 'pts', 21).points)
+})
+
+test('lineTip: the bubble over an average line names it and its value', () => {
+  assert.deepEqual(lineTip('season', 110.273), { title: 'Season avg 110.3', detail: "Average of this season's games", label: "Season avg 110.3. Average of this season's games." })
+  assert.equal(lineTip('league', 45.818, (n) => `${n.toFixed(1)}%`).title, 'League avg 45.8%')
+  assert.equal(lineTip('league', 113.315).detail, 'League average per team game')
 })

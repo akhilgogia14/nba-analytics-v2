@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { pageFromHash } from '../src/lib/pages.ts'
 import { sparkLayout, sparkTip } from '../src/lib/spark.ts'
-import { TEAM_CARDS, cardFormat, leagueNote, pctText, resultText, teamAverageRow, teamLogNote, teamMeetingsNote, teamNotices } from '../src/lib/teamPage.ts'
+import { TEAM_CARDS, cardFormat, leagueNote, pctText, pointFormat, resultText, teamAverageRow, teamLogNote, teamMeetingsNote, teamNotices } from '../src/lib/teamPage.ts'
 
 const game = (id, date, o = {}) => ({
   id, date, opp: o.opp ?? 'CLE', isHome: o.home ?? true, seasonLabel: o.season ?? '2026-27', won: o.won ?? true,
@@ -103,4 +103,11 @@ test('the note under the cards explains both lines, or is absent without a leagu
   assert.match(leagueNote({ ...league, seasonLabel: '2025-26' }, 'playoffs'), /2025-26 playoff, 300 team games/)
   assert.equal(leagueNote(null, 'regular-season'), null)
   assert.equal(leagueNote({ seasonLabel: null, games: 0, stats: {} }, 'playoffs'), null)
+})
+
+test('a game bubble keeps whole numbers whole and writes percentages with a % sign', () => {
+  const [pts, fg] = [TEAM_CARDS[0], TEAM_CARDS[1]]
+  assert.equal(pointFormat(pts), undefined) // the sparkline then writes the number as is: 111, not 111.0
+  assert.equal(pointFormat(fg)(49.397), '49.4%')
+  assert.equal(cardFormat(pts)(111), '111.0') // the card's own big number keeps its decimal
 })
