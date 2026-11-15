@@ -54,6 +54,7 @@ TABLES = {
     "player_season_games": {"key": ["person_id", "team_id", "game_id"], "layer": "gold", "python": "gold_player_season_games"},
     "team_game_log": {"key": ["team_id", "game_id"], "layer": "gold", "python": "gold_team_game_log"},
     "game_slate": {"key": ["game_id"], "layer": "gold", "python": "gold_game_slate"},
+    "game_context": {"key": ["team_id", "game_id"], "layer": "gold", "python": "gold_game_context"},
 }
 MAX_DELETE_FRACTION = 0.01
 MAX_EXAMPLES = 5
