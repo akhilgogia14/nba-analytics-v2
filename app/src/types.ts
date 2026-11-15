@@ -164,3 +164,14 @@ export type SlateGame = {
   homeWon: boolean | null
 }
 export type Slate = { games: SlateGame[] }
+
+/** Advanced stats (Teams): how games split by situation. A bucket is a group of games (all, home, away, back-to-back, ...). */
+export type ContextStat = 'pts' | 'allowed' | 'margin' | 'fg_pct' | 'fg3m' | 'tov'
+export type ContextBucket = { n: number; stats: Record<ContextStat, number | null> }
+export type ContextSplit = { buckets: Record<string, ContextBucket>; firstSeason: string | null; lastSeason: string | null }
+export type NextGame = {
+  id: string; date: string; opp: string; isHome: boolean; daysRest: number | null; isB2b: boolean | null
+  gamesIn4: number; gamesIn6: number; is3In4: boolean; is4In6: boolean; stintGame: number; oppDaysRest: number | null
+  restEdge: number | null; seasonLabel: string
+}
+export type TeamContext = { next: NextGame | null; team: ContextSplit; league: ContextSplit }
