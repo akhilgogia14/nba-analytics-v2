@@ -1,4 +1,4 @@
-import type { SlateGame } from '../types.ts'
+import type { SideContext, SlateGame } from '../types.ts'
 
 /** The schedule's dates are US dates, so "today" is today's date in US Eastern time, wherever the viewer is. Written YYYY-MM-DD. */
 export function easternDate(now: Date = new Date()): string {
@@ -46,4 +46,29 @@ export function winner(g: SlateGame): 'home' | 'away' | null {
 export function emptyText(iso: string, today: string, regular: boolean): string {
   const kind = regular ? 'regular-season' : 'playoff'
   return `No ${kind} games on ${dateHeading(iso, today).replace(/^[A-Za-z]+ · /, '')}. Use the arrows to look at another day.`
+}
+
+/** A small label under a team: a plain fact about its schedule going into the game. `tone` is 'warn' for the tiring ones. */
+export type Chip = { key: string; label: string; tone: 'warn' | 'good' | 'info' }
+
+// Thresholds, in one place: 3+ days off is "rested", a rest edge of 2+ days is worth a label, 3rd+ game of a trip is a trip.
+export const RESTED_DAYS = 3
+export const REST_EDGE_DAYS = 2
+export const ROAD_TRIP_GAME = 3
+
+/**
+ * The chips for one team: back-to-back, the stronger crowded stretch (3 in 4 nights, else 4 in 6), rested (3+ days off),
+ * road trip (away team only, 3rd game or later), and rest edge (only on the MORE rested team, 2+ days more than the opponent).
+ * Facts only, no claim about who will win. A team with nothing unusual gets none, and no context at all gets none.
+ */
+export function chipsFor(c: SideContext | null, isHome: boolean): Chip[] {
+  if (!c) return []
+  const chips: Chip[] = []
+  if (c.isB2b) chips.push({ key: 'b2b', label: 'Back-to-back', tone: 'warn' })
+  if (c.is3In4) chips.push({ key: 'crowded', label: '3 in 4 nights', tone: 'warn' })
+  else if (c.is4In6) chips.push({ key: 'crowded', label: '4 in 6 nights', tone: 'warn' })
+  if (c.daysRest !== null && c.daysRest >= RESTED_DAYS) chips.push({ key: 'rested', label: `Rested · ${c.daysRest} days`, tone: 'good' })
+  if (!isHome && c.stintGame !== null && c.stintGame >= ROAD_TRIP_GAME) chips.push({ key: 'trip', label: `Road trip · game ${c.stintGame}`, tone: 'info' })
+  if (c.restEdge !== null && c.restEdge >= REST_EDGE_DAYS) chips.push({ key: 'edge', label: `Rest edge +${c.restEdge}`, tone: 'good' })
+  return chips
 }

@@ -150,6 +150,16 @@ export type TeamMeetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; cu
 /** The league average of each team stat, per team game, for one game type in the latest season that has games of it. */
 export type LeagueAverages = { seasonLabel: string | null; games: number; stats: Record<string, number | null> }
 
+/** One team's rest facts going into a game (null when the data has no row for it). Days of rest and rest edge are null for a season opener. */
+export type SideContext = {
+  daysRest: number | null
+  isB2b: boolean
+  is3In4: boolean
+  is4In6: boolean
+  stintGame: number | null
+  restEdge: number | null
+}
+
 /** One game on the Today's games page. Scores and the winner are null until the game is final. */
 export type SlateGame = {
   id: string
@@ -162,6 +172,8 @@ export type SlateGame = {
   awayPts: number | null
   isFinal: boolean
   homeWon: boolean | null
+  homeContext: SideContext | null
+  awayContext: SideContext | null
 }
 export type Slate = { games: SlateGame[] }
 
