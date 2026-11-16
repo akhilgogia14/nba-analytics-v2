@@ -1,7 +1,11 @@
 import type { ContextBucket, ContextSplit, ContextStat, NextGame } from '../types.ts'
 
-/** A team's own split needs at least this many games on each side before we show a difference (a smaller sample is noise). */
-export const MIN_TEAM_GAMES = 8
+/**
+ * A team's own split needs at least this many games on each side before we show a difference. Owner's choice (2026-11-16): 1,
+ * so a team's figures show from its first game in a situation; the page prints the game count above every table and in each team
+ * column heading, so a figure from one game reads as one game. (It was 8 at first: a small sample is mostly noise.)
+ */
+export const MIN_TEAM_GAMES = 1
 
 export const CONTEXT_STAT_LIST: { key: ContextStat; label: string; lowerIsBetter: boolean }[] = [
   { key: 'pts', label: 'Points scored', lowerIsBetter: false },

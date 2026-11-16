@@ -64,7 +64,12 @@ test('a difference needs both groups, a number, and enough games', () => {
   assert.equal(difference(split, 'b2b', 'rested', 'pts', 20), null) // 14 games on one side is under 20
   const empty = { buckets: { a: { n: 10, stats: { pts: null } }, b: { n: 10, stats: { pts: 1 } } }, firstSeason: null, lastSeason: null }
   assert.equal(difference(empty, 'a', 'b', 'pts', 1), null)
-  assert.equal(MIN_TEAM_GAMES, 8)
+  assert.equal(MIN_TEAM_GAMES, 1) // owner's choice 2026-11-16
+  const one = { buckets: { b2b: { n: 1, stats: { pts: 99, allowed: 100, margin: -1, fg_pct: 44, fg3m: 10, tov: 12 } }, rested: { n: 9, stats: { pts: 110, allowed: 108, margin: 2, fg_pct: 47, fg3m: 12, tov: 13 } } }, firstSeason: null, lastSeason: null }
+  const d1 = difference(one, 'b2b', 'rested', 'pts', MIN_TEAM_GAMES)
+  assert.deepEqual([d1.diff, d1.nA, d1.nB], [-11, 1, 9]) // one game is shown, with its count
+  const none = { buckets: { b2b: { n: 0, stats: { pts: null } }, rested: { n: 9, stats: { pts: 110 } } }, firstSeason: null, lastSeason: null }
+  assert.equal(difference(none, 'b2b', 'rested', 'pts', MIN_TEAM_GAMES), null) // no games at all stays empty
 })
 
 test('numbers are written with one decimal; a difference carries a sign and never shows -0.0', () => {
