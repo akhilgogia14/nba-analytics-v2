@@ -42,12 +42,15 @@ export const LEAGUE_CONTEXT_SQL = `
   WHERE c.game_type = :gt AND c.is_final
   GROUP BY b.bucket`
 
-// The team's next game that has not been played (skipping any stale unplayed date more than a day old).
+// The team's next game that has not been played. Schedule dates are US dates, so "today" is today's date in US Eastern time:
+// a game stays "next" until Eastern midnight after its date (even if it has just finished and its box score has not landed),
+// and an unplayed game dated earlier than today (postponed, or a late box score) is skipped.
+export const EASTERN_TODAY = `CAST(from_utc_timestamp(current_timestamp(), 'America/New_York') AS DATE)`
 export const NEXT_GAME_SQL = `
   SELECT game_id, game_date, opponent_tricode, is_home, days_rest, is_b2b, games_in_4, games_in_6, is_3_in_4, is_4_in_6,
          stint_game_number, opp_days_rest, rest_edge, season_label
   FROM ${CTX_TABLE}
-  WHERE team_tricode = :team AND game_type = :gt AND NOT is_final AND game_date >= date_sub(current_date(), 1)
+  WHERE team_tricode = :team AND game_type = :gt AND NOT is_final AND game_date >= ${EASTERN_TODAY}
   ORDER BY game_date, game_id LIMIT 1`
 
 const num = (v) => (v === null || v === undefined ? null : Number(v))

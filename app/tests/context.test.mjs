@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { BUCKETS, CONTEXT_STATS, LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from '../server/contextQueries.mjs'
+import { BUCKETS, CONTEXT_STATS, EASTERN_TODAY, LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from '../server/contextQueries.mjs'
 import { COMPARISONS, MIN_TEAM_GAMES, applicableComparisons, difference, fmtDiff, fmtValue, nextGameFacts, ordinal, restWords } from '../src/lib/context.ts'
 import { hashFor, isAdvancedHash, pageFromHash, parseHash, rememberTeam } from '../src/lib/pages.ts'
 
@@ -22,6 +22,12 @@ test('only played games feed the splits and only unplayed games feed the next ga
   assert.match(NEXT_GAME_SQL, /NOT is_final/)
   assert.match(NEXT_GAME_SQL, /ORDER BY game_date, game_id LIMIT 1/)
   assert.match(TEAM_CONTEXT_SQL, /FROM workspace\.nba_v2_gold\.game_context c JOIN workspace\.nba_v2_gold\.team_game_log l/)
+})
+
+test('the next game is the first unplayed game dated today or later in US Eastern time, not in UTC', () => {
+  assert.match(EASTERN_TODAY, /from_utc_timestamp\(current_timestamp\(\), 'America\/New_York'\)/)
+  assert.ok(NEXT_GAME_SQL.includes(`game_date >= ${EASTERN_TODAY}`))
+  assert.doesNotMatch(NEXT_GAME_SQL, /current_date\(\)/) // current_date() is the UTC date, which is ahead of Eastern for 4 to 5 hours every evening
 })
 
 test('every bucket the page compares is produced by the SQL', () => {
