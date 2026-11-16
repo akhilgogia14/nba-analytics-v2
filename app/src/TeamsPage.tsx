@@ -3,6 +3,7 @@ import { fetchLeagueAverages, fetchTeamForm, fetchTeamGames, fetchTeamLog, fetch
 import { TeamBadge } from './components/Avatar.tsx'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
+import { TeamTabs } from './components/TeamTabs.tsx'
 import { parseHash, rememberTeam } from './lib/pages.ts'
 import { Scorecard } from './components/Scorecard.tsx'
 import { TeamGameLog } from './components/TeamGameLog.tsx'
@@ -194,6 +195,8 @@ export default function TeamsPage() {
           </div>
           <PageSwitch page="teams" team={team} />
         </header>
+
+        <TeamTabs view="overview" team={team} />
 
         <div className="flex flex-wrap items-end gap-4">
           <label className="flex max-w-80 min-w-56 flex-1 flex-col gap-1.5">
