@@ -2,7 +2,9 @@
 # Databricks job (only when bronze loaded something new), redeploy the app so it shows the new data, then tell Slack.
 # It polls once an hour from 14:00 to 23:00 UTC, because the source publishes at a different time each day (seen 13:50 to
 # 15:50 UTC). Most polls find nothing new and stop after bronze (about 2 minutes). The 22:17 UTC run always builds silver, as a
-# safety net. A poll also builds silver when the previous sync run failed, so a failed silver build is retried within the hour
+# safety net, and a 3:05 PM US Eastern (20:05 UTC) run builds silver every day too, after the source has usually published.
+# GitHub treats scheduled runs as best-effort and drops many of them (on 2026-11-15 and 11-16 most hourly polls never ran),
+# so the fixed daily runs are a backstop, though they can be delayed or dropped too (the 22:17 run came 3.5 hours late on 11-15). A poll also builds silver when the previous sync run failed, so a failed silver build is retried within the hour
 # instead of waiting for the 22:17 run (bronze would show "nothing new" on that next poll, because it had already loaded).
 # Scheduled runs only work from the default branch (main).
 name: daily-sync
@@ -10,6 +12,8 @@ name: daily-sync
 on:
   schedule:
     - cron: "17 14-21,23 * * *"   # hourly at :17 UTC. Off the top of the hour because GitHub delays busy slots (seen: up to 4 hours)
+    - cron: "5 20 * * *"          # 3:05 PM US Eastern (EST, UTC-5): the owner's daily run, always builds silver. In summer time (EDT) it is 4:05 PM
+                                  # Eastern; change 20 to 19 from the second Sunday of March to the first Sunday of November.
     - cron: "17 22 * * *"         # the daily safety-net run: always builds silver (see "Decide" below)
   workflow_dispatch:               # manual "Run workflow" button
     inputs:
@@ -72,7 +76,7 @@ jobs:
 
       # Did bronze load anything new? bronze_load.py prints "Files: N | CHANGED: x, UNCHANGED: y"; no CHANGED word means
       # nothing changed. Silver is built when something changed, when the previous sync run failed (retry), on the 22:17 UTC
-      # run, or on a manual run with force_silver on.
+      # run, the 3 PM and 22:17 runs, or on a manual run with force_silver on.
       - name: Decide whether to build silver
         id: decide
         if: ${{ steps.bronze.outcome == 'success' }}
@@ -93,6 +97,7 @@ jobs:
           retry=false
           if [ "$last" = "failure" ]; then retry=true; build=true; why="the previous sync run failed, so retrying the silver build"; fi
           if [ "$SCHEDULE" = "17 22 * * *" ]; then build=true; why="the daily 22:17 UTC run always builds silver"; fi
+          if [ "$SCHEDULE" = "5 20 * * *" ]; then build=true; why="the daily 3 PM Eastern run always builds silver"; fi
           if [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" = "true" ]; then build=true; why="manual run with force_silver on"; fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           echo "build=$build" >> "$GITHUB_OUTPUT"
