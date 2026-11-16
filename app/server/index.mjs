@@ -6,6 +6,7 @@ import {
   FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validPlayerId, validTeam,
 } from './queries.mjs'
+import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
 import { SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
 import {
   LEAGUE_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
@@ -218,6 +219,17 @@ teamRoute('/api/teams/:team/meetings', 'team meetings', async (req, res, team, t
       mapTeamMeetings(await sql(TEAM_MEETINGS_SQL, [...teamParams(team, type), { name: 'opp', value: opp, type: 'STRING' }])),
     ),
   )
+})
+
+// The Advanced stats tab: the team's next unplayed game with its rest situation, how the team's played games of this season
+// split by situation (home/away, back-to-back, rest), and the same split for the whole league over every season on record.
+teamRoute('/api/teams/:team/context', 'team context', async (_req, res, team, type) => {
+  const params = teamParams(team, type)
+  const [next, teamSplit] = await cached(`tctx:${team}:${type}`, FIVE_MINUTES, async () =>
+    Promise.all([sql(NEXT_GAME_SQL, params).then(mapNextGame), sql(TEAM_CONTEXT_SQL, params).then(mapBuckets)]),
+  )
+  const league = await cached(`lctx:${type}`, FIVE_MINUTES, async () => mapBuckets(await sql(LEAGUE_CONTEXT_SQL, [{ name: 'gt', value: type, type: 'STRING' }])))
+  res.json({ next, team: teamSplit, league })
 })
 
 // The league average of every team stat (per team game) for one game type, for the dotted line on the sparklines.
