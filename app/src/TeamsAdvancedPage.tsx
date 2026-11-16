@@ -54,8 +54,12 @@ function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[numb
               <th className={head}>League {c.aLabel}</th>
               <th className={head}>League {c.bLabel}</th>
               <th className={head}>League difference</th>
-              <th className={head}>Team {c.aLabel}</th>
-              <th className={head}>Team {c.bLabel}</th>
+              <th className={head}>
+                Team {c.aLabel} ({teamN[0]})
+              </th>
+              <th className={head}>
+                Team {c.bLabel} ({teamN[1]})
+              </th>
               <th className={head}>Team difference</th>
             </tr>
           </thead>
@@ -73,7 +77,7 @@ function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[numb
                   <td className={`${cell} font-semibold`}>{l ? fmtDiff(s.key, l.diff) : '-'}</td>
                   <td className={`${cell} text-(--muted)`}>{t ? fmtValue(s.key, t.a) : '-'}</td>
                   <td className={`${cell} text-(--muted)`}>{t ? fmtValue(s.key, t.b) : '-'}</td>
-                  <td className={`${cell} text-(--muted)`}>{t ? fmtDiff(s.key, t.diff) : 'too few games'}</td>
+                  <td className={`${cell} text-(--muted)`}>{t ? fmtDiff(s.key, t.diff) : 'no games yet'}</td>
                 </tr>
               )
             })}
@@ -238,7 +242,7 @@ export default function TeamsAdvancedPage() {
                 <section className="flex max-w-3xl flex-col gap-1.5 text-[14px] leading-relaxed text-(--muted)">
                   <div>
                     <strong className="text-(--text)">How to read this.</strong> The league columns come from every team's games on record, so the pattern is steady: it is the real
-                    effect of the situation. The team columns show this team's own games this season in the same situations. Those samples are small, and when we
+                    effect of the situation. The team columns show this team's own games this season in the same situations. Those samples are small (the number of games is in each column heading, and a figure from one or two games is a single result, not a pattern), and when we
                     tested seasons of past data a team's own split in one half of a season did not predict the other half. Treat them as context, not as a trait of the team.
                   </div>
                   <div>Games are compared as they were played, so a difference also reflects who the opponents were (for example, who played at home).</div>
