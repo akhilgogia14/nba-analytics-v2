@@ -2,7 +2,8 @@
 # Databricks job (only when bronze loaded something new), redeploy the app so it shows the new data, then tell Slack.
 # It polls once an hour from 14:00 to 23:00 UTC, because the source publishes at a different time each day (seen 13:50 to
 # 15:50 UTC). Most polls find nothing new and stop after bronze (about 2 minutes). The 22:17 UTC run always builds silver, as a
-# safety net (it also retries a day when silver failed after bronze had already loaded).
+# safety net. A poll also builds silver when the previous sync run failed, so a failed silver build is retried within the hour
+# instead of waiting for the 22:17 run (bronze would show "nothing new" on that next poll, because it had already loaded).
 # Scheduled runs only work from the default branch (main).
 name: daily-sync
 
@@ -70,7 +71,8 @@ jobs:
         run: python scripts/bronze_load.py --execute 2>&1 | tee bronze.log
 
       # Did bronze load anything new? bronze_load.py prints "Files: N | CHANGED: x, UNCHANGED: y"; no CHANGED word means
-      # nothing changed. Silver is built when something changed, on the 22:17 UTC run, or on a manual run with force_silver on.
+      # nothing changed. Silver is built when something changed, when the previous sync run failed (retry), on the 22:17 UTC
+      # run, or on a manual run with force_silver on.
       - name: Decide whether to build silver
         id: decide
         if: ${{ steps.bronze.outcome == 'success' }}
@@ -79,15 +81,22 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           EVENT: ${{ github.event_name }}
           FORCE: ${{ inputs.force_silver }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           changed=$(grep -h '^Files:' bronze.log | grep -oE '\bCHANGED: [0-9]+' | grep -oE '[0-9]+' | head -n1 || true)
           changed=${changed:-0}
           build=false; why="bronze loaded nothing new"
           if [ "$changed" -gt 0 ]; then build=true; why="bronze changed $changed file(s)"; fi
+          # Retry: the most recent FINISHED run of this workflow (this run is still going, so it is not counted) failed.
+          # If the lookup itself fails, do not retry (the 22:17 run is the backstop).
+          last=$(gh run list --workflow daily-sync.yml --status completed --limit 1 --json conclusion -q '.[0].conclusion' 2>/dev/null || true)
+          retry=false
+          if [ "$last" = "failure" ]; then retry=true; build=true; why="the previous sync run failed, so retrying the silver build"; fi
           if [ "$SCHEDULE" = "17 22 * * *" ]; then build=true; why="the daily 22:17 UTC run always builds silver"; fi
           if [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" = "true" ]; then build=true; why="manual run with force_silver on"; fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "retry=$retry" >> "$GITHUB_OUTPUT"
           echo "Build silver: $build ($why)"
           echo "$why" > decide.txt
 
@@ -124,9 +133,9 @@ jobs:
           } | tee -a "$GITHUB_STEP_SUMMARY" > summary.txt
 
       # New data is in the gold tables, so redeploy the app now instead of waiting for its own 6-hourly run. Only when
-      # something changed and silver succeeded. A failure here must not turn a good sync red: the scheduled deploy is the backstop.
+      # something changed, or this run was a retry of a failed build (its gold tables are new too), and silver succeeded. A failure here must not turn a good sync red: the scheduled deploy is the backstop.
       - name: Redeploy the app
-        if: ${{ steps.silver.outcome == 'success' && steps.decide.outputs.changed != '0' }}
+        if: ${{ steps.silver.outcome == 'success' && (steps.decide.outputs.changed != '0' || steps.decide.outputs.retry == 'true') }}
         continue-on-error: true
         shell: bash
         env:
