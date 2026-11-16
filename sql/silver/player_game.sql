@@ -4,6 +4,9 @@
 --   * "played" means minutes_seconds > 0. Never taken from `comment` or from a missing row.
 --   * minutes is text 'mm:ss' (seconds can be 60 or more, e.g. '9:60'); convert as m*60 + s.
 --   * starter = position is not empty (only starters carry G/F/C).
+--   * A game whose TEAM minutes are not a possible total (240:00 plus 25:00 per overtime; a box score with a player's minutes
+--     missing) is held back here exactly as in team_game, so the two silver tables always agree about which games exist.
+--     The warning that names it lives in team_game_warnings.sql.
 SELECT
   p.game_id,
   p.person_id,
@@ -51,3 +54,8 @@ CROSS JOIN LATERAL (
          END AS minutes_seconds
 ) mins
 WHERE p.team_id <> 0 AND p.person_id <> 0
+  AND p.game_id NOT IN (
+  SELECT game_id FROM (
+      SELECT game_id, try_cast(split_part(minutes, ':', 1) AS INT) * 60 + try_cast(split_part(minutes, ':', 2) AS INT) AS secs
+      FROM workspace.nba_v2_bronze.team_boxscores WHERE team_id <> 0)
+    WHERE secs < 14400 OR (secs - 14400) % 1500 <> 0)

@@ -5,8 +5,13 @@ UNION ALL SELECT 'key_has_null', count_if(game_id IS NULL OR person_id IS NULL) 
 UNION ALL SELECT 'missing_game_date', count_if(game_date IS NULL) FROM {T}
 UNION ALL SELECT 'minutes_unparsed',
   count_if(minutes_seconds IS NULL AND played) FROM {T}
+-- every real bronze row must arrive, except the rows of games held back for impossible TEAM minutes (see player_game.sql)
 UNION ALL SELECT 'dropped_vs_bronze',
-  (SELECT count(*) FROM workspace.nba_v2_bronze.player_boxscores WHERE team_id <> 0 AND person_id <> 0)
+  (SELECT count(*) FROM workspace.nba_v2_bronze.player_boxscores WHERE team_id <> 0 AND person_id <> 0 AND game_id NOT IN (
+     SELECT game_id FROM (
+         SELECT game_id, try_cast(split_part(minutes, ':', 1) AS INT) * 60 + try_cast(split_part(minutes, ':', 2) AS INT) AS secs
+         FROM workspace.nba_v2_bronze.team_boxscores WHERE team_id <> 0)
+       WHERE secs < 14400 OR (secs - 14400) % 1500 <> 0))
   - (SELECT count(*) FROM {T})
 UNION ALL SELECT 'points_without_minutes', count_if(NOT played AND coalesce(pts,0) > 0) FROM {T}
 UNION ALL SELECT 'team_games_without_5_starters', count(*) FROM (
