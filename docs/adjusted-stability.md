@@ -41,4 +41,4 @@ Per stat, the mean correlation across the 12 values (4 contexts x 3 methods; 1,2
 - Playoffs; role or minutes splits; defense-by-position (the grid in `docs/NEXT.md` item 30b).
 - A stricter version that matches games within the same opponent or uses preseason ratings (the season rating here includes the games being studied, which, if anything, shrinks the effects slightly).
 - Why the player back-to-back effect is positive.
-- The analysis script is not in the repo (it lived in a scratch folder); say if you want it kept under `scripts/analysis/`.
+- The three scripts behind the stability notes are in `scripts/analysis/` (README there says how to re-run them).
