@@ -9,25 +9,33 @@ export type Route = { page: Page; team: string }
 export function parseHash(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   const team = new URLSearchParams(query).get('team') ?? ''
-  const page: Page = path === '/players' ? 'players' : path === '/teams' || path === '/teams/advanced' ? 'teams' : 'today'
+  const page: Page = path === '/players' || path === '/players/advanced' ? 'players' : path === '/teams' || path === '/teams/advanced' ? 'teams' : 'today'
   return { page, team: /^[A-Z]{3}$/.test(team) ? team : '' }
 }
 
-/** The Teams page has two tabs: the Overview ("#/teams") and Advanced stats ("#/teams/advanced"). */
-export type View = 'overview' | 'advanced'
-export const isAdvancedHash = (hash: string): boolean => hash.replace(/^#/, '').split('?')[0] === '/teams/advanced'
+/** The player carried in the address ("#/players/advanced?team=NYK&player=1628973"): digits only, anything else is ignored. */
+export function playerFromHash(hash: string): string {
+  const query = hash.replace(/^#/, '').split('?')[1] ?? ''
+  const id = new URLSearchParams(query).get('player') ?? ''
+  return /^\d{1,12}$/.test(id) ? id : ''
+}
 
-/** The address for a page (or for the Teams page's Advanced stats tab), carrying the chosen team (if any). */
-export function hashFor(page: Page, team: string, view: View = 'overview'): string {
-  const path = page === 'teams' && view === 'advanced' ? 'teams/advanced' : page
-  return `#/${path}${/^[A-Z]{3}$/.test(team) ? `?team=${team}` : ''}`
+/** The Teams and Players pages each have two tabs: the Overview ("#/teams", "#/players") and Advanced stats ("#/teams/advanced", "#/players/advanced"). */
+export type View = 'overview' | 'advanced'
+export const isAdvancedHash = (hash: string): boolean => ['/teams/advanced', '/players/advanced'].includes(hash.replace(/^#/, '').split('?')[0])
+
+/** The address for a page (or for a page's Advanced stats tab), carrying the chosen team and, on the Players page, the chosen player (if any). */
+export function hashFor(page: Page, team: string, view: View = 'overview', player = ''): string {
+  const path = (page === 'teams' || page === 'players') && view === 'advanced' ? `${page}/advanced` : page
+  const parts = [/^[A-Z]{3}$/.test(team) ? `team=${team}` : '', page === 'players' && /^\d{1,12}$/.test(player) ? `player=${player}` : ''].filter(Boolean)
+  return `#/${path}${parts.length ? `?${parts.join('&')}` : ''}`
 }
 
 export const pageFromHash = (hash: string): Page => parseHash(hash).page
 
 /** Writes the chosen team into the address without adding a back-button step (and without a page change). */
-export function rememberTeam(page: Page, team: string, view: View = 'overview'): void {
-  if (/^[A-Z]{3}$/.test(team) && window.location.hash !== hashFor(page, team, view)) {
-    window.history.replaceState(null, '', hashFor(page, team, view))
+export function rememberTeam(page: Page, team: string, view: View = 'overview', player = ''): void {
+  if (/^[A-Z]{3}$/.test(team) && window.location.hash !== hashFor(page, team, view, player)) {
+    window.history.replaceState(null, '', hashFor(page, team, view, player))
   }
 }

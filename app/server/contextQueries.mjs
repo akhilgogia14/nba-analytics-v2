@@ -10,7 +10,7 @@ export const CONTEXT_STATS = ['pts', 'allowed', 'margin', 'fg_pct', 'fg3m', 'tov
 
 // A game falls into several "buckets" at once (all games, home or away, back-to-back, rested, ...). One row per bucket.
 export const BUCKETS = ['all', 'home', 'away', 'b2b', 'rested', 'rest1', 'rest2plus', 'edge_plus', 'edge_minus']
-const BUCKETS_SQL = `
+export const BUCKETS_SQL = `
   LATERAL VIEW explode(filter(array(
     'all',
     CASE WHEN c.is_home THEN 'home' ELSE 'away' END,

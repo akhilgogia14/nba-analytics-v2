@@ -1,11 +1,11 @@
-import { hashFor, type View } from '../lib/pages.ts'
+import { hashFor, type Page, type View } from '../lib/pages.ts'
 import { pillClass, pillStyle } from '../lib/styles.ts'
 
-/** The two tabs of the Teams page. Plain links that carry the chosen team ("#/teams/advanced?team=BOS"), so the team stays chosen and the back button works. */
-export function TeamTabs({ view, team }: { view: View; team: string }) {
+/** The two tabs of the Teams page and of the Players page. Plain links that carry the chosen team (and player), so the choice stays and the back button works. */
+export function TeamTabs({ view, team, page = 'teams', player = '' }: { view: View; team: string; page?: Extract<Page, 'teams' | 'players'>; player?: string }) {
   const link = (key: View, label: string) => (
     <a
-      href={hashFor('teams', team, key)}
+      href={hashFor(page, team, key, player)}
       aria-current={view === key ? 'page' : undefined}
       className={`${pillClass} inline-flex items-center no-underline`}
       style={pillStyle(view === key)}
@@ -14,7 +14,7 @@ export function TeamTabs({ view, team }: { view: View; team: string }) {
     </a>
   )
   return (
-    <nav aria-label="Teams view" className="flex items-center gap-2">
+    <nav aria-label={page === 'players' ? 'Players view' : 'Teams view'} className="flex items-center gap-2">
       {link('overview', 'Overview')}
       {link('advanced', 'Advanced stats')}
     </nav>

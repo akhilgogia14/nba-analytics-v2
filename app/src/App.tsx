@@ -6,6 +6,7 @@ import { GameLog } from './components/GameLog.tsx'
 import { MeetingsPanel } from './components/Meetings.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { parseHash, rememberTeam } from './lib/pages.ts'
+import { TeamTabs } from './components/TeamTabs.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
 import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
@@ -237,6 +238,8 @@ export default function App() {
           </div>
           <PageSwitch page="players" team={team} />
         </header>
+
+        <TeamTabs view="overview" page="players" team={team} player={playerId} />
 
         <div className="flex flex-wrap items-end gap-4">
           <label className="flex max-w-80 min-w-56 flex-1 flex-col gap-1.5">
