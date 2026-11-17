@@ -78,9 +78,9 @@ test('the notes above the table and the opponent panel say what the games are', 
   const games = [game('a', '2026-11-02'), game('b', '2026-04-01', { season: '2025-26', won: false })]
   assert.match(teamLogNote(games, 'games'), /last 2 games, newest first.*from 2025-26 to 2026-27.*1 won, 1 lost/)
   assert.equal(teamLogNote([], 'games'), 'No games on record for this team.')
-  const m = { scope: 'filled', currentSeason: '2026-27', games: [{ ...game('a', 'x'), kind: 'this' }, { ...game('b', 'y'), kind: 'last' }] }
-  assert.match(teamMeetingsNote(m, 'CLE', 'games'), /1 game against CLE in 2026-27, plus 1 from last season/)
-  assert.match(teamMeetingsNote({ scope: 'none', currentSeason: '2026-27', games: [] }, 'CLE', 'games'), /No games against CLE in 2026-27 or last season/)
+  const m = { scope: 'filled', currentSeason: '2026-27', games: [{ ...game('a', 'x'), kind: 'this' }, { ...game('b', 'y', { season: '2022-23' }), kind: 'earlier' }] }
+  assert.match(teamMeetingsNote(m, 'CLE', 'games'), /All 2 games against CLE on record: 1 in 2026-27, plus 1 from earlier seasons \(2022-23\), which are marked/)
+  assert.match(teamMeetingsNote({ scope: 'none', currentSeason: '2026-27', games: [] }, 'CLE', 'games'), /No games against CLE on record for this team/)
 })
 
 test('notices: a short window, a young season, a long break, and playoff windows', () => {

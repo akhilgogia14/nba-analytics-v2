@@ -2,7 +2,9 @@
 // app identity: team_form (one row per team, game type and stat: the scorecards) and team_game_log (one row per team per
 // game played: sparklines, the box-score table and the opponent panel). A team is named by its three-letter code; the page
 // shows ONE game type at a time, so a regular-season and a playoff game are never in the same window or average.
-import { MEETINGS_MIN, previousSeasonLabel } from './queries.mjs'
+import { MEETINGS_COUNT, pickMeetings } from './queries.mjs'
+
+export { pickMeetings }
 
 const FORM_TABLE = 'workspace.nba_v2_gold.team_form'
 const LOG_TABLE = 'workspace.nba_v2_gold.team_game_log'
@@ -33,9 +35,9 @@ const lastGamesSql = (n) => `
 export const TEAM_GAMES_SQL = lastGamesSql(TEAM_GAMES_WINDOW)
 export const TEAM_LOG_SQL = lastGamesSql(TEAM_LOG_WINDOW)
 
-// A team's games against ONE opponent (?opp=NYK), newest first, with this season's flagged. The same rule as the player
-// page picks which to show (see pickMeetings). The opponent is looked up to its team id from its code.
-export const TEAM_MEETINGS_LIMIT = 100
+// A team's games against ONE opponent (?opp=NYK), newest first, with the current season's flagged: the LAST 10 meetings, however
+// far back (the same rule as the player page, see pickMeetings). The opponent is looked up to its team id from its code.
+export const TEAM_MEETINGS_LIMIT = MEETINGS_COUNT
 export const TEAM_MEETINGS_SQL = `
   SELECT ${GAME_COLUMNS},
          season = (SELECT max(season) FROM ${LOG_TABLE} WHERE game_type = :gt) AS is_current,
@@ -109,23 +111,6 @@ export function mapTeamGames(rows) {
 // { games } newest first (the box-score table's order).
 export function mapTeamLog(rows) {
   return { games: rows.map(mapTeamGame) }
-}
-
-// Choose which of a team's (or player's) meetings to show. `games` are newest first, each with seasonLabel and isCurrent (this
-// season). Returns { scope, currentSeason, games }, games newest first, each with kind 'this' or 'last'; older are dropped:
-//   'season' = MEETINGS_MIN or more this season (or some, and none last season); 'filled' = this season's topped up from last
-//   season to MEETINGS_MIN; 'earlier' = none this season, last season's up to MEETINGS_MIN; 'none' = neither.
-export function pickMeetings(games, currentSeason) {
-  const lastSeason = previousSeasonLabel(currentSeason)
-  const kept = games
-    .map((g) => ({ ...g, kind: g.isCurrent ? 'this' : g.seasonLabel === lastSeason ? 'last' : 'older' }))
-    .filter((g) => g.kind !== 'older')
-  const thisSeason = kept.filter((g) => g.kind === 'this')
-  const last = kept.filter((g) => g.kind === 'last')
-  if (thisSeason.length >= MEETINGS_MIN || (thisSeason.length > 0 && last.length === 0)) return { scope: 'season', currentSeason, games: thisSeason }
-  if (thisSeason.length > 0) return { scope: 'filled', currentSeason, games: [...thisSeason, ...last.slice(0, MEETINGS_MIN - thisSeason.length)] }
-  if (last.length > 0) return { scope: 'earlier', currentSeason, games: last.slice(0, MEETINGS_MIN) }
-  return { scope: 'none', currentSeason, games: [] }
 }
 
 // Rows come in TEAM_MEETINGS_SQL's column order (GAME_COLUMNS, then is_current and current_season), newest first.

@@ -78,7 +78,7 @@ export type RecentGame = {
 /** The last 10 games played of one game type, oldest first. */
 export type Recent = { games: RecentGame[] }
 
-/** One game against the chosen opponent. kind says which season it is from, relative to the current one. */
+/** One game against the chosen opponent. kind says whether it is from the current season or an earlier one. */
 export type MeetingGame = {
   id: string
   date: string
@@ -88,9 +88,9 @@ export type MeetingGame = {
   seasonLabel: string
   minutes: number | null
   stats: Record<'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl', number | null>
-  kind: 'this' | 'last'
+  kind: 'this' | 'earlier'
 }
-/** A player against one opponent, newest game first. scope: season (7+ this season), filled (topped up from last season), earlier (none this season, so last season's), none. */
+/** A player against one opponent: the last 10 meetings, newest first, from any season. scope: season (all from the current season), filled (some current, the rest earlier), earlier (none from the current season), none. */
 export type Meetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; currentSeason: string | null; games: MeetingGame[] }
 
 /** The rest of a played game's box score (any of these can be null if the source had a gap). */
@@ -144,7 +144,7 @@ export type TeamGame = {
   stats: Record<string, number | null>
   box: TeamBox
 }
-export type TeamMeetingGame = TeamGame & { kind: 'this' | 'last' }
+export type TeamMeetingGame = TeamGame & { kind: 'this' | 'earlier' }
 export type TeamMeetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; currentSeason: string | null; games: TeamMeetingGame[] }
 
 /** The league average of each team stat, per team game, for one game type in the latest season that has games of it. */
