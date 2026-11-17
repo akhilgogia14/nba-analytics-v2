@@ -10,8 +10,8 @@ const cell = 'py-1.5 pr-3 text-right tabular-nums'
 const num = (v: number | null) => (v === null ? '–' : String(v))
 
 /**
- * The team's games against one opponent: all of this season's, topped up with last season's when there are few. Games from last
- * season are marked in the Season column and shown dimmer, with a dashed line where they start. Offense columns only for now.
+ * The team's last 10 games against one opponent, from any season. Games from earlier seasons are marked in the Season column and
+ * shown dimmer, with a dashed line where they start. Offense columns only for now.
  */
 export function TeamMeetingsPanel({
   opponents, opp, onOpp, meetings, error, gameType, gamesWord,

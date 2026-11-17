@@ -1,6 +1,7 @@
 import { daysSince, shortDate } from './format.ts'
 import { f1 } from './geom.ts'
 import { gamesWord } from './gameType.ts'
+import { meetingsNoteFor } from './meetings.ts'
 import type { GameType, LeagueAverages, TeamGame, TeamInfo, TeamMeetings } from '../types.ts'
 
 /** The Teams page's six scorecards, offense first (defense comes later). `pct` stats are written with a % sign. */
@@ -84,22 +85,8 @@ export function teamLogNote(games: TeamGame[], gamesWordText: string): string {
   return `The team's last ${games.length} ${gamesWordText}, newest first, against any opponent${span}. ${wins} won, ${games.length - wins} lost.`
 }
 
-/** The words above the opponent table, which must make it obvious when games are from last season. */
-export function teamMeetingsNote(m: TeamMeetings, opp: string, gamesWordText: string): string {
-  const n = m.games.length
-  const last = m.games.filter((g) => g.kind === 'last').length
-  const thisSeason = n - last
-  switch (m.scope) {
-    case 'season':
-      return `All ${n} ${gamesWordText} against ${opp} in ${m.currentSeason}.`
-    case 'filled':
-      return `${thisSeason} ${thisSeason === 1 ? 'game' : 'games'} against ${opp} in ${m.currentSeason}, plus ${last} from last season to fill it out. The last-season games are marked.`
-    case 'earlier':
-      return `No ${gamesWordText} against ${opp} in ${m.currentSeason} yet. These are ${last === 1 ? 'the 1 meeting' : `the ${last} meetings`} from last season, marked as such.`
-    default:
-      return m.currentSeason ? `No ${gamesWordText} against ${opp} in ${m.currentSeason} or last season.` : `No ${gamesWordText} against ${opp} on record for this team.`
-  }
-}
+/** The words above the opponent table: the last 10 meetings from any season, with the earlier ones marked. */
+export const teamMeetingsNote = (m: TeamMeetings, opp: string, gamesWordText: string): string => meetingsNoteFor(m, opp, gamesWordText, "the team's")
 
 /** The sentence that explains the dotted line (null when there is no league figure to explain). */
 export function leagueNote(league: LeagueAverages | null, gameType: GameType): string | null {

@@ -103,15 +103,13 @@ export const GAMELOG_SQL = `
   ORDER BY game_date DESC, game_id DESC
   LIMIT ${GAMELOG_WINDOW}`
 
-// A player's games against ONE opponent, of one game type. The page shows every meeting from the current season (the newest
-// season that has any game of this type). If there are fewer than MEETINGS_MIN, it is filled up to MEETINGS_MIN with his
-// meetings from LAST SEASON only (the season before the current one), each marked as last season so the page can say so.
-// With no meeting this season it is last season's meetings (up to MEETINGS_MIN). Older seasons are never shown. The SQL
-// returns his meetings newest first (up to MEETINGS_LIMIT, far more than any matchup has had) with is_current marking this
-// season's; mapMeetings makes the choice. The opponent is named by tricode and looked up to its team id, so a team that
-// changed tricode in the past is still matched by id.
-export const MEETINGS_MIN = 7
-export const MEETINGS_LIMIT = 100
+// A player's games against ONE opponent, of one game type: his LAST 10 meetings, however far back they are (owner's choice,
+// 2026-11-17; before that it was this season's, topped up from last season only). The SQL returns them newest first, capped
+// at MEETINGS_COUNT, with is_current marking the current season's (the newest season that has any game of this type); a game
+// from any earlier season is marked 'earlier' so the page can say so. The data starts in 2021-22, so a matchup can have fewer
+// than 10. The opponent is named by tricode and looked up to its team id, so a team that changed tricode in the past is still
+// matched by id. Regular season and playoffs are never mixed (one game type per request).
+export const MEETINGS_COUNT = 10
 export const MEETINGS_SQL = `
   SELECT game_id, game_date, team_tricode, opponent_tricode, is_home, season_label, minutes, pts, reb, ast, fg3m, blk, stl,
          season = (SELECT max(season) FROM ${SEASON_TABLE} WHERE game_type = :gt) AS is_current,
@@ -120,7 +118,7 @@ export const MEETINGS_SQL = `
   WHERE person_id = :id AND game_type = :gt AND played
     AND opponent_team_id = (SELECT max_by(team_id, game_date) FROM ${SEASON_TABLE} WHERE team_tricode = :opp)
   ORDER BY game_date DESC, game_id DESC
-  LIMIT ${MEETINGS_LIMIT}`
+  LIMIT ${MEETINGS_COUNT}`
 
 // ---- row mapping (the warehouse returns every value as a string or null) ----
 const num = (v) => (v === null || v === undefined ? null : Number(v))
@@ -202,28 +200,27 @@ export function previousSeasonLabel(label) {
   return `${start}-${String((start + 1) % 100).padStart(2, '0')}`
 }
 
-// Rows come in MEETINGS_SQL's column order, newest first. Returns { scope, currentSeason, games } with games newest first,
-// each game's kind being 'this' (this season) or 'last' (the season before); older games are dropped.
-//   scope 'season'  = MEETINGS_MIN or more meetings this season, or some but none last season: just this season's;
-//   scope 'filled'  = some meetings this season, topped up from last season to MEETINGS_MIN (or all of last season's if fewer);
-//   scope 'earlier' = none this season: last season's meetings, up to MEETINGS_MIN;
-//   scope 'none'    = no meetings this season or last (currentSeason is null when he has never played them at all).
+// Choose what to show of a player's (or team's) meetings. `games` are newest first, each with isCurrent (from the current
+// season). Returns { scope, currentSeason, games }: the first MEETINGS_COUNT games, newest first, each with kind 'this' (the
+// current season) or 'earlier' (any earlier season). scope: 'season' = all from the current season; 'filled' = some from the
+// current season and the rest from earlier ones; 'earlier' = none from the current season; 'none' = no meetings at all.
+export function pickMeetings(games, currentSeason) {
+  const kept = games.slice(0, MEETINGS_COUNT).map((g) => ({ ...g, kind: g.isCurrent ? 'this' : 'earlier' }))
+  const current = kept.filter((g) => g.kind === 'this').length
+  const scope = kept.length === 0 ? 'none' : current === kept.length ? 'season' : current > 0 ? 'filled' : 'earlier'
+  return { scope, currentSeason, games: kept }
+}
+
+// Rows come in MEETINGS_SQL's column order, newest first. Returns { scope, currentSeason, games } (see pickMeetings), games newest first.
 export function mapMeetings(rows) {
   const currentSeason = rows.length > 0 ? rows[0][14] : null
-  const lastSeason = previousSeasonLabel(currentSeason)
-  const games = rows
-    .map((r) => ({
-      id: r[0], date: r[1], team: r[2], opp: r[3], isHome: bool(r[4]), seasonLabel: r[5], minutes: num(r[6]),
-      stats: { pts: num(r[7]), reb: num(r[8]), ast: num(r[9]), fg3m: num(r[10]), blk: num(r[11]), stl: num(r[12]) },
-      kind: bool(r[13]) ? 'this' : r[5] === lastSeason ? 'last' : 'older',
-    }))
-    .filter((g) => g.kind !== 'older')
-  const thisSeason = games.filter((g) => g.kind === 'this')
-  const last = games.filter((g) => g.kind === 'last')
-  if (thisSeason.length >= MEETINGS_MIN || (thisSeason.length > 0 && last.length === 0)) return { scope: 'season', currentSeason, games: thisSeason }
-  if (thisSeason.length > 0) return { scope: 'filled', currentSeason, games: [...thisSeason, ...last.slice(0, MEETINGS_MIN - thisSeason.length)] }
-  if (last.length > 0) return { scope: 'earlier', currentSeason, games: last.slice(0, MEETINGS_MIN) }
-  return { scope: 'none', currentSeason, games: [] }
+  const games = rows.map((r) => ({
+    id: r[0], date: r[1], team: r[2], opp: r[3], isHome: bool(r[4]), seasonLabel: r[5], minutes: num(r[6]),
+    stats: { pts: num(r[7]), reb: num(r[8]), ast: num(r[9]), fg3m: num(r[10]), blk: num(r[11]), stl: num(r[12]) },
+    isCurrent: bool(r[13]),
+  }))
+  const out = pickMeetings(games, currentSeason)
+  return { ...out, games: out.games.map(({ isCurrent: _isCurrent, ...g }) => g) }
 }
 
 // Rows come in GAMELOG_SQL's column order, newest first. Returns { games: [...] } newest first, the order of a box-score table; each
