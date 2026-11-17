@@ -38,3 +38,14 @@ export function fmtLeague(v: number): string {
   const text = Math.abs(v) < 0.005 ? '0.00' : v.toFixed(2)
   return `${v > 0.005 ? '+' : ''}${text}`
 }
+
+/**
+ * The one personal signal that repeated a little in the stability check (release 062): whether he plays the second night of a
+ * back-to-back. Shown as a plain count, never a rate or a label ("rests on back-to-backs"), because it mixes habit with injuries.
+ * Null when there is nothing to say (no back-to-back games yet).
+ */
+export function b2bAvailabilityLine(buckets: Record<string, PlayerBucket>, playoffs: boolean): string | null {
+  const b = buckets.b2b
+  if (!b || b.scheduled === 0) return null
+  return `${playoffs ? 'Playoff back-to-backs' : 'Back-to-backs'} so far this season: played ${b.n} of ${b.scheduled} team game${b.scheduled === 1 ? '' : 's'}`
+}

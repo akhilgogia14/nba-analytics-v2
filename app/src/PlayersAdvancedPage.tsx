@@ -8,7 +8,7 @@ import { shortDate, teamLabel } from './lib/format.ts'
 import { GAME_TYPE_OPTIONS } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
-import { PLAYER_STAT_LIST, availabilityText, fmtLeague, fmtShare, fmtShareDiff, playedShare } from './lib/playerContext.ts'
+import { PLAYER_STAT_LIST, availabilityText, b2bAvailabilityLine, fmtLeague, fmtShare, fmtShareDiff, playedShare } from './lib/playerContext.ts'
 import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
@@ -200,6 +200,7 @@ export default function PlayersAdvancedPage() {
   const next = ctx?.next ?? null
   const highlighted = applicableComparisons(next)
   const noGames = ctx !== null && Object.keys(ctx.player.buckets).length === 0
+  const b2bLine = ctx ? b2bAvailabilityLine(ctx.player.buckets, gameType === 'playoffs') : null
 
   return (
     <div className="relative isolate min-h-screen px-6 pt-8 pb-14" style={rootStyle}>
@@ -289,21 +290,33 @@ export default function PlayersAdvancedPage() {
               ) : (
                 <div className="text-[15px] text-(--muted)">No {gameType === 'playoffs' ? 'playoff ' : ''}game on the schedule yet for this player's team.</div>
               )}
+              {b2bLine && <div className="text-[13px] text-(--muted)">{b2bLine}</div>}
             </section>
 
             {noGames ? (
               <div className="text-[15px] text-(--muted)">This player has no {gameType === 'playoffs' ? 'playoff ' : ''}games on record this season, so there is nothing to split.</div>
             ) : (
               <>
-                <section className="flex max-w-3xl flex-col gap-1.5 text-[14px] leading-relaxed text-(--muted)">
-                  <div>
-                    <strong className="text-(--text)">How to read this.</strong> The league columns show how much each stat moves from a player's own average for the season in that
-                    situation, across every player and season on record (players with at least 20 games in a season). Measuring each player against himself keeps the figure from depending on
-                    who tends to play. The player columns show this player's own averages this season in the same situations; the number in each heading is how many games he played, and a
-                    figure from one or two games is a single result, not a pattern. The last row shows how many of his team's games he played in. Treat all of it as context, not as a
-                    forecast, and not as a trait of the player.
-                  </div>
-                  <div>Games are compared as they were played, so a difference also reflects who the opponents were, and games a player missed (injury, rest, a trade) count in "team games played".</div>
+                <section className="flex max-w-3xl flex-col gap-2 text-[14px] leading-relaxed text-(--muted)">
+                  <strong className="text-(--text)">How to read this</strong>
+                  <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
+                    <li>
+                      <strong className="text-(--text)">League columns:</strong> how far a stat moves from a player's own season average in that situation, across every player and
+                      season on record (20+ games in a season). The effects are small, usually well under one point or one minute.
+                    </li>
+                    <li>
+                      <strong className="text-(--text)">Player columns:</strong> his own averages this season. The number in each heading is how many games he played; one or two
+                      games is a single result, not a pattern.
+                    </li>
+                    <li>
+                      <strong className="text-(--text)">Last row:</strong> how many of his team's games he played in that situation. Games missed to injury, rest or a trade count.
+                    </li>
+                    <li>
+                      <strong className="text-(--text)">Tested:</strong> over five seasons, a player's own split in one half of a season did not predict the other half. Treat the player
+                      columns as context, not a trait and not a forecast.
+                    </li>
+                    <li>Games are compared as played, so opponents and home or away mix in with rest.</li>
+                  </ul>
                 </section>
                 {COMPARISONS.map((c) => (
                   <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} />
