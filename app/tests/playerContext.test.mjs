@@ -4,7 +4,7 @@ import { BUCKETS_SQL } from '../server/contextQueries.mjs'
 import { LEAGUE_PLAYER_CONTEXT_SQL, MIN_SEASON_GAMES, PLAYER_CONTEXT_SQL, PLAYER_STATS, PLAYER_TEAM_SQL, mapPlayerBuckets, mapPlayerTeam } from '../server/playerContextQueries.mjs'
 import { COMPARISONS, difference } from '../src/lib/context.ts'
 import { hashFor, isAdvancedHash, parseHash, playerFromHash } from '../src/lib/pages.ts'
-import { PLAYER_STAT_LIST, availabilityText, fmtLeague, fmtShare, fmtShareDiff, playedShare } from '../src/lib/playerContext.ts'
+import { PLAYER_STAT_LIST, availabilityText, b2bAvailabilityLine, fmtLeague, fmtShare, fmtShareDiff, playedShare } from '../src/lib/playerContext.ts'
 
 test('outside values only enter the player SQL as named parameters, on tables the app already reads', () => {
   for (const q of [PLAYER_CONTEXT_SQL, LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_TEAM_SQL]) {
@@ -98,4 +98,14 @@ test('league figures keep two decimals and a sign, because the effects are small
   assert.equal(fmtLeague(0.0461), '+0.05')
   assert.equal(fmtLeague(-0.001), '0.00') // never "-0.00"
   assert.equal(fmtLeague(0), '0.00')
+})
+
+test('the back-to-back availability line is a plain count, says playoff when it is, and is empty with no back-to-backs', () => {
+  const b = (n, scheduled) => ({ n, scheduled, stats: {} })
+  assert.equal(b2bAvailabilityLine({ b2b: b(2, 5) }, false), 'Back-to-backs so far this season: played 2 of 5 team games')
+  assert.equal(b2bAvailabilityLine({ b2b: b(0, 3) }, false), 'Back-to-backs so far this season: played 0 of 3 team games')
+  assert.equal(b2bAvailabilityLine({ b2b: b(1, 1) }, true), 'Playoff back-to-backs so far this season: played 1 of 1 team game')
+  assert.equal(b2bAvailabilityLine({}, false), null)
+  assert.equal(b2bAvailabilityLine({ b2b: b(0, 0) }, false), null)
+  assert.doesNotMatch(b2bAvailabilityLine({ b2b: b(2, 5) }, false), /rest|%|tends|usually/i) // a count, never a label or a rate
 })
