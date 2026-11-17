@@ -118,7 +118,7 @@ test('the Advanced stats address opens the Teams page on the Advanced tab; every
   assert.equal(hashFor('teams', 'BOS', 'advanced'), '#/teams/advanced?team=BOS')
   assert.equal(hashFor('teams', 'BOS'), '#/teams?team=BOS')
   assert.equal(hashFor('teams', '', 'advanced'), '#/teams/advanced')
-  assert.equal(hashFor('players', 'BOS', 'advanced'), '#/players?team=BOS') // only the Teams page has the tab
+  assert.equal(hashFor('players', 'BOS', 'advanced'), '#/players/advanced?team=BOS') // the Players page has the tab too (release 061)
   assert.equal(typeof rememberTeam, 'function')
   assert.equal(pageFromHash('#/teams/advancedx'), 'today')
 })

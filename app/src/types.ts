@@ -187,3 +187,11 @@ export type NextGame = {
   restEdge: number | null; seasonLabel: string
 }
 export type TeamContext = { next: NextGame | null; team: ContextSplit; league: ContextSplit }
+
+/** Advanced stats (Players). A bucket is a group of the team's games (all, home, away, back-to-back, ...). `n` is the games the
+ *  player PLAYED (what the averages are made from); `scheduled` is every team game in that situation, so n / scheduled is availability. */
+export type PlayerStat = 'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl' | 'minutes'
+export type PlayerBucket = { n: number; scheduled: number; stats: Record<PlayerStat, number | null> }
+export type PlayerSplit = { buckets: Record<string, PlayerBucket>; firstSeason: string | null; lastSeason: string | null }
+/** `player` holds his own averages; `league` holds each stat as the average difference from a player's own season average. */
+export type PlayerContext = { team: string | null; next: NextGame | null; player: PlayerSplit; league: PlayerSplit }

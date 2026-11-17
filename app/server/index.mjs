@@ -7,6 +7,7 @@ import {
   validPlayerId, validTeam,
 } from './queries.mjs'
 import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
+import { LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_CONTEXT_SQL, PLAYER_TEAM_SQL, mapPlayerBuckets, mapPlayerTeam } from './playerContextQueries.mjs'
 import { SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
 import {
   LEAGUE_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
@@ -169,6 +170,30 @@ app.get('/api/players/:id/season', async (req, res) => {
     )
   } catch (err) {
     fail(res, 'season', err)
+  }
+})
+
+// The Advanced stats tab (Players): the player's team's next unplayed game, how the player's own games of this season split by
+// situation (home/away, back-to-back, rest) including how many team games he played in each, and the league effect "vs each
+// player's own average" over every season on record. Regular season and playoffs are never mixed.
+app.get('/api/players/:id/context', async (req, res) => {
+  const { id } = req.params
+  const type = req.query.type ?? 'regular-season'
+  if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+  try {
+    const params = [{ name: 'id', value: id, type: 'BIGINT' }, { name: 'gt', value: type, type: 'STRING' }]
+    const mine = await cached(`pctx:${id}:${type}`, FIVE_MINUTES, async () => {
+      const [player, team] = await Promise.all([sql(PLAYER_CONTEXT_SQL, params).then(mapPlayerBuckets), sql(PLAYER_TEAM_SQL, params).then(mapPlayerTeam)])
+      const next = team ? mapNextGame(await sql(NEXT_GAME_SQL, [{ name: 'team', value: team, type: 'STRING' }, { name: 'gt', value: type, type: 'STRING' }])) : null
+      return { team, next, player }
+    })
+    const league = await cached(`plctx:${type}`, FIVE_MINUTES, async () =>
+      mapPlayerBuckets(await sql(LEAGUE_PLAYER_CONTEXT_SQL, [{ name: 'gt', value: type, type: 'STRING' }])),
+    )
+    res.json({ ...mine, league })
+  } catch (err) {
+    fail(res, 'player context', err)
   }
 })
 

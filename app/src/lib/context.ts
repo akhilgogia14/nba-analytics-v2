@@ -1,4 +1,4 @@
-import type { ContextBucket, ContextSplit, ContextStat, NextGame } from '../types.ts'
+import type { ContextStat, NextGame } from '../types.ts'
 
 /**
  * A team's own split needs at least this many games on each side before we show a difference. Owner's choice (2026-11-16): 1,
@@ -28,9 +28,15 @@ export type ComparisonKey = (typeof COMPARISONS)[number]['key']
 export type Difference = { a: number; b: number; diff: number; nA: number; nB: number }
 
 /** A against B for one stat. Null if either group is missing, has no number, or has fewer than `minGames` games. */
-export function difference(split: ContextSplit, a: string, b: string, stat: ContextStat, minGames: number): Difference | null {
-  const ba: ContextBucket | undefined = split.buckets[a]
-  const bb: ContextBucket | undefined = split.buckets[b]
+export function difference<S extends string>(
+  split: { buckets: Record<string, { n: number; stats: Record<S, number | null> }> },
+  a: string,
+  b: string,
+  stat: S,
+  minGames: number,
+): Difference | null {
+  const ba = split.buckets[a]
+  const bb = split.buckets[b]
   if (!ba || !bb || ba.n < minGames || bb.n < minGames) return null
   const va = ba.stats[stat]
   const vb = bb.stats[stat]
