@@ -5,7 +5,7 @@ import { CombosTable } from './components/CombosTable.tsx'
 import { GameLog } from './components/GameLog.tsx'
 import { MeetingsPanel } from './components/Meetings.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
-import { parseHash, rememberTeam } from './lib/pages.ts'
+import { parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
 import { TeamTabs } from './components/TeamTabs.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
@@ -34,7 +34,7 @@ export default function App() {
   const [teams, setTeams] = useState<Team[] | null>(null)
   const [team, setTeam] = useState(() => parseHash(window.location.hash).team) // the team carried over from the other page, if any
   const [players, setPlayers] = useState<PlayerOption[] | null>(null)
-  const [playerId, setPlayerId] = useState('')
+  const [playerId, setPlayerId] = useState(() => playerFromHash(window.location.hash)) // the player carried over from the Advanced tab, if any
   const [form, setForm] = useState<FormResult | null>(null)
   const [gameType, setGameType] = useState<GameType>('regular-season') // the page's one toggle
   const [season, setSeason] = useState<Season | null>(null)
@@ -121,7 +121,7 @@ export default function App() {
   }, [gameType, attempt])
 
   // The chosen team goes into the address, so the Teams link (and a bookmark) carry it.
-  useEffect(() => rememberTeam('players', team), [team])
+  useEffect(() => rememberTeam('players', team, 'overview', playerId), [team, playerId])
 
   // 2. The players on the chosen team, most minutes first. The current player stays if he is in the list; otherwise the
   // first one is picked. (Waits for the team list, so a team that is not in the new list is never asked for.)

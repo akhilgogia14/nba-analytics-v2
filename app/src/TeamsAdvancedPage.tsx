@@ -239,13 +239,23 @@ export default function TeamsAdvancedPage() {
               <div className="text-[15px] text-(--muted)">This team has no {gameType === 'playoffs' ? 'playoff ' : ''}games on record yet, so there is nothing to split.</div>
             ) : (
               <>
-                <section className="flex max-w-3xl flex-col gap-1.5 text-[14px] leading-relaxed text-(--muted)">
-                  <div>
-                    <strong className="text-(--text)">How to read this.</strong> The league columns come from every team's games on record, so the pattern is steady: it is the real
-                    effect of the situation. The team columns show this team's own games this season in the same situations. Those samples are small (the number of games is in each column heading, and a figure from one or two games is a single result, not a pattern), and when we
-                    tested seasons of past data a team's own split in one half of a season did not predict the other half. Treat them as context, not as a trait of the team.
-                  </div>
-                  <div>Games are compared as they were played, so a difference also reflects who the opponents were (for example, who played at home).</div>
+                <section className="flex max-w-3xl flex-col gap-2 text-[14px] leading-relaxed text-(--muted)">
+                  <strong className="text-(--text)">How to read this</strong>
+                  <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
+                    <li>
+                      <strong className="text-(--text)">League columns:</strong> every team's games on record in that situation. The samples are large, so the pattern is steady and is the
+                      real effect of the situation.
+                    </li>
+                    <li>
+                      <strong className="text-(--text)">Team columns:</strong> this team's own games this season in the same situations. The number in each heading is how many games;
+                      one or two games is a single result, not a pattern.
+                    </li>
+                    <li>
+                      <strong className="text-(--text)">Tested:</strong> over five seasons, a team's own split in one half of a season did not predict the other half. Treat the team
+                      columns as context, not a trait of the team.
+                    </li>
+                    <li>Games are compared as played, so opponents and home or away mix in with rest.</li>
+                  </ul>
                 </section>
                 {COMPARISONS.map((c) => (
                   <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} />
