@@ -195,3 +195,19 @@ export type PlayerBucket = { n: number; scheduled: number; stats: Record<PlayerS
 export type PlayerSplit = { buckets: Record<string, PlayerBucket>; firstSeason: string | null; lastSeason: string | null }
 /** `player` holds his own averages; `league` holds each stat as the average difference from a player's own season average. */
 export type PlayerContext = { team: string | null; next: NextGame | null; player: PlayerSplit; league: PlayerSplit }
+
+/** Defense by position (Teams > Advanced stats): what the OPPONENT's players put up against one team, grouped by role (started the game or
+ *  not) and the roster's listed position. `games` = the team's defended games counted; `playerGames` = opposing player-games in the group. */
+export type DefenseStat = 'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl'
+export type DefenseCell = { perGame: number | null; low: number | null; high: number | null; per36: number | null }
+export type DefenseGroup = {
+  role: 'starter' | 'bench'
+  label: string
+  games: number
+  playerGames: number
+  minutes: number | null
+  stats: Record<DefenseStat, DefenseCell>
+}
+export type DefenseSplit = { groups: DefenseGroup[]; firstSeason: string | null; lastSeason: string | null }
+/** `team` is the team's newest season of the game type; `league` is every team over every season on record. */
+export type TeamDefense = { team: DefenseSplit; league: DefenseSplit }

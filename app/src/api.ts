@@ -1,5 +1,5 @@
 import type {
-  FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, LeagueAverages, PlayerContext, Season, Slate, Team, TeamContext, TeamFormResult, TeamGame, TeamMeetings,
+  FormResult, GameType, LogGame, Meetings, PlayerOption, Recent, LeagueAverages, PlayerContext, Season, Slate, Team, TeamContext, TeamDefense, TeamFormResult, TeamGame, TeamMeetings,
 } from './types.ts'
 
 async function getJson<T>(url: string): Promise<T> {
@@ -40,5 +40,7 @@ export const fetchSlate = (date: string, type: GameType) =>
 // ---- Advanced stats tab (Teams) ----
 export const fetchTeamContext = (team: string, type: GameType) =>
   getJson<TeamContext>(`/api/teams/${encodeURIComponent(team)}/context?type=${type}`)
+export const fetchTeamDefense = (team: string, type: GameType) =>
+  getJson<TeamDefense>(`/api/teams/${encodeURIComponent(team)}/defense?type=${type}`)
 export const fetchPlayerContext = (id: string, type: GameType) =>
   getJson<PlayerContext>(`/api/players/${encodeURIComponent(id)}/context?type=${type}`)
