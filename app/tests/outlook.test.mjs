@@ -73,3 +73,48 @@ test('the Predictions page has its own address and keeps the team and the player
   assert.equal(hashFor('players', 'NYK', 'overview', '1628973'), '#/players?team=NYK&player=1628973') // unchanged
   assert.equal(hashFor('today', 'NYK', 'overview', '1628973'), '#/today?team=NYK') // a player is only carried by Players and Predictions
 })
+
+// ---- chart layout ----
+import { CHART_PAD, ROW_HEIGHT, chartLayout } from '../src/lib/outlookChart.ts'
+const mk = (id, pts, date = '2026-11-01', extra = {}) => ({ id, date, opp: 'BOS', isHome: true, seasonLabel: '2026-27', values: { pts, reb: 5, ast: 4, fg3m: 2, blk: 0, stl: 1, minutes: 30 }, ...extra })
+const views = (last10, season, opponent) => ({ last10, season, opponent })
+
+test('chart: one shared scale, lowest value at the left edge and highest at the right, the same dot at the same place in every row', () => {
+  const v = views([mk('a', 10), mk('b', 30)], [mk('a', 10), mk('b', 30), mk('c', 20)], [mk('o', 20)])
+  const l = chartLayout(v, 'pts', 1)
+  assert.equal(l.lo, 10)
+  assert.equal(l.hi, 30)
+  assert.equal(l.rows.length, 3)
+  assert.ok(Math.abs(l.rows[0].minX - CHART_PAD) < 1e-9 && Math.abs(l.rows[0].maxX - (100 - CHART_PAD)) < 1e-9)
+  assert.ok(Math.abs(l.rows[2].avgX - 50) < 1e-9) // 20 is the middle of 10 and 30
+  assert.equal(l.rows[1].dots.length, 3)
+  assert.ok(Math.abs(l.rows[1].dots[2].x - l.rows[2].dots[0].x) < 1e-9) // 20 sits at the same x in the season row and the opponent row
+  assert.ok(ROW_HEIGHT > 0)
+})
+
+test('chart: the baseline is on the scale, and widens it when it falls outside every game', () => {
+  const l = chartLayout(views([mk('a', 10), mk('b', 30)], [mk('a', 10), mk('b', 30)], []), 'pts', 1)
+  assert.ok(Math.abs(l.baselineX - 50) < 1e-9) // blend of 20 and 20
+  assert.deepEqual([l.rows[2].minX, l.rows[2].avgX, l.rows[2].maxX, l.rows[2].dots.length, l.rows[2].games], [null, null, null, 0, 0])
+})
+
+test('chart: dots carry a hover text with the date, home or away, the opponent and the number', () => {
+  const l = chartLayout(views([mk('a', 31.4, '2026-10-23', { opp: 'MIN', isHome: false })], [], []), 'pts', 1)
+  assert.equal(l.rows[0].dots[0].title, 'Oct 23 at MIN: 31.4')
+  const h = chartLayout(views([mk('a', 12)], [], []), 'pts', 0)
+  assert.equal(h.rows[0].dots[0].title, 'Nov 1 vs BOS: 12')
+})
+
+test('chart: a gap is not drawn, and identical values do not divide by zero', () => {
+  const l = chartLayout(views([mk('a', null), mk('b', 7)], [mk('b', 7)], [mk('b', 7)]), 'pts', 1)
+  assert.equal(l.rows[0].dots.length, 1)
+  assert.equal(l.rows[0].games, 2)
+  assert.deepEqual([l.lo, l.hi], [6, 8])
+  assert.ok(Number.isFinite(l.rows[0].avgX) && Number.isFinite(l.baselineX))
+})
+
+test('chart: nothing at all gives empty rows and no baseline', () => {
+  const l = chartLayout(views([], [], []), 'pts', 1)
+  assert.equal(l.baselineX, null)
+  assert.ok(l.rows.every((r) => r.dots.length === 0 && r.minX === null))
+})

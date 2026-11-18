@@ -1,0 +1,81 @@
+import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, summarize, type OutlookStat, type Views } from '../lib/outlook.ts'
+import { CHART_PAD, ROW_HEIGHT, chartLayout } from '../lib/outlookChart.ts'
+import { panelStyle } from '../lib/styles.ts'
+
+/** One stat: three rows on a shared scale, each a line from his lowest to his highest, a dot for every game, a tick at the average, and a dashed line at the baseline. */
+function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: OutlookStat; label: string; digits: number; opp: string | null }) {
+  const layout = chartLayout(views, stat, digits)
+  const base = baseline(summarize(views.last10, stat), summarize(views.season, stat))
+  const height = layout.rows.length * ROW_HEIGHT
+  const rowName = (key: string) => (key === 'opponent' ? (opp ? `vs ${opp}` : 'vs opponent') : (VIEWS.find((v) => v.key === key)?.label.replace('Last 10 games', 'Last 10').replace('This season', 'Season') ?? key))
+  const summary = `${label}. Baseline ${fmtOutlook(base, digits)}. ${layout.rows
+    .map((r) => {
+      const s = summarize(views[r.key], stat)
+      return s ? `${rowName(r.key)}: low ${fmtOutlook(s.min, digits)}, average ${fmtOutlook(s.avg, digits)}, high ${fmtOutlook(s.max, digits)} over ${r.games} games` : `${rowName(r.key)}: no games`
+    })
+    .join('. ')}.`
+  return (
+    <div className="flex flex-col gap-2 rounded-[14px] border border-(--border) p-4" data-chart={stat}>
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="m-0 text-[16px] font-semibold">{label}</h3>
+        <span className="text-xs text-(--muted)">Baseline {fmtOutlook(base, digits)}</span>
+      </div>
+      <div className="flex gap-2">
+        <div className="flex w-[72px] shrink-0 flex-col text-xs text-(--muted)" aria-hidden="true">
+          {layout.rows.map((r) => (
+            <div key={r.key} className="flex items-center" style={{ height: ROW_HEIGHT }}>
+              {rowName(r.key)}
+            </div>
+          ))}
+        </div>
+        <svg role="img" aria-label={summary} className="min-w-0 flex-1" style={{ height }}>
+          {layout.baselineX !== null && <line x1={`${layout.baselineX}%`} x2={`${layout.baselineX}%`} y1={0} y2={height} stroke="var(--accent)" strokeWidth={1.5} strokeDasharray="4 3" data-baseline />}
+          {layout.rows.map((r, i) => {
+            const cy = i * ROW_HEIGHT + ROW_HEIGHT / 2
+            const muted = r.key === 'opponent' ? 0.7 : 1
+            return (
+              <g key={r.key} opacity={muted}>
+                <line x1={`${CHART_PAD}%`} x2={`${100 - CHART_PAD}%`} y1={cy} y2={cy} stroke="var(--track)" strokeWidth={1} />
+                {r.minX !== null && r.maxX !== null && <line x1={`${r.minX}%`} x2={`${r.maxX}%`} y1={cy} y2={cy} stroke="var(--whisker)" strokeWidth={3} strokeLinecap="round" data-range />}
+                {r.dots.map((d, j) => (
+                  <circle key={j} cx={`${d.x}%`} cy={cy} r={3.5} fill="var(--accent)" fillOpacity={0.55} data-dot>
+                    <title>{d.title}</title>
+                  </circle>
+                ))}
+                {r.avgX !== null && <line x1={`${r.avgX}%`} x2={`${r.avgX}%`} y1={cy - 9} y2={cy + 9} stroke="var(--text)" strokeWidth={2.5} data-avg />}
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+      <div className="flex justify-between pl-[80px] text-[11px] text-(--muted) tabular-nums" aria-hidden="true">
+        <span>{fmtOutlook(layout.lo, digits)}</span>
+        <span>{fmtOutlook(layout.hi, digits)}</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The same numbers as the table, drawn: for each stat, three rows (his last 10 games, this season, his last 10 against the next
+ * opponent) on one shared scale, so how much the views agree is visible at a glance. A dot is one game (hover for the date and the
+ * number), the thick line runs from his lowest to his highest, the white tick is the average, and the dashed line is the baseline.
+ */
+export function OutlookCharts({ views, opp }: { views: Views; opp: string | null }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
+      <h2 className="m-0 text-[20px] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
+        The same games, drawn
+      </h2>
+      <div className="text-[13px] text-(--muted)">
+        Each dot is one game. The thick line runs from his lowest to his highest, the white tick is his average, and the dashed line is the baseline. All three rows share one scale
+        per stat.
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {OUTLOOK_STATS.map((s) => (
+          <StatChart key={s.key} views={views} stat={s.key} label={s.label} digits={s.digits} opp={opp} />
+        ))}
+      </div>
+    </section>
+  )
+}

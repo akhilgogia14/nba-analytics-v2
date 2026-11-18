@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { fetchMeetings, fetchPlayerContext, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
+import { OutlookCharts } from './components/OutlookCharts.tsx'
 import { OutlookTable } from './components/OutlookTable.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { nextGameFacts } from './lib/context.ts'
@@ -201,6 +202,7 @@ export default function PredictionsPage() {
               )}
             </section>
             <OutlookTable views={views} opp={next?.opp ?? null} />
+            <OutlookCharts views={views} opp={next?.opp ?? null} />
           </div>
         )}
       </div>
