@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchTeamContext, fetchTeams } from './api.ts'
+import { fetchTeamContext, fetchTeamDefense, fetchTeams } from './api.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
+import { DefenseGrid } from './components/DefenseGrid.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { TeamTabs } from './components/TeamTabs.tsx'
 import { COMPARISONS, CONTEXT_STAT_LIST, MIN_TEAM_GAMES, applicableComparisons, difference, fmtDiff, fmtValue, nextGameFacts } from './lib/context.ts'
@@ -12,7 +13,7 @@ import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { ContextSplit, GameType, Team, TeamContext } from './types.ts'
+import type { ContextSplit, GameType, Team, TeamContext, TeamDefense } from './types.ts'
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -99,12 +100,17 @@ export default function TeamsAdvancedPage() {
   const [team, setTeam] = useState(() => parseHash(window.location.hash).team)
   const [gameType, setGameType] = useState<GameType>('regular-season')
   const [ctx, setCtx] = useState<TeamContext | null>(null)
+  const [defense, setDefense] = useState<TeamDefense | null>(null)
+  const [defError, setDefError] = useState('')
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const [defAttempt, setDefAttempt] = useState(0)
 
   function chooseTeam(code: string) {
     setTeam(code)
     setCtx(null)
+    setDefense(null)
+    setDefError('')
     setError('')
   }
   function chooseGameType(t: GameType) {
@@ -112,6 +118,8 @@ export default function TeamsAdvancedPage() {
     setGameType(t)
     setTeams(null)
     setCtx(null)
+    setDefense(null)
+    setDefError('')
     setError('')
   }
 
@@ -142,6 +150,18 @@ export default function TeamsAdvancedPage() {
       cancelled = true
     }
   }, [team, listed, gameType, attempt])
+
+  // Defense by position loads on its own, so a slow answer never holds up the rest of the page.
+  useEffect(() => {
+    if (!listed) return
+    let cancelled = false
+    fetchTeamDefense(team, gameType)
+      .then((d) => !cancelled && setDefense(d))
+      .catch((e) => !cancelled && setDefError(errorText(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [team, listed, gameType, defAttempt])
 
   const look = teamLook(team)
   const bright = chartPalette(team).top
@@ -260,6 +280,7 @@ export default function TeamsAdvancedPage() {
                 {COMPARISONS.map((c) => (
                   <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} />
                 ))}
+                <DefenseGrid defense={defense} error={defError} onRetry={() => { setDefError(''); setDefAttempt((n) => n + 1) }} />
               </>
             )}
           </div>

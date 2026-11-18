@@ -8,6 +8,7 @@ import {
 } from './queries.mjs'
 import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
 import { LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_CONTEXT_SQL, PLAYER_TEAM_SQL, mapPlayerBuckets, mapPlayerTeam } from './playerContextQueries.mjs'
+import { LEAGUE_DEFENSE_SQL, TEAM_DEFENSE_SQL, mapDefense } from './defenseQueries.mjs'
 import { SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
 import {
   LEAGUE_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
@@ -255,6 +256,14 @@ teamRoute('/api/teams/:team/context', 'team context', async (_req, res, team, ty
   )
   const league = await cached(`lctx:${type}`, FIVE_MINUTES, async () => mapBuckets(await sql(LEAGUE_CONTEXT_SQL, [{ name: 'gt', value: type, type: 'STRING' }])))
   res.json({ next, team: teamSplit, league })
+})
+
+// Defense by position: what the opposing players put up against this team, grouped starter/bench x listed position, for the
+// team's newest season of this game type, and the same grid for the whole league over every season on record.
+teamRoute('/api/teams/:team/defense', 'team defense', async (_req, res, team, type) => {
+  const mine = await cached(`tdef:${team}:${type}`, FIVE_MINUTES, async () => mapDefense(await sql(TEAM_DEFENSE_SQL, teamParams(team, type))))
+  const league = await cached(`ldef:${type}`, FIVE_MINUTES, async () => mapDefense(await sql(LEAGUE_DEFENSE_SQL, [{ name: 'gt', value: type, type: 'STRING' }])))
+  res.json({ team: mine, league })
 })
 
 // The league average of every team stat (per team game) for one game type, for the dotted line on the sparklines.
