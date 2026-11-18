@@ -1,7 +1,7 @@
 import { hashFor, type Page } from '../lib/pages.ts'
 import { pillClass, pillStyle } from '../lib/styles.ts'
 
-/** The three page buttons in the header. They are plain links that carry the chosen team ("#/players?team=BOS"), so the team stays chosen on the other page; being plain links, the back button and a bookmark work. */
+/** The four page buttons in the header. They are plain links that carry the chosen team ("#/players?team=BOS"), so the team stays chosen on the other page; being plain links, the back button and a bookmark work. */
 export function PageSwitch({ page, team }: { page: Page; team: string }) {
   const link = (key: Page, label: string) => (
     <a
@@ -18,6 +18,7 @@ export function PageSwitch({ page, team }: { page: Page; team: string }) {
       {link('today', "Today's games")}
       {link('teams', 'Teams')}
       {link('players', 'Players')}
+      {link('predictions', 'Predictions')}
     </nav>
   )
 }

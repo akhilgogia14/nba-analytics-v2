@@ -1,4 +1,4 @@
-export type Page = 'players' | 'teams' | 'today'
+export type Page = 'players' | 'teams' | 'today' | 'predictions'
 export type Route = { page: Page; team: string }
 
 /**
@@ -9,7 +9,8 @@ export type Route = { page: Page; team: string }
 export function parseHash(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   const team = new URLSearchParams(query).get('team') ?? ''
-  const page: Page = path === '/players' || path === '/players/advanced' ? 'players' : path === '/teams' || path === '/teams/advanced' ? 'teams' : 'today'
+  const page: Page =
+    path === '/players' || path === '/players/advanced' ? 'players' : path === '/teams' || path === '/teams/advanced' ? 'teams' : path === '/predictions' ? 'predictions' : 'today'
   return { page, team: /^[A-Z]{3}$/.test(team) ? team : '' }
 }
 
@@ -27,7 +28,7 @@ export const isAdvancedHash = (hash: string): boolean => ['/teams/advanced', '/p
 /** The address for a page (or for a page's Advanced stats tab), carrying the chosen team and, on the Players page, the chosen player (if any). */
 export function hashFor(page: Page, team: string, view: View = 'overview', player = ''): string {
   const path = (page === 'teams' || page === 'players') && view === 'advanced' ? `${page}/advanced` : page
-  const parts = [/^[A-Z]{3}$/.test(team) ? `team=${team}` : '', page === 'players' && /^\d{1,12}$/.test(player) ? `player=${player}` : ''].filter(Boolean)
+  const parts = [/^[A-Z]{3}$/.test(team) ? `team=${team}` : '', (page === 'players' || page === 'predictions') && /^\d{1,12}$/.test(player) ? `player=${player}` : ''].filter(Boolean)
   return `#/${path}${parts.length ? `?${parts.join('&')}` : ''}`
 }
 
