@@ -31,29 +31,36 @@ def build_rows(games, min_history=MIN_HISTORY, window=WINDOW):
     """One row per game from index min_history on: identifying facts, and per stat {actual, last10, last5, ewma10, season, career, opp10, lo10, hi10, loS, hiS, n_season, n_opp}."""
     rows = []
     ewma = {s: None for s in STATS}
+    career_sum = {s: 0.0 for s in STATS}
+    career_n = {s: 0 for s in STATS}
+    by_season, by_opp = {}, {}  # games so far, grouped (kept as running lists so no row re-scans a whole history)
     for i, g in enumerate(games):
         if i >= min_history:
-            prior = games[:i]
-            last = prior[-window:]
-            same_season = [x for x in prior if x["season"] == g["season"]]
-            meetings = [x for x in prior if x["opp"] == g["opp"]][-window:]
+            last = games[max(0, i - window):i]
+            same_season = by_season.get(g["season"], [])
+            meetings = by_opp.get(g["opp"], [])[-window:]
             stats = {}
             for s in STATS:
                 actual = g.get(s)
                 if actual is None:
                     continue
-                v10, v5, vS, vC, vO = _vals(last, s), _vals(prior[-5:], s), _vals(same_season, s), _vals(prior, s), _vals(meetings, s)
+                v10, v5, vS, vO = _vals(last, s), _vals(games[i - 5:i], s), _vals(same_season, s), _vals(meetings, s)
                 stats[s] = {
-                    "actual": actual, "last10": _mean(v10), "last5": _mean(v5), "ewma10": ewma[s], "season": _mean(vS), "career": _mean(vC),
+                    "actual": actual, "last10": _mean(v10), "last5": _mean(v5), "ewma10": ewma[s], "season": _mean(vS),
+                    "career": career_sum[s] / career_n[s] if career_n[s] else None,
                     "opp10": _mean(vO), "lo10": min(v10) if v10 else None, "hi10": max(v10) if v10 else None,
                     "loS": min(vS) if vS else None, "hiS": max(vS) if vS else None, "n_season": len(vS), "n_opp": len(vO),
                 }
             rows.append({"i": i, "season": g["season"], "date": g["date"], "game_id": g.get("game_id"), "opp": g["opp"], "n_prior": i,
                          "prior_minutes": _mean(_vals(last, "minutes")), "stats": stats})
-        for s in STATS:  # only now does the game join the history
+        by_season.setdefault(g["season"], []).append(g)  # only now does the game join the history
+        by_opp.setdefault(g["opp"], []).append(g)
+        for s in STATS:
             v = g.get(s)
             if v is not None:
                 ewma[s] = v if ewma[s] is None else ALPHA * v + (1 - ALPHA) * ewma[s]
+                career_sum[s] += v
+                career_n[s] += 1
     return rows
 
 
