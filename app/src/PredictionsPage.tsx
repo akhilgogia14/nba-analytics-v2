@@ -1,11 +1,12 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { fetchMeetings, fetchPlayerContext, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
+import { OutlookTable } from './components/OutlookTable.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { nextGameFacts } from './lib/context.ts'
 import { shortDate, teamLabel } from './lib/format.ts'
 import { chartPalette } from './lib/hex.ts'
-import { fromMeeting, fromRecent, seasonGames, VIEWS, type Views } from './lib/outlook.ts'
+import { fromMeeting, fromRecent, seasonGames, type Views } from './lib/outlook.ts'
 import { parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
 import { panelStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
@@ -198,10 +199,8 @@ export default function PredictionsPage() {
               ) : (
                 <div className="text-[15px] text-(--muted)">No game on the schedule yet for this team, so there is no next matchup to look at.</div>
               )}
-              <div className="text-[13px] text-(--muted)">
-                {VIEWS.map((v) => `${v.label}: ${views[v.key].length} games`).join(' · ')}
-              </div>
             </section>
+            <OutlookTable views={views} opp={next?.opp ?? null} />
           </div>
         )}
       </div>
