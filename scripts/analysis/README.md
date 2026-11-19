@@ -7,9 +7,10 @@ One-off studies behind the stability notes. They only read from Databricks and w
 | `team_stability.py` | Are a team's rest and home/away effects real, and does a team's own split repeat? | `docs/advanced-stats-stability.md` |
 | `player_stability.py` | The same for players (stat effects and availability). | `docs/players-advanced-stability.md` |
 | `adjusted_stability.py` | Do both survive removing home/away and opponent strength? | `docs/adjusted-stability.md` |
+| `backtest_baseline.py` (with `backtest_features.py`) | How good is the Predictions baseline (50/50 last-10 and season) against what happened? | `docs/predictions-backtest.md` |
 
 ## How to run
 - They need Databricks Connect, which is **not** in `requirements.txt` (it is a separate environment, see CLAUDE.md "Tools"). Use a venv with `databricks-connect` 16.4.x, `numpy` and `pyarrow<20`, logged in as profile `DEFAULT`.
-- From the repo root: `<that venv>/bin/python scripts/analysis/team_stability.py`. Each takes one to a few minutes and prints its tables.
+- From the repo root: `<that venv>/bin/python scripts/analysis/team_stability.py`. The back-test's feature builder is plain Python with tests (`tests/test_backtest_features.py`, run by pytest). Each takes one to a few minutes and prints its tables.
 - The scripts keep seasons up to `season <= 2026` (the 2025-26 season is season 2026), the last completed one when they were written. Raise that number in the `WHERE` clauses once another season is complete.
 - `team_stability.py` rebuilds `game_context` in memory (`scripts/gold_game_context.py`) instead of reading the table, so it also works before the table is granted.
