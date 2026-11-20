@@ -76,6 +76,43 @@ export const PLAYOFF_PLAYERS_SQL = `
   WHERE game_type = 'playoffs' AND team_tricode = :team AND season = ${PLAYOFFS_SEASON}
   GROUP BY person_id ORDER BY minutes DESC NULLS LAST, player_name`
 
+// A team's roster for the matchup view: each player on this season's roster with his last-10 average of each stat (player_form
+// holds one row per player and stat) and how many of his last 10 games played he STARTED (player_season_games). Regular season
+// only. Most starts first, then most minutes.
+export const ROSTER_STATS = ['minutes', 'pts', 'reb', 'ast', 'fg3m', 'blk', 'stl']
+export const ROSTER_SQL = `
+  WITH r AS (
+    SELECT person_id, player_name, stat, l10_games, l10_mean
+    FROM ${TABLE}
+    WHERE game_type = '${GAME_TYPE}' AND team_tricode = :team AND last_season_label = ${CURRENT}
+      AND stat IN (${ROSTER_STATS.map((x) => `'${x}'`).join(', ')})),
+  last10 AS (
+    SELECT person_id, started FROM (
+      SELECT person_id, started, row_number() OVER (PARTITION BY person_id ORDER BY game_date DESC, game_id DESC) AS rn
+      FROM ${SEASON_TABLE}
+      WHERE game_type = '${GAME_TYPE}' AND played AND person_id IN (SELECT person_id FROM r)) x
+    WHERE rn <= 10),
+  starts AS (SELECT person_id, count_if(started) AS starts FROM last10 GROUP BY person_id),
+  wide AS (
+    SELECT r.person_id, max(r.player_name) AS player_name, max(r.l10_games) AS l10_games, coalesce(max(s.starts), 0) AS starts,
+           ${ROSTER_STATS.map((x) => `max(IF(r.stat = '${x}', r.l10_mean, NULL)) AS ${x}`).join(', ')}
+    FROM r LEFT JOIN starts s ON s.person_id = r.person_id
+    GROUP BY r.person_id)
+  SELECT person_id, player_name, l10_games, starts, ${ROSTER_STATS.join(', ')}
+  FROM wide
+  ORDER BY starts DESC, minutes DESC NULLS LAST, player_name`
+
+/** Rows -> [{ id, name, games, starts, stats: { minutes, pts, ... } }] in the query's order (starters first). */
+export function mapRoster(rows) {
+  return rows.map((r) => ({
+    id: r[0],
+    name: r[1],
+    games: num(r[2]),
+    starts: num(r[3]) ?? 0,
+    stats: Object.fromEntries(ROSTER_STATS.map((s, i) => [s, num(r[4 + i])])),
+  }))
+}
+
 /** The team-list and player-list SQL for the page's game type (regular season = this season's roster). */
 export const teamsSqlFor = (gameType) => (gameType === 'playoffs' ? PLAYOFF_TEAMS_SQL : TEAMS_SQL)
 export const playersSqlFor = (gameType) => (gameType === 'playoffs' ? PLAYOFF_PLAYERS_SQL : PLAYERS_SQL)

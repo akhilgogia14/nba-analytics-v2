@@ -25,18 +25,40 @@ export function playerFromHash(hash: string): string {
 export type View = 'overview' | 'advanced'
 export const isAdvancedHash = (hash: string): boolean => ['/teams/advanced', '/players/advanced'].includes(hash.replace(/^#/, '').split('?')[0])
 
-/** The address for a page (or for a page's Advanced stats tab), carrying the chosen team and, on the Players page, the chosen player (if any). */
-export function hashFor(page: Page, team: string, view: View = 'overview', player = ''): string {
+/** The opponent carried in the address ("#/teams?team=NYK&opp=POR"): three capital letters, anything else is ignored. */
+export function oppFromHash(hash: string): string {
+  const query = hash.replace(/^#/, '').split('?')[1] ?? ''
+  const opp = new URLSearchParams(query).get('opp') ?? ''
+  return /^[A-Z]{3}$/.test(opp) ? opp : ''
+}
+
+/** True when the address asks to land on the roster ("#/teams?team=NYK&opp=POR&focus=roster"). */
+export const focusRosterFromHash = (hash: string): boolean => new URLSearchParams(hash.replace(/^#/, '').split('?')[1] ?? '').get('focus') === 'roster'
+
+/** The opponent in the address the page is at now. */
+export const currentOpp = (): string => oppFromHash(window.location.hash)
+
+/**
+ * The address for a page (or for a page's Advanced stats tab), carrying the chosen team, on Players and Predictions the chosen player
+ * (if any), and on Teams, Players and Predictions the opponent (if any, and never the team itself). `focus: 'roster'` asks the Teams
+ * page to scroll to the roster.
+ */
+export function hashFor(page: Page, team: string, view: View = 'overview', player = '', opp = '', focus = ''): string {
   const path = (page === 'teams' || page === 'players') && view === 'advanced' ? `${page}/advanced` : page
-  const parts = [/^[A-Z]{3}$/.test(team) ? `team=${team}` : '', (page === 'players' || page === 'predictions') && /^\d{1,12}$/.test(player) ? `player=${player}` : ''].filter(Boolean)
+  const parts = [
+    /^[A-Z]{3}$/.test(team) ? `team=${team}` : '',
+    (page === 'players' || page === 'predictions') && /^\d{1,12}$/.test(player) ? `player=${player}` : '',
+    page !== 'today' && /^[A-Z]{3}$/.test(opp) && opp !== team ? `opp=${opp}` : '',
+    page === 'teams' && focus === 'roster' ? 'focus=roster' : '',
+  ].filter(Boolean)
   return `#/${path}${parts.length ? `?${parts.join('&')}` : ''}`
 }
 
 export const pageFromHash = (hash: string): Page => parseHash(hash).page
 
-/** Writes the chosen team into the address without adding a back-button step (and without a page change). */
-export function rememberTeam(page: Page, team: string, view: View = 'overview', player = ''): void {
-  if (/^[A-Z]{3}$/.test(team) && window.location.hash !== hashFor(page, team, view, player)) {
-    window.history.replaceState(null, '', hashFor(page, team, view, player))
+/** Writes the chosen team (and player, opponent) into the address without adding a back-button step (and without a page change). The opponent already in the address is kept unless one is given. */
+export function rememberTeam(page: Page, team: string, view: View = 'overview', player = '', opp: string = currentOpp()): void {
+  if (/^[A-Z]{3}$/.test(team) && window.location.hash !== hashFor(page, team, view, player, opp)) {
+    window.history.replaceState(null, '', hashFor(page, team, view, player, opp))
   }
 }

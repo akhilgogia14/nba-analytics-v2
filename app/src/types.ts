@@ -216,3 +216,7 @@ export type DefenseGroup = {
 export type DefenseSplit = { groups: DefenseGroup[]; firstSeason: string | null; lastSeason: string | null }
 /** `team` is the team's newest season of the game type; `league` is every team over every season on record. */
 export type TeamDefense = { team: DefenseSplit; league: DefenseSplit }
+
+/** One player on a team's roster, with his last-10 averages and how many of his last games played he started. */
+export type RosterPlayer = { id: string; name: string; games: number | null; starts: number; stats: Record<string, number | null> }
+export type Roster = { players: RosterPlayer[] }

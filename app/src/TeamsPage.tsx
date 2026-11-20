@@ -1,13 +1,14 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchLeagueAverages, fetchTeamForm, fetchTeamGames, fetchTeamLog, fetchTeamMeetings, fetchTeams } from './api.ts'
+import { fetchLeagueAverages, fetchRoster, fetchTeamForm, fetchTeamGames, fetchTeamLog, fetchTeamMeetings, fetchTeams } from './api.ts'
 import { TeamBadge } from './components/Avatar.tsx'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { TeamTabs } from './components/TeamTabs.tsx'
-import { parseHash, rememberTeam } from './lib/pages.ts'
+import { focusRosterFromHash, oppFromHash, parseHash, rememberTeam } from './lib/pages.ts'
 import { Scorecard } from './components/Scorecard.tsx'
 import { TeamGameLog } from './components/TeamGameLog.tsx'
 import { TeamMeetingsPanel } from './components/TeamMeetings.tsx'
+import { TeamRoster } from './components/TeamRoster.tsx'
 import { shortDate, teamLabel } from './lib/format.ts'
 import { DEFAULT_VIEW, LOG_VIEWS, type LogView } from './lib/gamelog.ts'
 import { GAME_TYPE_OPTIONS, gamesWord } from './lib/gameType.ts'
@@ -17,7 +18,7 @@ import { TEAM_IDS, readableOn } from './lib/teams.ts'
 import { TEAM_CARDS, cardFormat, leagueNote, pointFormat, teamNotices } from './lib/teamPage.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { GameType, LeagueAverages, Team, TeamFormResult, TeamGame, TeamMeetings } from './types.ts'
+import type { GameType, LeagueAverages, RosterPlayer, Team, TeamFormResult, TeamGame, TeamMeetings } from './types.ts'
 
 const ALL_TEAMS = Object.keys(TEAM_IDS).sort()
 
@@ -44,7 +45,10 @@ export default function TeamsPage() {
   const [view, setView] = useState<LogView>(DEFAULT_VIEW)
   const [log, setLog] = useState<TeamGame[] | null>(null)
   const [logError, setLogError] = useState('')
-  const [opp, setOpp] = useState('')
+  const [opp, setOpp] = useState(() => oppFromHash(window.location.hash)) // the opponent carried in the address (from Today's games, say)
+  const [roster, setRoster] = useState<RosterPlayer[] | null>(null)
+  const [rosterError, setRosterError] = useState('')
+  const [landOnRoster] = useState(() => focusRosterFromHash(window.location.hash))
   const [meetings, setMeetings] = useState<TeamMeetings | null>(null)
   const [meetingsError, setMeetingsError] = useState('')
   const [error, setError] = useState('')
@@ -58,6 +62,8 @@ export default function TeamsPage() {
     setLogError('')
     setMeetings(null)
     setMeetingsError('')
+    setRoster(null)
+    setRosterError('')
     setError('')
   }
   function chooseTeam(code: string) {
@@ -109,7 +115,8 @@ export default function TeamsPage() {
   }, [gameType, attempt])
 
   // The chosen team goes into the address, so the Players link (and a bookmark) carry it.
-  useEffect(() => rememberTeam('teams', team), [team])
+  const oppNow = opp === team ? '' : opp // an opponent the same as the team is ignored
+  useEffect(() => rememberTeam('teams', team, 'overview', '', oppNow), [team, oppNow])
 
   const listed = !!team && !!teams?.some((t) => t.team === team)
 
@@ -144,6 +151,18 @@ export default function TeamsPage() {
     fetchTeamLog(team, gameType)
       .then((r) => !cancelled && setLog(r.games))
       .catch((e) => !cancelled && setLogError(errorText(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [team, listed, gameType, attempt])
+
+  // 2c. The roster with last-10 averages (regular season only). An extra: if this fails only the roster shows the error.
+  useEffect(() => {
+    if (!listed || gameType !== 'regular-season') return
+    let cancelled = false
+    fetchRoster(team)
+      .then((r) => !cancelled && setRoster(r.players))
+      .catch((e) => !cancelled && setRosterError(errorText(e)))
     return () => {
       cancelled = true
     }
@@ -193,10 +212,10 @@ export default function TeamsPage() {
             </div>
             <div className="text-[13px] text-(--muted)">How a team's offense has looked over its recent games, as a range</div>
           </div>
-          <PageSwitch page="teams" team={team} />
+          <PageSwitch page="teams" team={team} opp={oppNow} />
         </header>
 
-        <TeamTabs view="overview" team={team} />
+        <TeamTabs view="overview" team={team} opp={oppNow} />
 
         <div className="flex flex-wrap items-end gap-4">
           <label className="flex max-w-80 min-w-56 flex-1 flex-col gap-1.5">
@@ -228,6 +247,20 @@ export default function TeamsPage() {
             </div>
           </div>
         </div>
+
+        {oppNow && listed && (
+          <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-(--border) bg-(--panel) px-4 py-3" style={panelStyle} aria-label="Matchup">
+            <TeamBadge abbrev={team} size={28} />
+            <span className="text-[17px] font-semibold" style={{ fontFamily: 'var(--display)' }}>
+              {team} vs {oppNow}
+            </span>
+            <TeamBadge abbrev={oppNow} size={28} />
+            <span className="text-xs text-(--muted)">The last 10 meetings and the roster are below.</span>
+            <button type="button" onClick={() => chooseOpp('')} className="ml-auto min-h-9 cursor-pointer rounded-full border border-(--pillBorder) bg-(--pill) px-3 text-xs font-semibold text-(--pillText)">
+              Clear opponent
+            </button>
+          </div>
+        )}
 
         <div aria-live="polite" className="flex flex-col gap-3">
           {error && (
@@ -348,6 +381,11 @@ export default function TeamsPage() {
               gameType={gameType}
               gamesWord={words}
             />
+            {gameType === 'regular-season' ? (
+              <TeamRoster team={team} opp={oppNow} players={roster} error={rosterError} autoScroll={landOnRoster} />
+            ) : (
+              <div className="text-sm text-(--muted)">The roster with last-10 averages is shown for the regular season.</div>
+            )}
           </div>
         )}
 
