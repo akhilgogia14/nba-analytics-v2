@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import { fetchGameDetail } from '../api.ts'
+import { shortDate } from '../lib/format.ts'
 import { f1 } from '../lib/geom.ts'
+import { againstAverage, detailTiles, resultText } from '../lib/gameDetail.ts'
+import { hashFor } from '../lib/pages.ts'
 import {
   BINS, GRID_STATS, MISSED, STAT_NAMES, UPCOMING, buildCells, chartPalette, hexLayout, hexPoints, hexTip,
   isVsOpp, playedSummary, seasonMean, type Cell,
 } from '../lib/hex.ts'
 import { panelStyle, pillClass, pillStyle } from '../lib/styles.ts'
 import { clampAnchor } from '../lib/tips.ts'
-import type { GameType, GridStat, Season } from '../types.ts'
+import type { GameDetail as GameDetailData, GameType, GridStat, Season } from '../types.ts'
+import { KpiTiles } from './KpiTiles.tsx'
 
 const TYPE_NAMES: Record<GameType, string> = { 'regular-season': 'Regular season', playoffs: 'Playoffs' }
 
@@ -28,18 +33,76 @@ function Swatch({ fill, stroke, dashed, ring, size = 18 }: { fill: string; strok
   )
 }
 
+/** What a click on a hexagon opens: the game, the result, his full line, and a way to see all his games against that opponent. */
+function GameDetailPanel({ cell, stat, mean, playerId, team, onClose }: { cell: Cell; stat: GridStat; mean: number | null; playerId: string; team: string; onClose: () => void }) {
+  const gameId = cell.game?.id ?? null
+  const [loaded, setLoaded] = useState<{ id: string; data: GameDetailData | null; error: string } | null>(null)
+  useEffect(() => {
+    if (!gameId) return
+    let cancelled = false
+    fetchGameDetail(playerId, gameId)
+      .then((data) => !cancelled && setLoaded({ id: gameId, data, error: '' }))
+      .catch(() => !cancelled && setLoaded({ id: gameId, data: null, error: 'Could not load this game. Try clicking it again.' }))
+    return () => {
+      cancelled = true
+    }
+  }, [playerId, gameId])
+  const here = loaded && loaded.id === gameId ? loaded : null
+  const opp = cell.game?.opp ?? cell.next?.opp ?? ''
+  const isHome = cell.game?.isHome ?? cell.next?.isHome ?? false
+  const date = cell.game?.date ?? cell.next?.date ?? ''
+  const result = resultText(here?.data?.result ?? null)
+  const played = cell.kind === 'played' || cell.kind === 'gap'
+  const vsLine = againstAverage(cell.value, mean, stat)
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-(--border) p-4" role="region" aria-label="Game detail">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <div className="text-[15px] font-semibold">
+            {date && shortDate(date)} · {isHome ? 'vs' : '@'} {opp}
+            {result && <span className="ml-2 text-(--muted)">{result}</span>}
+          </div>
+          <div className="text-xs text-(--muted)">
+            {cell.kind === 'upcoming'
+              ? `Not played yet · ${isHome ? 'home' : 'away'}`
+              : cell.kind === 'missed'
+                ? 'Did not play'
+                : here?.data?.game.box.started === null || !here?.data
+                  ? ''
+                  : here.data.game.box.started
+                    ? 'Started'
+                    : 'Came off the bench'}
+          </div>
+        </div>
+        <button type="button" onClick={onClose} className="min-h-9 cursor-pointer rounded-full border border-(--pillBorder) px-3.5 text-[13px] font-semibold">
+          Close
+        </button>
+      </div>
+      {played && here?.error && <div className="text-sm text-(--warnText)" role="alert">{here.error}</div>}
+      {played && !here && <div className="text-sm text-(--muted)">Loading the box score...</div>}
+      {played && here?.data && <KpiTiles tiles={detailTiles(here.data.game)} caption={vsLine} minWidth={76} />}
+      {opp && (
+        <a href={hashFor('players', team, 'overview', playerId, opp)} className="text-[14px] font-semibold text-(--accent) no-underline hover:underline">
+          See all his games against {opp}
+        </a>
+      )}
+    </div>
+  )
+}
+
 /**
  * The season chart: one hexagon per team game, in date order, for the game type the page's toggle has chosen (regular
  * season or playoffs, never both). Played games are coloured by the chosen stat (five steps from his lowest to his highest
  * game, in the team's colours), a game where he reached his season average has a ring around it, a game he missed is dark
  * grey, and (regular season) games not played yet are empty outlines up to 82. A traded player has one grid per team.
  */
-export function SeasonGrid({ season, team, gameType, opp = '' }: { season: Season | null; team: string; gameType: GameType; opp?: string }) {
+export function SeasonGrid({ season, team, gameType, playerId, opp = '' }: { season: Season | null; team: string; gameType: GameType; playerId: string; opp?: string }) {
   const palette = chartPalette(team)
   const oppPalette = chartPalette(opp)
   const [stat, setStat] = useState<GridStat>('pts')
   const [teamChoice, setTeamChoice] = useState('')
   const [tip, setTip] = useState<number | null>(null)
+  const [sel, setSel] = useState<number | null>(null) // the clicked hexagon: its game opens under the chart
   const box = useRef<HTMLDivElement>(null)
 
   // A tap or click anywhere else closes the bubble (phones have no "mouse leave").
@@ -113,7 +176,7 @@ export function SeasonGrid({ season, team, gameType, opp = '' }: { season: Seaso
       {grids.length > 1 && (
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Team">
           {grids.map((g) => (
-            <button key={g.teamId} type="button" aria-pressed={g === grid} className={pillClass} style={pillStyle(g === grid)} onClick={() => { setTeamChoice(g.teamId); setTip(null) }}>
+            <button key={g.teamId} type="button" aria-pressed={g === grid} className={pillClass} style={pillStyle(g === grid)} onClick={() => { setTeamChoice(g.teamId); setTip(null); setSel(null) }}>
               {g.team}
             </button>
           ))}
@@ -157,6 +220,7 @@ export function SeasonGrid({ season, team, gameType, opp = '' }: { season: Seaso
                     strokeLinejoin="round"
                   />
                 )}
+                {sel === i && <polygon data-selected points={hexPoints(cx, cy, layout.radius - 0.4)} fill="none" stroke="var(--text)" strokeWidth={1.6} strokeLinejoin="round" />}
                 <polygon
                   points={hexPoints(cx, cy, layout.radius - 4.6)}
                   fill={fillFor(c)}
@@ -174,13 +238,16 @@ export function SeasonGrid({ season, team, gameType, opp = '' }: { season: Seaso
                 role="button"
                 tabIndex={0}
                 aria-label={t.label}
-                className="cursor-help outline-none focus-visible:[&>polygon]:stroke-(--accent)"
+                className="cursor-pointer outline-none focus-visible:[&>polygon]:stroke-(--accent)"
                 onMouseEnter={() => setTip(i)}
                 onMouseLeave={() => setTip((cur) => (cur === i ? null : cur))}
                 onFocus={() => setTip(i)}
                 onBlur={() => setTip((cur) => (cur === i ? null : cur))}
-                onClick={() => setTip(i)}
-                onKeyDown={(e) => e.key === 'Escape' && setTip(null)}
+                onClick={() => { setTip(null); setSel(i) }} // the panel shows everything the bubble does
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setTip(null)
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(i) }
+                }}
               >
                 {poly}
               </g>
@@ -188,6 +255,10 @@ export function SeasonGrid({ season, team, gameType, opp = '' }: { season: Seaso
           })}
         </svg>
       </div>
+
+      {sel !== null && cells[sel] && (
+        <GameDetailPanel key={sel} cell={cells[sel]} stat={stat} mean={mean} playerId={playerId} team={team} onClose={() => setSel(null)} />
+      )}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-(--muted)">
         <span className="inline-flex items-center gap-1.5">
@@ -223,6 +294,7 @@ export function SeasonGrid({ season, team, gameType, opp = '' }: { season: Seaso
             not played yet
           </span>
         )}
+        <span>Click a game for its box score.</span>
         {opp && gameType === 'regular-season' && !hasVs && (
           <span>No games against {opp} on this chart yet.</span>
         )}

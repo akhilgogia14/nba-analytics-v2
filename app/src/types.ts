@@ -107,6 +107,11 @@ export type Box = {
 /** A game in the box-score table: the same as a RecentGame plus the fuller box score. */
 export type LogGame = RecentGame & { box: Box }
 
+/** The team's final score in a game (from the team game log). */
+export type GameResult = { won: boolean; teamPts: number | null; oppPts: number | null; overtimes: number }
+/** One game of one player, for the click on a hexagon: `game` holds his box score (empty numbers if he did not play). */
+export type GameDetail = { played: boolean; game: LogGame; result: GameResult | null }
+
 /** What a sparkline needs from a game: the stats are keyed by name so the same line works for players and teams. */
 export type SparkGame = { id: string; date: string; opp: string; isHome: boolean; stats: Record<string, number | null> }
 

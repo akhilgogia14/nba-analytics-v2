@@ -21,6 +21,9 @@ export const STATS = ['pts', 'reb', 'ast', 'fg3m', 'blk', 'stl', 'pra', 'pr', 'p
 export function validTeam(v) {
   return typeof v === 'string' && /^[A-Z]{3}$/.test(v)
 }
+export function validGameId(v) {
+  return typeof v === 'string' && /^[0-9]{8,12}$/.test(v)
+}
 export function validPlayerId(v) {
   return typeof v === 'string' && /^[0-9]{1,12}$/.test(v)
 }
@@ -180,6 +183,18 @@ export const MEETINGS_SQL = `
   ORDER BY game_date DESC, game_id DESC
   LIMIT ${MEETINGS_COUNT}`
 
+// One game of one player, for the click on a hexagon: the same 23 columns as GAMELOG_SQL (so mapGameLog reads them), then whether
+// he played and the team's result from team_game_log (joined on the game and the team he played for). A game he missed has a row
+// here too (played = false) with empty numbers.
+export const GAME_DETAIL_SQL = `
+  SELECT t.game_id, t.game_date, t.opponent_tricode, t.is_home, t.season_label, t.minutes, t.pts, t.reb, t.ast, t.fg3m, t.blk, t.stl,
+         t.started, t.fgm, t.fga, t.fg3a, t.ftm, t.fta, t.oreb, t.dreb, t.tov, t.pf, t.plus_minus,
+         t.played, g.won, g.pts, g.opp_pts, g.overtime_periods
+  FROM ${SEASON_TABLE} t
+  LEFT JOIN workspace.nba_v2_gold.team_game_log g ON g.game_id = t.game_id AND g.team_id = t.team_id
+  WHERE t.person_id = :id AND t.game_id = :gid
+  LIMIT 1`
+
 // ---- row mapping (the warehouse returns every value as a string or null) ----
 const num = (v) => (v === null || v === undefined ? null : Number(v))
 
@@ -300,4 +315,16 @@ export function mapGameLog(rows) {
       }
     }),
   }
+}
+
+// Rows come in GAME_DETAIL_SQL's column order. Returns null for no row (404), else { played, game, result }: `game` is a mapGameLog
+// game (stats and box; empty numbers if he did not play), `result` is the team's final score or null when the log has none.
+export function mapGameDetail(rows) {
+  if (rows.length === 0) return null
+  const r = rows[0]
+  const game = mapGameLog([r.slice(0, 23)]).games[0]
+  const result = r[24] === null || r[24] === undefined || r[25] === null || r[26] === null
+    ? null
+    : { won: bool(r[24]), teamPts: num(r[25]), oppPts: num(r[26]), overtimes: num(r[27]) ?? 0 }
+  return { played: bool(r[23]), game, result }
 }
