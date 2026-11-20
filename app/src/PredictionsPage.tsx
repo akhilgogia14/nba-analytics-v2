@@ -211,7 +211,7 @@ export default function PredictionsPage() {
                 <div className="text-[15px] text-(--muted)">No game on the schedule yet for this team, so there is no next matchup to look at.</div>
               )}
             </section>
-            <OutlookHeadline views={views} />
+            <OutlookHeadline views={views} opp={oppUsed} />
             <OutlookTable views={views} opp={oppUsed} />
             <OutlookCharts views={views} opp={oppUsed} />
           </div>

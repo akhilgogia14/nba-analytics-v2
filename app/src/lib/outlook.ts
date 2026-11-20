@@ -124,3 +124,36 @@ export function headlineTiles(views: Views): Tile[] {
     return { key: s.key, label: s.label, digits: s.digits, base, miss: typicalMiss(s.key, band), lo: last10?.min ?? null, hi: last10?.max ?? null, games: last10?.n ?? 0 }
   })
 }
+
+/** One game behind a tile: its value for the stat and which of the two baseline windows it counts in. */
+export type BehindRow = { game: OutlookGame; value: number | null; inLast10: boolean; inSeason: boolean }
+/** Everything a click on a tile shows for one stat: the three averages, the baseline, and the games. */
+export type Behind = {
+  stat: OutlookStat
+  label: string
+  digits: number
+  base: number | null
+  last10: Summary | null
+  season: Summary | null
+  opponent: Summary | null
+  /** The games in the last-10 window and/or the season, once each, newest first. */
+  rows: BehindRow[]
+  /** His last meetings with the chosen opponent (not part of the baseline), newest first. */
+  opponentRows: BehindRow[]
+}
+
+const newestFirst = (a: OutlookGame, b: OutlookGame) => (a.date === b.date ? (a.id < b.id ? 1 : -1) : a.date < b.date ? 1 : -1)
+
+/** The games behind one stat's tile. The baseline is the same figure the tile shows (headlineTiles), built from the same two summaries. */
+export function behindTile(views: Views, stat: OutlookStat): Behind {
+  const spec = OUTLOOK_STATS.find((s) => s.key === stat) ?? OUTLOOK_STATS[0]
+  const last10 = summarize(views.last10, stat)
+  const season = summarize(views.season, stat)
+  const ids10 = new Set(views.last10.map((g) => g.id))
+  const idsSeason = new Set(views.season.map((g) => g.id))
+  const all = new Map<string, OutlookGame>()
+  for (const g of [...views.last10, ...views.season]) all.set(g.id, g)
+  const rows = [...all.values()].sort(newestFirst).map((game) => ({ game, value: game.values[stat], inLast10: ids10.has(game.id), inSeason: idsSeason.has(game.id) }))
+  const opponentRows = [...views.opponent].sort(newestFirst).map((game) => ({ game, value: game.values[stat], inLast10: false, inSeason: false }))
+  return { stat, label: spec.label, digits: spec.digits, base: baseline(last10, season), last10, season, opponent: summarize(views.opponent, stat), rows, opponentRows }
+}
