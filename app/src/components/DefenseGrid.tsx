@@ -87,8 +87,12 @@ export function DefenseGrid({ defense, error, onRetry }: { defense: TeamDefense 
                 <strong className="text-(--text)">Difference:</strong> this team minus the league for the same group. Positive means this team gives up more to that group.
               </li>
               <li>
-                <strong className="text-(--text)">Few:</strong> fewer than {THIN_PLAYER_GAMES} opposing player-games, so the row is a handful of games. Not tested yet: whether a team's pattern by
-                position repeats from one part of a season to the next, so read this as what has happened so far.
+                <strong className="text-(--text)">Few:</strong> fewer than {THIN_PLAYER_GAMES} opposing player-games, so the row is a handful of games.
+              </li>
+              <li>
+                <strong className="text-(--text)">Does it repeat?</strong> We tested it on 2021-22 to 2025-26. A team that gives up more than the league overall tends to keep doing so, across all groups. What is
+                specific to one position (more to centers, less to guards) mostly does not repeat, apart from some blocks. So read the Difference column mainly as how good this defense is, and a single
+                position row as what has happened so far.
               </li>
             </ul>
           </section>
