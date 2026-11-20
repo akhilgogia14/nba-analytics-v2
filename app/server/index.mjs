@@ -6,8 +6,8 @@ import {
   FORM_SQL, GAMELOG_SQL, GAME_DETAIL_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, UPCOMING_SQL, addUpcoming, mapForm, mapGameDetail, mapGameLog, mapGames, mapMeetings, mapPlayers, mapRoster, ROSTER_SQL, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validGameId, validPlayerId, validTeam,
 } from './queries.mjs'
-import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
-import { LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_CONTEXT_SQL, PLAYER_TEAM_SQL, mapPlayerBuckets, mapPlayerTeam } from './playerContextQueries.mjs'
+import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_GAMES_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame, mapTeamContextGames } from './contextQueries.mjs'
+import { LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_CONTEXT_GAMES_SQL, PLAYER_CONTEXT_SQL, PLAYER_TEAM_SQL, mapPlayerBuckets, mapPlayerContextGames, mapPlayerTeam } from './playerContextQueries.mjs'
 import { DEFENSE_PLAYERS_SQL, LEAGUE_DEFENSE_SQL, TEAM_DEFENSE_SQL, mapDefense, mapDefensePlayers } from './defenseQueries.mjs'
 import { SLATE_AVERAGES_SQL, SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
 import {
@@ -242,6 +242,24 @@ app.get('/api/players/:id/context', async (req, res) => {
   }
 })
 
+// The games behind the Players Advanced tab's table: every team game of his newest season with whether he played and the
+// situations it falls in, so a click can list the games on each side of a comparison.
+app.get('/api/players/:id/context/games', async (req, res) => {
+  const { id } = req.params
+  const type = req.query.type ?? 'regular-season'
+  if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+  try {
+    res.json(
+      await cached(`pctxg:${id}:${type}`, FIVE_MINUTES, async () =>
+        mapPlayerContextGames(await sql(PLAYER_CONTEXT_GAMES_SQL, [{ name: 'id', value: id, type: 'BIGINT' }, { name: 'gt', value: type, type: 'STRING' }])),
+      ),
+    )
+  } catch (err) {
+    fail(res, 'player context games', err)
+  }
+})
+
 // ---- Teams page (reads gold team_form and team_game_log). A team is named by its three-letter code. ----
 // Same checks as the player routes: a bad team or type is refused (400) before it reaches SQL.
 function teamRoute(path, label, work) {
@@ -300,6 +318,11 @@ teamRoute('/api/teams/:team/context', 'team context', async (_req, res, team, ty
   )
   const league = await cached(`lctx:${type}`, FIVE_MINUTES, async () => mapBuckets(await sql(LEAGUE_CONTEXT_SQL, [{ name: 'gt', value: type, type: 'STRING' }])))
   res.json({ next, team: teamSplit, league })
+})
+
+// The games behind the Teams Advanced tab's table: the team's played games of its newest season, with the situations each falls in.
+teamRoute('/api/teams/:team/context/games', 'team context games', async (_req, res, team, type) => {
+  res.json(await cached(`tctxg:${team}:${type}`, FIVE_MINUTES, async () => mapTeamContextGames(await sql(TEAM_CONTEXT_GAMES_SQL, teamParams(team, type)))))
 })
 
 // Defense by position: what the opposing players put up against this team, grouped starter/bench x listed position, for the

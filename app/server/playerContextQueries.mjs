@@ -11,7 +11,7 @@
 //    tends to play in a situation (stars often sit the second night of a back-to-back). Only player-seasons with at least
 //    MIN_SEASON_GAMES games played count, so a handful of games cannot pull the average around.
 
-import { BUCKETS_SQL } from './contextQueries.mjs'
+import { BUCKETS_SQL, BUCKET_ARRAY_SQL } from './contextQueries.mjs'
 
 const GRID_TABLE = 'workspace.nba_v2_gold.player_season_games'
 const CTX_TABLE = 'workspace.nba_v2_gold.game_context'
@@ -32,6 +32,18 @@ export const PLAYER_CONTEXT_SQL = `
   WHERE p.person_id = :id AND p.game_type = :gt AND c.game_type = :gt AND c.is_final
     AND p.season = (SELECT max(season) FROM ${CTX_TABLE} WHERE game_type = :gt AND is_final)
   GROUP BY b.bucket`
+
+// The games behind PLAYER_CONTEXT_SQL: every team game of the same season, one row each, with whether he played, the situations it
+// falls in (comma separated) and his seven stats (empty for a game he missed).
+export const PLAYER_CONTEXT_GAMES_SQL = `
+  SELECT p.game_id, CAST(c.game_date AS STRING), c.opponent_tricode, c.is_home, c.days_rest, c.rest_edge,
+         concat_ws(',', ${BUCKET_ARRAY_SQL}) AS buckets, p.played,
+         ${PLAYER_STATS.map((s) => played(s)).join(', ')}
+  FROM ${GRID_TABLE} p
+  JOIN ${CTX_TABLE} c ON c.team_id = p.team_id AND c.game_id = p.game_id
+  WHERE p.person_id = :id AND p.game_type = :gt AND c.game_type = :gt AND c.is_final
+    AND p.season = (SELECT max(season) FROM ${CTX_TABLE} WHERE game_type = :gt AND is_final)
+  ORDER BY c.game_date DESC, c.game_id DESC`
 
 // Every player's played games of this type in every season on record, each measured against that player's own season average.
 export const LEAGUE_PLAYER_CONTEXT_SQL = `
@@ -83,3 +95,14 @@ export function mapPlayerBuckets(rows) {
 }
 
 export const mapPlayerTeam = (rows) => rows[0]?.[0] ?? null
+
+/** Rows (PLAYER_CONTEXT_GAMES_SQL) -> { games: [{ id, date, opp, isHome, daysRest, restEdge, buckets, played, stats }] }, newest first. */
+export function mapPlayerContextGames(rows) {
+  return {
+    games: rows.map((r) => ({
+      id: r[0], date: r[1], opp: r[2], isHome: r[3] === true || r[3] === 'true', daysRest: num(r[4]), restEdge: num(r[5]),
+      buckets: typeof r[6] === 'string' && r[6] !== '' ? r[6].split(',') : [], played: r[7] === true || r[7] === 'true',
+      stats: Object.fromEntries(PLAYER_STATS.map((s, i) => [s, num(r[8 + i])])),
+    })),
+  }
+}
