@@ -12,6 +12,12 @@ export function complete(s: ApiStat | undefined): Dist | null {
 }
 
 /** One decimal, never "-0.0". */
+/** A single game's count written as a whole number ("5", never "5.0"); no negative zero. Averages use f1. */
+export function f0(v: number): string {
+  const r = Math.round(v)
+  return String(r === 0 ? 0 : r)
+}
+
 export function f1(v: number): string {
   const r = Math.round(v * 10) / 10
   return (r === 0 ? 0 : r).toFixed(1)

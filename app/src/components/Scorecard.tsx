@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { complete, f1, geometry, shareSegments } from '../lib/geom.ts'
+import { complete, f0, f1, geometry, shareSegments } from '../lib/geom.ts'
 import { panelStyle } from '../lib/styles.ts'
 import { changeVsSeason } from '../lib/spark.ts'
 import { markTips, shareTips, type Tip } from '../lib/tips.ts'
@@ -88,7 +88,8 @@ export function Scorecard({
   const g = geometry(d)
   const change = changeVsSeason(d.mean, season)
   const segments = shareSegments(stat?.shares ?? null)
-  const [mean, median, band, range] = markTips(d, g, games, fmt)
+  const one = pointFmt ?? f0 // the lowest and the highest are single games: whole numbers (a percentage keeps its decimal)
+  const [mean, median, band, range] = markTips(d, g, games, fmt, one)
   const shares = shareTips(segments)
 
   return (
@@ -161,11 +162,11 @@ export function Scorecard({
           <button type="button" className={`${hitClass} top-0 h-7 z-[4] -ml-2 w-4`} style={{ left: pct(g.meanLeft) }} {...hit(mean)} />
         </div>
         <div className="flex justify-between gap-2 text-xs text-(--muted)">
-          <span>low {fmt(d.min)}</span>
+          <span>low {one(d.min)}</span>
           <span>
             middle 80%: {fmt(d.p10)} to {fmt(d.p90)}
           </span>
-          <span>high {fmt(d.max)}</span>
+          <span>high {one(d.max)}</span>
         </div>
       </div>
 

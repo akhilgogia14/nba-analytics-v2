@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { dateWithYear, shortDate } from '../lib/format.ts'
-import { behindTile, fmtOutlook, headlineTiles, missBand, missBandText, typicalMiss, type Behind, type BehindRow, type OutlookStat, type Views } from '../lib/outlook.ts'
+import { behindTile, fmtGame, fmtOutlook, headlineTiles, missBand, missBandText, typicalMiss, type Behind, type BehindRow, type OutlookStat, type Views } from '../lib/outlook.ts'
 import { panelStyle } from '../lib/styles.ts'
 
 /** The games behind one stat: one line each with a bar scaled to his highest figure, and whether it counts in the last 10, the season, or both. */
-function GameRows({ rows, digits, newestSeason, showWindows }: { rows: BehindRow[]; digits: number; newestSeason: string; showWindows: boolean }) {
+function GameRows({ rows, newestSeason, showWindows }: { rows: BehindRow[]; newestSeason: string; showWindows: boolean }) {
   const top = Math.max(0, ...rows.map((r) => r.value ?? 0))
   return (
     <ul className="m-0 flex list-none flex-col p-0">
@@ -17,7 +17,7 @@ function GameRows({ rows, digits, newestSeason, showWindows }: { rows: BehindRow
               <span className="ml-2 text-xs text-(--muted)">{[r.inLast10 && 'last 10', r.inSeason && 'season'].filter(Boolean).join(' + ')}</span>
             )}
           </div>
-          <div className="text-right text-[15px] font-semibold tabular-nums">{fmtOutlook(r.value, digits)}</div>
+          <div className="text-right text-[15px] font-semibold tabular-nums">{fmtGame(r.value)}</div>
           <div className="col-span-2 h-1.5 rounded-sm bg-(--track)" aria-hidden="true">
             <div className="h-full rounded-sm" style={{ width: `${top > 0 && r.value !== null ? (r.value / top) * 100 : 0}%`, background: 'var(--accent)', opacity: r.inLast10 || !showWindows ? 1 : 0.45 }} />
           </div>
@@ -45,7 +45,7 @@ function BehindPanel({ b, band, opp, onClose }: { b: Behind; band: ReturnType<ty
       <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px] leading-relaxed">
         <li>
           <strong>Last 10 games:</strong> average {fmtOutlook(b.last10?.avg ?? null, d)}
-          {b.last10 && <span className="text-(--muted)"> (low {fmtOutlook(b.last10.min, d)}, high {fmtOutlook(b.last10.max, d)})</span>}
+          {b.last10 && <span className="text-(--muted)"> (low {fmtGame(b.last10.min)}, high {fmtGame(b.last10.max)})</span>}
         </li>
         <li>
           <strong>This season:</strong> average {fmtOutlook(b.season?.avg ?? null, d)}
@@ -63,7 +63,7 @@ function BehindPanel({ b, band, opp, onClose }: { b: Behind; band: ReturnType<ty
       ) : (
         <div className="flex flex-col gap-1">
           <div className="text-xs font-semibold tracking-wider text-(--muted) uppercase">The games, newest first (faded ones count in the season only)</div>
-          <GameRows rows={b.rows} digits={d} newestSeason={newestSeason} showWindows />
+          <GameRows rows={b.rows} newestSeason={newestSeason} showWindows />
         </div>
       )}
       {opp && (
@@ -74,7 +74,7 @@ function BehindPanel({ b, band, opp, onClose }: { b: Behind; band: ReturnType<ty
           {b.opponentRows.length > 0 && (
             <div className="mt-1 flex flex-col gap-1">
               <div className="text-xs">Not part of the baseline. Shown for reference.</div>
-              <GameRows rows={b.opponentRows} digits={d} newestSeason={newestSeason} showWindows={false} />
+              <GameRows rows={b.opponentRows} newestSeason={newestSeason} showWindows={false} />
             </div>
           )}
         </details>
@@ -122,7 +122,7 @@ export function OutlookHeadline({ views, opp = null }: { views: Views; opp?: str
             </div>
             <div className="text-[13px] text-(--muted)">typical miss ±{fmtOutlook(t.miss, t.digits)}</div>
             <div className="text-[13px] text-(--muted)">
-              {t.lo === null || t.hi === null ? 'no recent games' : `last ${t.games}: ${fmtOutlook(t.lo, t.digits)} to ${fmtOutlook(t.hi, t.digits)}`}
+              {t.lo === null || t.hi === null ? 'no recent games' : `last ${t.games}: ${fmtGame(t.lo)} to ${fmtGame(t.hi)}`}
             </div>
           </button>
         ))}

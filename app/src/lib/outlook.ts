@@ -3,14 +3,14 @@ import type { MeetingGame, RecentGame, Season, SeasonGame } from '../types.ts'
 /** The seven numbers the Predictions page describes: the six stat lines plus minutes. */
 export type OutlookStat = 'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl' | 'minutes'
 
-/** `digits` = decimals for a figure (3-pointers, blocks and steals are small counts, so they get two). */
+/** `digits` = decimals for an average, baseline or typical miss: one for every stat. A single game's number is whole (fmtGame). */
 export const OUTLOOK_STATS: { key: OutlookStat; label: string; digits: number }[] = [
   { key: 'pts', label: 'Points', digits: 1 },
   { key: 'reb', label: 'Rebounds', digits: 1 },
   { key: 'ast', label: 'Assists', digits: 1 },
-  { key: 'fg3m', label: '3-pointers', digits: 2 },
-  { key: 'blk', label: 'Blocks', digits: 2 },
-  { key: 'stl', label: 'Steals', digits: 2 },
+  { key: 'fg3m', label: '3-pointers', digits: 1 },
+  { key: 'blk', label: 'Blocks', digits: 1 },
+  { key: 'stl', label: 'Steals', digits: 1 },
   { key: 'minutes', label: 'Minutes', digits: 1 },
 ]
 
@@ -72,8 +72,11 @@ export function baseline(last10: Summary | null, season: Summary | null): number
   return last10?.avg ?? season?.avg ?? null
 }
 
-/** A figure to the stat's decimals, or a dash. */
+/** An average, baseline or typical miss to the stat's decimals, or a dash. */
 export const fmtOutlook = (v: number | null, digits: number): string => (v === null ? '-' : v.toFixed(digits))
+
+/** A single game's number (a game's points, his lowest or highest): whole, or a dash. Minutes are rounded. */
+export const fmtGame = (v: number | null): string => (v === null ? '-' : String(Math.round(v) === 0 ? 0 : Math.round(v)))
 
 /**
  * How far the baseline was from what actually happened, on average (mean absolute error), in the back-test of 2026-11-18, rerun

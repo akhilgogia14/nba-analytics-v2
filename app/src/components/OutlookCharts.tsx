@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type OutlookStat, type Views } from '../lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baseline, fmtGame, fmtOutlook, missBand, summarize, typicalMiss, type OutlookStat, type Views } from '../lib/outlook.ts'
 import { CHART_PAD, ROW_HEIGHT, chartLayout, dotGroups, tipGames } from '../lib/outlookChart.ts'
 import { panelStyle } from '../lib/styles.ts'
 
@@ -22,7 +22,7 @@ function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: Ou
   const summary = `${label}. Baseline ${fmtOutlook(base, digits)}, typical miss ${fmtOutlook(miss, digits)}. ${layout.rows
     .map((r) => {
       const s = summarize(views[r.key], stat)
-      return s ? `${rowName(r.key)}: low ${fmtOutlook(s.min, digits)}, average ${fmtOutlook(s.avg, digits)}, high ${fmtOutlook(s.max, digits)} over ${r.games} games` : `${rowName(r.key)}: no games`
+      return s ? `${rowName(r.key)}: low ${fmtGame(s.min)}, average ${fmtOutlook(s.avg, digits)}, high ${fmtGame(s.max)} over ${r.games} games` : `${rowName(r.key)}: no games`
     })
     .join('. ')}.`
   return (
@@ -54,7 +54,7 @@ function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: Ou
               style={{ left: `${Math.min(84, Math.max(16, g.x))}%`, top: active.row * ROW_HEIGHT + ROW_HEIGHT / 2 - 8, background: 'var(--pillOn)', color: 'var(--pillOnText)' }}
             >
               <div className="font-semibold">
-                {fmtOutlook(g.value, digits)} {label.toLowerCase()} · {rowName(r.key)}
+                {fmtGame(g.value)} {label.toLowerCase()} · {rowName(r.key)}
               </div>
               {tipGames(g.games).map((t) => (
                 <div key={t} className="opacity-80">{t}</div>
@@ -86,7 +86,7 @@ function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: Ou
                       fill="transparent"
                       role="button"
                       tabIndex={0}
-                      aria-label={`${fmtOutlook(g.value, digits)} ${label.toLowerCase()}, ${rowName(r.key)}: ${g.games.join('; ')}`}
+                      aria-label={`${fmtGame(g.value)} ${label.toLowerCase()}, ${rowName(r.key)}: ${g.games.join('; ')}`}
                       className="cursor-help outline-none focus-visible:stroke-(--accent)"
                       data-hit
                       onMouseEnter={on}
@@ -106,8 +106,8 @@ function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: Ou
         </div>
       </div>
       <div className="flex justify-between pl-[80px] text-[11px] text-(--muted) tabular-nums" aria-hidden="true">
-        <span>{fmtOutlook(layout.lo, digits)}</span>
-        <span>{fmtOutlook(layout.hi, digits)}</span>
+        <span>{fmtGame(layout.lo)}</span>
+        <span>{fmtGame(layout.hi)}</span>
       </div>
     </div>
   )
@@ -125,8 +125,8 @@ export function OutlookCharts({ views, opp }: { views: Views; opp: string | null
         The same games, drawn
       </h2>
       <div className="text-[13px] text-(--muted)">
-        Each dot is one game. The thick line runs from his lowest to his highest, the white tick is his average, and the dashed line is the baseline. All three rows share one scale
-        per stat. The typical miss is for {missBandText(missBand(views))}.
+        Each dot is one game. The bar runs from his lowest to his highest game, the white tick is his average and the dashed line is the baseline. The three rows share one
+        scale, so they compare directly.
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {OUTLOOK_STATS.map((s) => (

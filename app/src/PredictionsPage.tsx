@@ -141,7 +141,7 @@ export default function PredictionsPage() {
               Predictions
             </div>
             <div className="text-[13px] text-(--muted)">
-              What a player's past games say about his next game. Ranges from past games for now, not a fitted model.
+              What a player's past games say about his next game. A baseline built from past games, not a forecast model yet.
             </div>
           </div>
           <PageSwitch page="predictions" team={team} />

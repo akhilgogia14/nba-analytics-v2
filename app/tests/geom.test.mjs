@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { complete, f1, geometry, shareSegments } from '../src/lib/geom.ts'
+import { complete, f0, f1, geometry, shareSegments } from '../src/lib/geom.ts'
 import { daysSince, shortDate, teamLabel } from '../src/lib/format.ts'
 
 const near = (actual, expected, msg) => assert.ok(Math.abs(actual - expected) < 0.01, `${msg}: ${actual} vs ${expected}`)
@@ -60,4 +60,8 @@ test('dates and team names', () => {
   assert.equal(daysSince('2026-11-13', new Date(Date.UTC(2026, 10, 13, 23, 0))), 0)
   assert.equal(teamLabel('NYK'), 'New York Knicks (NYK)')
   assert.equal(teamLabel('XXX'), 'XXX')
+})
+
+test('f0 writes a single game as a whole number and never shows -0', () => {
+  assert.deepEqual([f0(5), f0(39.0), f0(13.8), f0(0), f0(-0.2), f0(26.5)], ['5', '39', '14', '0', '0', '27'])
 })
