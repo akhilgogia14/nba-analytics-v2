@@ -2,6 +2,7 @@ import { shortDate } from '../lib/format.ts'
 import { panelStyle } from '../lib/styles.ts'
 import { pctText, resultText, teamAverageRow, teamLogNote } from '../lib/teamPage.ts'
 import type { TeamGame } from '../types.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 const num = (v: number | null) => (v === null ? '–' : String(v))
 const madeAtt = (made: number | null, att: number | null) => (made === null || att === null ? '–' : `${made}-${att}`)
@@ -39,7 +40,7 @@ export function TeamGameLog({ games, error, gamesWord }: { games: TeamGame[] | n
         <div className="text-xs text-(--muted)">{teamLogNote(games, gamesWord)}</div>
       </div>
       {games.length > 0 && (
-        <div className="overflow-x-auto">
+        <ScrollX>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="text-xs text-(--muted)">
@@ -106,7 +107,7 @@ export function TeamGameLog({ games, error, gamesWord }: { games: TeamGame[] | n
               </tr>
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       )}
     </section>
   )

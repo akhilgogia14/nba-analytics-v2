@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { gameCount, gameLine } from '../lib/contextGames.ts'
 import { shortDate } from '../lib/format.ts'
 import type { ContextGameBase } from '../types.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 const cell = 'px-1.5 py-1.5 text-right text-[13px] md:px-3 md:text-[14px] tabular-nums whitespace-nowrap'
 const head = 'px-1.5 py-1.5 text-right text-[10px] font-semibold md:px-3 md:text-xs tracking-normal md:tracking-wider text-(--muted) uppercase whitespace-nowrap'
@@ -39,7 +40,7 @@ export function ContextGames<G extends ContextGameBase>({
               {s.games.length === 0 ? (
                 <div className="text-(--muted)">No games in this situation yet.</div>
               ) : (
-                <div className="overflow-x-auto">
+                <ScrollX>
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
@@ -67,7 +68,7 @@ export function ContextGames<G extends ContextGameBase>({
                       })}
                     </tbody>
                   </table>
-                </div>
+                </ScrollX>
               )}
             </div>
           ))}

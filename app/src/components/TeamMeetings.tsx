@@ -3,6 +3,7 @@ import { seasonTag } from '../lib/meetings.ts'
 import { panelStyle } from '../lib/styles.ts'
 import { pctText, resultText, teamMeetingsNote } from '../lib/teamPage.ts'
 import type { GameType, TeamMeetings } from '../types.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 const selectClass =
   'h-10 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3 text-[14px] font-semibold text-(--text) disabled:opacity-50'
@@ -46,7 +47,7 @@ export function TeamMeetingsPanel({
         <>
           <div className="text-[13px] text-(--muted)">{teamMeetingsNote(meetings, opp, gamesWord)}</div>
           {meetings.games.length > 0 && (
-            <div className="overflow-x-auto">
+            <ScrollX>
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="text-left text-xs text-(--muted)">
@@ -89,7 +90,7 @@ export function TeamMeetingsPanel({
                   })}
                 </tbody>
               </table>
-            </div>
+            </ScrollX>
           )}
         </>
       )}

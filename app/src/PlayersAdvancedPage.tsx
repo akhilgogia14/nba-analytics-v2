@@ -18,6 +18,7 @@ import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
 import type { GameType, PlayerContext, PlayerContextGame, PlayerOption, PlayerSplit, Team } from './types.ts'
+import { ScrollX } from './components/ScrollX.tsx'
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -69,7 +70,7 @@ function ComparisonPanel({ c, ctx, highlighted, gamesData, gamesError, onNeedGam
           {c.aLabel}: {availabilityText(pA)} · {c.bLabel}: {availabilityText(pB)}
         </div>
         {own ? (
-          <div className="overflow-x-auto">
+          <ScrollX>
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -99,7 +100,7 @@ function ComparisonPanel({ c, ctx, highlighted, gamesData, gamesError, onNeedGam
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         ) : (
           <div className="text-[14px] text-(--muted)">{tooFewText(c.aLabel, pA?.n ?? 0, c.bLabel, pB?.n ?? 0)}</div>
         )}

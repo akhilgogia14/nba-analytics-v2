@@ -18,6 +18,7 @@ import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
 import type { ContextSplit, GameType, Team, TeamContext, TeamContextGame, TeamDefense } from './types.ts'
+import { ScrollX } from './components/ScrollX.tsx'
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -60,7 +61,7 @@ function ComparisonPanel({ c, ctx, highlighted, gamesData, gamesError, onNeedGam
       <div className="flex flex-col gap-2">
         <div className="text-xs font-semibold tracking-wider text-(--muted) uppercase">This team, {seasons(ctx.team) || 'this season'}</div>
         {own ? (
-          <div className="overflow-x-auto">
+          <ScrollX>
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -90,7 +91,7 @@ function ComparisonPanel({ c, ctx, highlighted, gamesData, gamesError, onNeedGam
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         ) : (
           <div className="text-[14px] text-(--muted)">{tooFewText(c.aLabel, teamN[0], c.bLabel, teamN[1])}</div>
         )}
