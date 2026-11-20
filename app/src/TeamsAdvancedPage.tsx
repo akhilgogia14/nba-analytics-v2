@@ -4,7 +4,8 @@ import { CourtBackground } from './components/CourtBackground.tsx'
 import { DefenseGrid } from './components/DefenseGrid.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { TeamTabs } from './components/TeamTabs.tsx'
-import { COMPARISONS, CONTEXT_STAT_LIST, MIN_TEAM_GAMES, applicableComparisons, difference, fmtDiff, fmtValue, nextGameFacts } from './lib/context.ts'
+import { COMPARISONS, CONTEXT_STAT_LIST, MIN_TEAM_GAMES, applicableComparisons, difference, enoughGames, fmtDiff, fmtValue, nextGameFacts, orderComparisons, tooFewText } from './lib/context.ts'
+import { KpiTiles } from './components/KpiTiles.tsx'
 import { shortDate, teamLabel } from './lib/format.ts'
 import { GAME_TYPE_OPTIONS } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
@@ -18,8 +19,8 @@ import type { ContextSplit, GameType, Team, TeamContext, TeamDefense } from './t
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
 const labelClass = 'text-xs font-semibold tracking-wider text-(--muted) uppercase'
-const cell = 'px-3 py-2 text-right text-[14px] tabular-nums whitespace-nowrap'
-const head = 'px-3 py-2 text-right text-xs font-semibold tracking-wider text-(--muted) uppercase whitespace-nowrap'
+const cell = 'px-1.5 py-2 text-right text-[13px] md:px-3 md:text-[14px] tabular-nums whitespace-nowrap'
+const head = 'px-1.5 py-2 text-right text-[10px] font-semibold tracking-normal md:px-3 md:text-xs md:tracking-wider text-(--muted) uppercase whitespace-nowrap'
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong.'
@@ -27,10 +28,15 @@ function errorText(e: unknown): string {
 const games = (n: number) => n.toLocaleString('en-US')
 const seasons = (s: ContextSplit) => (s.firstSeason && s.lastSeason ? (s.firstSeason === s.lastSeason ? s.firstSeason : `${s.firstSeason} to ${s.lastSeason}`) : '')
 
-/** One comparison: the league-wide figures (every team, every season on record) beside this team's own figures this season. */
+/** One comparison: the league pattern as small tiles, then this team's own games this season (only when each side has enough games). */
 function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[number]; ctx: TeamContext; highlighted: boolean }) {
   const leagueN = [ctx.league.buckets[c.a]?.n ?? 0, ctx.league.buckets[c.b]?.n ?? 0]
   const teamN = [ctx.team.buckets[c.a]?.n ?? 0, ctx.team.buckets[c.b]?.n ?? 0]
+  const tiles = CONTEXT_STAT_LIST.map((s) => {
+    const l = difference(ctx.league, c.a, c.b, s.key, 1)
+    return { label: s.label, value: l ? fmtDiff(s.key, l.diff) : '-' }
+  })
+  const own = enoughGames(teamN[0], teamN[1])
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
       <div className="flex flex-wrap items-center gap-3">
@@ -43,47 +49,47 @@ function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[numb
           </span>
         )}
       </div>
-      <div className="text-[13px] text-(--muted)">
-        League ({seasons(ctx.league)}): {c.aLabel} {games(leagueN[0])} games, {c.bLabel} {games(leagueN[1])} games. This team ({seasons(ctx.team) || 'this season'}):{' '}
-        {c.aLabel} {teamN[0]} games, {c.bLabel} {teamN[1]} games.
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse">
-          <thead>
-            <tr>
-              <th className={`${head} text-left`}>Stat</th>
-              <th className={head}>League {c.aLabel}</th>
-              <th className={head}>League {c.bLabel}</th>
-              <th className={head}>League difference</th>
-              <th className={head}>
-                Team {c.aLabel} ({teamN[0]})
-              </th>
-              <th className={head}>
-                Team {c.bLabel} ({teamN[1]})
-              </th>
-              <th className={head}>Team difference</th>
-            </tr>
-          </thead>
-          <tbody>
-            {CONTEXT_STAT_LIST.map((s) => {
-              const l = difference(ctx.league, c.a, c.b, s.key, 1)
-              const t = difference(ctx.team, c.a, c.b, s.key, MIN_TEAM_GAMES)
-              return (
-                <tr key={s.key} className="border-t border-(--border)">
-                  <th scope="row" className="px-3 py-2 text-left text-[14px] font-semibold whitespace-nowrap">
-                    {s.label}
+      <KpiTiles
+        tiles={tiles}
+        caption={`League pattern: ${c.aLabel} minus ${c.bLabel} (${seasons(ctx.league)}; ${games(leagueN[0])} and ${games(leagueN[1])} games)`}
+      />
+      <div className="flex flex-col gap-2">
+        <div className="text-xs font-semibold tracking-wider text-(--muted) uppercase">This team, {seasons(ctx.team) || 'this season'}</div>
+        {own ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={`${head} text-left!`}>Stat</th>
+                  <th className={head}>
+                    {c.aLabel} ({teamN[0]})
                   </th>
-                  <td className={cell}>{l ? fmtValue(s.key, l.a) : '-'}</td>
-                  <td className={cell}>{l ? fmtValue(s.key, l.b) : '-'}</td>
-                  <td className={`${cell} font-semibold`}>{l ? fmtDiff(s.key, l.diff) : '-'}</td>
-                  <td className={`${cell} text-(--muted)`}>{t ? fmtValue(s.key, t.a) : '-'}</td>
-                  <td className={`${cell} text-(--muted)`}>{t ? fmtValue(s.key, t.b) : '-'}</td>
-                  <td className={`${cell} text-(--muted)`}>{t ? fmtDiff(s.key, t.diff) : 'no games yet'}</td>
+                  <th className={head}>
+                    {c.bLabel} ({teamN[1]})
+                  </th>
+                  <th className={head}>Diff</th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {CONTEXT_STAT_LIST.map((s) => {
+                  const t = difference(ctx.team, c.a, c.b, s.key, MIN_TEAM_GAMES)
+                  return (
+                    <tr key={s.key} className="border-t border-(--border)">
+                      <th scope="row" className="px-1.5 py-2 text-left text-[13px] font-semibold md:px-3 md:text-[14px]">
+                        {s.label}
+                      </th>
+                      <td className={cell}>{t ? fmtValue(s.key, t.a) : '-'}</td>
+                      <td className={cell}>{t ? fmtValue(s.key, t.b) : '-'}</td>
+                      <td className={`${cell} font-semibold`}>{t ? fmtDiff(s.key, t.diff) : '-'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-[14px] text-(--muted)">{tooFewText(c.aLabel, teamN[0], c.bLabel, teamN[1])}</div>
+        )}
       </div>
     </section>
   )
@@ -259,25 +265,23 @@ export default function TeamsAdvancedPage() {
               <div className="text-[15px] text-(--muted)">This team has no {gameType === 'playoffs' ? 'playoff ' : ''}games on record yet, so there is nothing to split.</div>
             ) : (
               <>
-                <section className="flex max-w-3xl flex-col gap-2 text-[14px] leading-relaxed text-(--muted)">
-                  <strong className="text-(--text)">How to read this</strong>
-                  <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
+                <p className="m-0 max-w-3xl text-[14px] leading-relaxed text-(--muted)">
+                  In five seasons of data, a team's own split in one half of a season did not predict the other half. Treat the team numbers as context, not a trait.
+                </p>
+                <details className="max-w-3xl text-[14px] leading-relaxed text-(--muted)">
+                  <summary className="min-h-11 cursor-pointer font-semibold text-(--text)">How to read this</summary>
+                  <ul className="m-0 mt-1 flex list-disc flex-col gap-1.5 pl-5">
                     <li>
-                      <strong className="text-(--text)">League columns:</strong> every team's games on record in that situation. The samples are large, so the pattern is steady and is the
-                      real effect of the situation.
+                      <strong className="text-(--text)">League pattern (tiles):</strong> the first situation minus the second, over every team's games on record. The samples are large, so the pattern is steady.
                     </li>
                     <li>
-                      <strong className="text-(--text)">Team columns:</strong> this team's own games this season in the same situations. The number in each heading is how many games;
-                      one or two games is a single result, not a pattern.
-                    </li>
-                    <li>
-                      <strong className="text-(--text)">Tested:</strong> over five seasons, a team's own split in one half of a season did not predict the other half. Treat the team
-                      columns as context, not a trait of the team.
+                      <strong className="text-(--text)">This team (table):</strong> its own games this season in the same situations. The number in each heading is how many games. A comparison needs at
+                      least {MIN_TEAM_GAMES} games on each side; below that it is a single result, not a pattern.
                     </li>
                     <li>Games are compared as played, so opponents and home or away mix in with rest.</li>
                   </ul>
-                </section>
-                {COMPARISONS.map((c) => (
+                </details>
+                {orderComparisons(highlighted).map((c) => (
                   <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} />
                 ))}
                 <DefenseGrid defense={defense} error={defError} onRetry={() => { setDefError(''); setDefAttempt((n) => n + 1) }} />

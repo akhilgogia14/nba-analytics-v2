@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { BUCKETS, CONTEXT_STATS, EASTERN_TODAY, LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from '../server/contextQueries.mjs'
-import { COMPARISONS, MIN_TEAM_GAMES, applicableComparisons, difference, fmtDiff, fmtValue, nextGameFacts, ordinal, restWords } from '../src/lib/context.ts'
+import { COMPARISONS, MIN_TEAM_GAMES, applicableComparisons, difference, enoughGames, fmtDiff, fmtValue, nextGameFacts, orderComparisons, ordinal, restWords, tooFewText } from '../src/lib/context.ts'
 import { hashFor, isAdvancedHash, pageFromHash, parseHash, rememberTeam } from '../src/lib/pages.ts'
 
 // A bucket row in the order the SQL returns it: bucket, n, then the six stats, then first and last season.
@@ -64,10 +64,12 @@ test('a difference needs both groups, a number, and enough games', () => {
   assert.equal(difference(split, 'b2b', 'rested', 'pts', 20), null) // 14 games on one side is under 20
   const empty = { buckets: { a: { n: 10, stats: { pts: null } }, b: { n: 10, stats: { pts: 1 } } }, firstSeason: null, lastSeason: null }
   assert.equal(difference(empty, 'a', 'b', 'pts', 1), null)
-  assert.equal(MIN_TEAM_GAMES, 1) // owner's choice 2026-11-16
+  assert.equal(MIN_TEAM_GAMES, 5) // owner's choice 2026-11-20 (it was 1 from 2026-11-16)
   const one = { buckets: { b2b: { n: 1, stats: { pts: 99, allowed: 100, margin: -1, fg_pct: 44, fg3m: 10, tov: 12 } }, rested: { n: 9, stats: { pts: 110, allowed: 108, margin: 2, fg_pct: 47, fg3m: 12, tov: 13 } } }, firstSeason: null, lastSeason: null }
-  const d1 = difference(one, 'b2b', 'rested', 'pts', MIN_TEAM_GAMES)
-  assert.deepEqual([d1.diff, d1.nA, d1.nB], [-11, 1, 9]) // one game is shown, with its count
+  assert.equal(difference(one, 'b2b', 'rested', 'pts', MIN_TEAM_GAMES), null) // one game on a side is not enough
+  const five = { buckets: { b2b: { n: 5, stats: { pts: 99, allowed: 100, margin: -1, fg_pct: 44, fg3m: 10, tov: 12 } }, rested: { n: 9, stats: { pts: 110, allowed: 108, margin: 2, fg_pct: 47, fg3m: 12, tov: 13 } } }, firstSeason: null, lastSeason: null }
+  const d1 = difference(five, 'b2b', 'rested', 'pts', MIN_TEAM_GAMES)
+  assert.deepEqual([d1.diff, d1.nA, d1.nB], [-11, 5, 9]) // five games on each side is enough, shown with its count
   const none = { buckets: { b2b: { n: 0, stats: { pts: null } }, rested: { n: 9, stats: { pts: 110 } } }, firstSeason: null, lastSeason: null }
   assert.equal(difference(none, 'b2b', 'rested', 'pts', MIN_TEAM_GAMES), null) // no games at all stays empty
 })
@@ -121,4 +123,17 @@ test('the Advanced stats address opens the Teams page on the Advanced tab; every
   assert.equal(hashFor('players', 'BOS', 'advanced'), '#/players/advanced?team=BOS') // the Players page has the tab too (release 061)
   assert.equal(typeof rememberTeam, 'function')
   assert.equal(pageFromHash('#/teams/advancedx'), 'today')
+})
+
+test('too few games: both sides need at least five, and the text says what each side has', () => {
+  assert.equal(enoughGames(5, 5), true)
+  assert.equal(enoughGames(4, 20), false)
+  assert.equal(enoughGames(0, 0), false)
+  assert.equal(tooFewText('Home', 2, 'Away', 1), 'Too few games to compare: Home 2, Away 1. It needs at least 5 on each side.')
+})
+
+test('the panel that applies to the next game comes first, the others keep their order', () => {
+  assert.deepEqual(orderComparisons(new Set(['rest', 'home'])).map((c) => c.key), ['home', 'rest', 'b2b', 'edge'])
+  assert.deepEqual(orderComparisons(new Set()).map((c) => c.key), COMPARISONS.map((c) => c.key))
+  assert.deepEqual(orderComparisons(new Set(['edge'])).map((c) => c.key), ['edge', 'home', 'b2b', 'rest'])
 })
