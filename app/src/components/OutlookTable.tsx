@@ -1,4 +1,4 @@
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, summarize, type ViewKey, type Views } from '../lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type ViewKey, type Views } from '../lib/outlook.ts'
 import { panelStyle } from '../lib/styles.ts'
 
 const cell = 'px-3 py-2 text-right text-[14px] tabular-nums whitespace-nowrap'
@@ -10,6 +10,7 @@ const SUB = ['Min', 'Avg', 'Max'] as const
  * of his past games. The "vs opponent" columns are muted: in the v1 back-test opponent history added almost nothing to the plain blend.
  */
 export function OutlookTable({ views, opp }: { views: Views; opp: string | null }) {
+  const band = missBand(views)
   const label = (k: ViewKey) => (k === 'opponent' ? (opp ? `Last 10 vs ${opp}` : 'Last 10 vs opponent') : (VIEWS.find((v) => v.key === k)?.label ?? k))
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
@@ -21,6 +22,10 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
         <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
           <li>
             <strong className="text-(--text)">Baseline:</strong> half his last-10 average, half his season average. It is a plain starting point, not a model, and the weights are my choice.
+          </li>
+          <li>
+            <strong className="text-(--text)">Typical miss:</strong> how far the baseline was from what happened, on average, when we tested it on 2025-26 and 2026-27 games (for {missBandText(band)}). It is
+            an average over those players, so for someone who scores very little the real miss is smaller. Some games miss by more, some by less.
           </li>
           <li>
             <strong className="text-(--text)">Min, Avg, Max:</strong> the lowest, average and highest he has had in each set of games he played. Min and max are single games, so with few games they
@@ -42,6 +47,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
             <tr>
               <th rowSpan={2} className={`${head} text-left align-bottom`}>Stat</th>
               <th rowSpan={2} className={`${head} align-bottom`}>Baseline</th>
+              <th rowSpan={2} className={`${head} align-bottom`}>Typical miss</th>
               {VIEWS.map((v) => (
                 <th key={v.key} colSpan={3} scope="colgroup" className={`${head} border-l border-(--border) text-center${v.key === 'opponent' ? ' opacity-70' : ''}`}>
                   {label(v.key)} ({views[v.key].length})
@@ -68,6 +74,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
                     {s.label}
                   </th>
                   <td className={`${cell} font-semibold`}>{fmtOutlook(base, s.digits)}</td>
+                  <td className={`${cell} text-(--muted)`}>±{fmtOutlook(typicalMiss(s.key, band), s.digits)}</td>
                   {VIEWS.map((v) => {
                     const sum = sums[v.key]
                     const muted = v.key === 'opponent' ? ' text-(--muted)' : ''
