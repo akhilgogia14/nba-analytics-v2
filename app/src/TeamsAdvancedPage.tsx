@@ -1,11 +1,14 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchTeamContext, fetchTeamDefense, fetchTeams } from './api.ts'
+import { fetchTeamContext, fetchTeamContextGames, fetchTeamDefense, fetchTeams } from './api.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { DefenseGrid } from './components/DefenseGrid.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { TeamTabs } from './components/TeamTabs.tsx'
 import { COMPARISONS, CONTEXT_STAT_LIST, MIN_TEAM_GAMES, applicableComparisons, difference, enoughGames, fmtDiff, fmtValue, nextGameFacts, orderComparisons, tooFewText } from './lib/context.ts'
+import { ContextGames } from './components/ContextGames.tsx'
 import { KpiTiles } from './components/KpiTiles.tsx'
+import { explainTeamTile, splitGames, teamScore } from './lib/contextGames.ts'
+import { useLazyLoad } from './lib/useLazyLoad.ts'
 import { shortDate, teamLabel } from './lib/format.ts'
 import { GAME_TYPE_OPTIONS } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
@@ -14,7 +17,7 @@ import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { ContextSplit, GameType, Team, TeamContext, TeamDefense } from './types.ts'
+import type { ContextSplit, GameType, Team, TeamContext, TeamContextGame, TeamDefense } from './types.ts'
 
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
@@ -29,14 +32,15 @@ const games = (n: number) => n.toLocaleString('en-US')
 const seasons = (s: ContextSplit) => (s.firstSeason && s.lastSeason ? (s.firstSeason === s.lastSeason ? s.firstSeason : `${s.firstSeason} to ${s.lastSeason}`) : '')
 
 /** One comparison: the league pattern as small tiles, then this team's own games this season (only when each side has enough games). */
-function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[number]; ctx: TeamContext; highlighted: boolean }) {
+function ComparisonPanel({ c, ctx, highlighted, gamesData, gamesError, onNeedGames }: { c: (typeof COMPARISONS)[number]; ctx: TeamContext; highlighted: boolean; gamesData: TeamContextGame[] | null; gamesError: string; onNeedGames: () => void }) {
   const leagueN = [ctx.league.buckets[c.a]?.n ?? 0, ctx.league.buckets[c.b]?.n ?? 0]
   const teamN = [ctx.team.buckets[c.a]?.n ?? 0, ctx.team.buckets[c.b]?.n ?? 0]
   const tiles = CONTEXT_STAT_LIST.map((s) => {
     const l = difference(ctx.league, c.a, c.b, s.key, 1)
-    return { label: s.label, value: l ? fmtDiff(s.key, l.diff) : '-' }
+    return { label: s.label, value: l ? fmtDiff(s.key, l.diff) : '-', detail: explainTeamTile(s.label, c.aLabel, c.bLabel, s.key, l) }
   })
   const own = enoughGames(teamN[0], teamN[1])
+  const sides = gamesData ? splitGames(gamesData, c.a, c.b) : null
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
       <div className="flex flex-wrap items-center gap-3">
@@ -90,6 +94,21 @@ function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[numb
         ) : (
           <div className="text-[14px] text-(--muted)">{tooFewText(c.aLabel, teamN[0], c.bLabel, teamN[1])}</div>
         )}
+        {(teamN[0] > 0 || teamN[1] > 0) && (
+          <ContextGames
+            sides={[{ label: c.aLabel, total: teamN[0], games: sides?.a ?? [] }, { label: c.bLabel, total: teamN[1], games: sides?.b ?? [] }]}
+            columns={[
+              { head: 'Score', cell: (g) => teamScore(g) || '-' },
+              { head: 'Margin', phone: false, cell: (g) => (g.stats.margin === null ? '-' : fmtDiff('margin', g.stats.margin)) },
+              { head: 'FG%', cell: (g) => (g.stats.fg_pct === null ? '-' : fmtValue('fg_pct', g.stats.fg_pct)) },
+              { head: '3PM', phone: false, cell: (g) => g.stats.fg3m ?? '-' },
+              { head: 'TOV', phone: false, cell: (g) => g.stats.tov ?? '-' },
+            ]}
+            data={gamesData}
+            error={gamesError}
+            onOpen={onNeedGames}
+          />
+        )}
       </div>
     </section>
   )
@@ -111,6 +130,8 @@ export default function TeamsAdvancedPage() {
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [defAttempt, setDefAttempt] = useState(0)
+
+  const teamGames = useLazyLoad(`${team}:${gameType}`, () => fetchTeamContextGames(team, gameType).then((r) => r.games))
 
   function chooseTeam(code: string) {
     setTeam(code)
@@ -282,7 +303,7 @@ export default function TeamsAdvancedPage() {
                   </ul>
                 </details>
                 {orderComparisons(highlighted).map((c) => (
-                  <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} />
+                  <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} gamesData={teamGames.data} gamesError={teamGames.error} onNeedGames={teamGames.request} />
                 ))}
                 <DefenseGrid team={team} gameType={gameType} defense={defense} error={defError} onRetry={() => { setDefError(''); setDefAttempt((n) => n + 1) }} />
               </>

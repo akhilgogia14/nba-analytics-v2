@@ -208,6 +208,11 @@ export type TeamContext = { next: NextGame | null; team: ContextSplit; league: C
 export type PlayerStat = 'pts' | 'reb' | 'ast' | 'fg3m' | 'blk' | 'stl' | 'minutes'
 export type PlayerBucket = { n: number; scheduled: number; stats: Record<PlayerStat, number | null> }
 export type PlayerSplit = { buckets: Record<string, PlayerBucket>; firstSeason: string | null; lastSeason: string | null }
+/** One game behind the Advanced tab's table: when, against whom, the rest facts, and which situations ("buckets") it falls in. */
+export type ContextGameBase = { id: string; date: string; opp: string; isHome: boolean; daysRest: number | null; restEdge: number | null; buckets: string[] }
+export type TeamContextGame = ContextGameBase & { stats: Record<ContextStat, number | null> }
+export type PlayerContextGame = ContextGameBase & { played: boolean; stats: Record<PlayerStat, number | null> }
+
 /** `player` holds his own averages; `league` holds each stat as the average difference from a player's own season average. */
 export type PlayerContext = { team: string | null; next: NextGame | null; player: PlayerSplit; league: PlayerSplit }
 
