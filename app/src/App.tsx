@@ -433,7 +433,7 @@ export default function App() {
                 The season chart could not load: {seasonError}
               </div>
             ) : (
-              <SeasonGrid key={playerId} season={season} team={team} gameType={gameType} />
+              <SeasonGrid key={playerId} season={season} team={team} gameType={gameType} opp={cardsMode === 'opp' ? oppNow : ''} />
             )}
 
             <MeetingsPanel

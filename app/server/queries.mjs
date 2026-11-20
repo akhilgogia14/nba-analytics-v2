@@ -59,6 +59,29 @@ export const SEASON_SQL = `
     AND t.season = (SELECT max(x.season) FROM ${SEASON_TABLE} x WHERE x.person_id = t.person_id AND x.game_type = t.game_type)
   ORDER BY t.game_type, t.team_id, t.game_number`
 
+// The team's games still to come this season (regular season), from the schedule table: date order, with the opponent. One
+// string parameter holds the team codes (comma separated), so a traded player's teams are all covered by one query.
+export const UPCOMING_SQL = `
+  SELECT game_id, CAST(game_date AS STRING), home_tricode, away_tricode
+  FROM workspace.nba_v2_gold.game_slate
+  WHERE game_type = 'regular-season' AND NOT is_final AND season_label = :label
+    AND (array_contains(split(:teams, ','), home_tricode) OR array_contains(split(:teams, ','), away_tricode))
+  ORDER BY game_date, game_id`
+
+/**
+ * Adds, to the regular-season grid of his current team (the one he played for most recently), the games still to come: id,
+ * date, opponent code and whether it is at home. Rows come in UPCOMING_SQL's order. A grid without them gets an empty list.
+ */
+export function addUpcoming(season, rows) {
+  const grid = season.grids.find((g) => g.gameType === 'regular-season')
+  for (const g of season.grids) if (g.gameType === 'regular-season') g.upcoming = []
+  if (!grid) return season
+  grid.upcoming = rows
+    .filter((r) => r[2] === grid.team || r[3] === grid.team)
+    .map((r) => ({ id: r[0], date: r[1], opp: r[2] === grid.team ? r[3] : r[2], isHome: r[2] === grid.team }))
+  return season
+}
+
 // The pickers in PLAYOFFS mode: only teams and players that were in the latest playoffs (the newest season that has any
 // playoff game). They read player_season_games, whose grid has the team the player actually played the playoffs for
 // (player_form only knows his current team). A grid exists only if he played at least one playoff game for that team.

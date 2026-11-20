@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { f1 } from '../lib/geom.ts'
 import {
   BINS, GRID_STATS, MISSED, STAT_NAMES, UPCOMING, buildCells, chartPalette, hexLayout, hexPoints, hexTip,
-  playedSummary, seasonMean, type Cell,
+  isVsOpp, playedSummary, seasonMean, type Cell,
 } from '../lib/hex.ts'
 import { panelStyle, pillClass, pillStyle } from '../lib/styles.ts'
 import { clampAnchor } from '../lib/tips.ts'
@@ -34,8 +34,9 @@ function Swatch({ fill, stroke, dashed, ring, size = 18 }: { fill: string; strok
  * game, in the team's colours), a game where he reached his season average has a ring around it, a game he missed is dark
  * grey, and (regular season) games not played yet are empty outlines up to 82. A traded player has one grid per team.
  */
-export function SeasonGrid({ season, team, gameType }: { season: Season | null; team: string; gameType: GameType }) {
+export function SeasonGrid({ season, team, gameType, opp = '' }: { season: Season | null; team: string; gameType: GameType; opp?: string }) {
   const palette = chartPalette(team)
+  const oppPalette = chartPalette(opp)
   const [stat, setStat] = useState<GridStat>('pts')
   const [teamChoice, setTeamChoice] = useState('')
   const [tip, setTip] = useState<number | null>(null)
@@ -80,8 +81,14 @@ export function SeasonGrid({ season, team, gameType }: { season: Season | null; 
   const activeTip = active ? hexTip(active, stat, mean) : null
   const anchor = tip === null ? null : layout.cells[tip]
 
-  const fillFor = (c: Cell) => (c.kind === 'played' ? palette.ramp[c.bin] : c.kind === 'upcoming' ? 'none' : MISSED.fill)
-  const strokeFor = (c: Cell) => (c.kind === 'upcoming' ? UPCOMING.stroke : c.kind === 'played' ? 'none' : MISSED.stroke)
+  // With an opponent chosen, his games against them take the opponent's colors; the scheduled ones are outlines in them.
+  const vs = (c: Cell) => gameType === 'regular-season' && isVsOpp(c, opp)
+  const hasVs = cells.some(vs)
+  const hasVsPlayed = cells.some((c) => vs(c) && c.kind === 'played')
+  const hasVsFuture = cells.some((c) => vs(c) && c.kind === 'upcoming')
+  const fillFor = (c: Cell) => (c.kind === 'played' ? (vs(c) ? oppPalette : palette).ramp[c.bin] : c.kind === 'upcoming' ? 'none' : MISSED.fill)
+  const strokeFor = (c: Cell) =>
+    vs(c) ? oppPalette.top : c.kind === 'upcoming' ? UPCOMING.stroke : c.kind === 'played' ? 'none' : MISSED.stroke
 
   return (
     <section className={shell} style={panelStyle}>
@@ -145,7 +152,7 @@ export function SeasonGrid({ season, team, gameType }: { season: Season | null; 
                     data-ring
                     points={hexPoints(cx, cy, layout.radius - 1.4)}
                     fill="none"
-                    stroke={palette.ring}
+                    stroke={vs(c) ? oppPalette.ring : palette.ring}
                     strokeWidth={1.6}
                     strokeLinejoin="round"
                   />
@@ -154,7 +161,7 @@ export function SeasonGrid({ season, team, gameType }: { season: Season | null; 
                   points={hexPoints(cx, cy, layout.radius - 4.6)}
                   fill={fillFor(c)}
                   stroke={strokeFor(c)}
-                  strokeWidth={1}
+                  strokeWidth={vs(c) ? 1.8 : 1}
                   strokeDasharray={c.kind === 'upcoming' ? '3 3' : undefined}
                   strokeLinejoin="round"
                 />
@@ -198,11 +205,26 @@ export function SeasonGrid({ season, team, gameType }: { season: Season | null; 
           <Swatch fill={MISSED.fill} stroke={MISSED.stroke} />
           did not play
         </span>
+        {hasVsPlayed && (
+          <span className="inline-flex items-center gap-1.5">
+            <Swatch fill={oppPalette.ramp[BINS - 1]} stroke={oppPalette.top} />
+            games vs {opp}
+          </span>
+        )}
+        {hasVsFuture && (
+          <span className="inline-flex items-center gap-1.5">
+            <Swatch fill="none" stroke={oppPalette.top} dashed />
+            games vs {opp} still to come
+          </span>
+        )}
         {hasUpcoming && (
           <span className="inline-flex items-center gap-1.5">
             <Swatch fill="none" stroke={UPCOMING.stroke} dashed />
             not played yet
           </span>
+        )}
+        {opp && gameType === 'regular-season' && !hasVs && (
+          <span>No games against {opp} on this chart yet.</span>
         )}
       </div>
     </section>
