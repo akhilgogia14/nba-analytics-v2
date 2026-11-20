@@ -87,3 +87,36 @@ export function mapDefense(rows) {
   groups.sort((a, b) => order(a.role, a.label) - order(b.role, b.label))
   return { groups, firstSeason: first, lastSeason: last }
 }
+
+// ---- The players behind the grid ----
+// Every opposing player-game that went into the team's grid (the same defended games, role and position label), one row per
+// player per game, so a click on a grid row can name them. Nothing is cut off here: a group with one player-game lists that one.
+export const DEFENSE_PLAYERS_SQL = `
+  WITH defended AS (
+    SELECT team_id AS def_id, game_id
+    FROM ${LOG_TABLE}
+    WHERE game_type = :gt AND team_tricode = :team AND season = (SELECT max(season) FROM ${LOG_TABLE} WHERE game_type = :gt)
+  )
+  SELECT p.person_id, p.player_name, p.team_tricode, p.game_id, CAST(p.game_date AS STRING) AS game_date, p.is_home,
+         IF(p.started, 'starter', 'bench') AS role, coalesce(pos.position, '${NOT_LISTED}') AS label, p.minutes,
+         ${DEFENSE_STATS.map((s) => `p.${s}`).join(', ')}
+  FROM ${GRID_TABLE} p
+  JOIN defended d ON d.def_id = p.opponent_team_id AND d.game_id = p.game_id
+  LEFT JOIN ${POS_TABLE} pos ON pos.person_id = p.person_id AND pos.season = p.season
+  WHERE p.played AND p.game_type = :gt
+  ORDER BY p.game_date DESC, p.game_id DESC, p.pts DESC`
+
+/** Rows -> { lines: [{ id, name, team, gameId, date, home, role, label, minutes, stats: { pts, ... } }] }, newest game first. */
+export function mapDefensePlayers(rows) {
+  const lines = rows.map((r) => {
+    const stats = {}
+    DEFENSE_STATS.forEach((s, i) => {
+      stats[s] = num(r[9 + i])
+    })
+    return {
+      id: String(r[0]), name: r[1], team: r[2], gameId: r[3], date: r[4], home: r[5] === true || r[5] === 'true',
+      role: r[6], label: r[7], minutes: num(r[8]), stats,
+    }
+  })
+  return { lines }
+}

@@ -222,6 +222,20 @@ export type DefenseSplit = { groups: DefenseGroup[]; firstSeason: string | null;
 /** `team` is the team's newest season of the game type; `league` is every team over every season on record. */
 export type TeamDefense = { team: DefenseSplit; league: DefenseSplit }
 
+/** One opposing player's game against the team: the lines the Defense grid adds up. */
+export type DefenseLine = {
+  id: string
+  name: string
+  team: string
+  gameId: string
+  date: string
+  home: boolean
+  role: 'starter' | 'bench'
+  label: string
+  minutes: number | null
+  stats: Record<DefenseStat, number | null>
+}
+
 /** One player on a team's roster, with his last-10 averages and how many of his last games played he started. */
 export type RosterPlayer = { id: string; name: string; games: number | null; starts: number; stats: Record<string, number | null> }
 export type Roster = { players: RosterPlayer[] }

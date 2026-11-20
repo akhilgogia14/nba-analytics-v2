@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  DEFENSE_STAT_LIST, THIN_PLAYER_GAMES, barShare, defendedGames, defenseTotals, listRows, defenseRows, fmtDelta, fmtFigure, fmtRange, roleLabel, seasonSpan,
+  DEFENSE_STAT_LIST, THIN_PLAYER_GAMES, barShare, defendedGames, defenseTotals, listRows, defenseRows, groupSummary, linesForGroup, fmtDelta, fmtFigure, fmtRange, roleLabel, seasonSpan,
 } from '../src/lib/defense.ts'
 
 const cell = (perGame, per36 = 17, low = 1, high = 30) => ({ perGame, low, high, per36 })
@@ -99,4 +99,20 @@ test('a bar reaches from the centre: the biggest difference reaches the end, non
   assert.equal(barShare(null, 5.6), 0)
   assert.equal(barShare(3, 0), 0)
   assert.equal(barShare(99, 5.6), 50) // never past the end
+})
+
+const line = (id, date, role, label, pts, name = `P${id}`) => ({ id, name, team: 'MIA', gameId: `g${id}${date}`, date, home: true, role, label, minutes: 20, stats: { pts, reb: 1, ast: 1, fg3m: 0, blk: 0, stl: 0 } })
+
+test('a group lists every opposing player-game in it, biggest first, ties newest first, other groups left out', () => {
+  const lines = [line('1', '2026-11-01', 'bench', 'G', 12), line('2', '2026-11-03', 'bench', 'G', 30), line('1', '2026-11-05', 'bench', 'G', 12), line('3', '2026-11-04', 'starter', 'G', 40), line('4', '2026-11-02', 'bench', 'G', null)]
+  const got = linesForGroup(lines, 'bench:G', 'pts')
+  assert.deepEqual(got.map((l) => [l.id, l.date]), [['2', '2026-11-03'], ['1', '2026-11-05'], ['1', '2026-11-01'], ['4', '2026-11-02']]) // a missing figure goes last, never dropped
+  assert.deepEqual(linesForGroup(lines, 'starter:C', 'pts'), []) // an empty group is an empty list
+  assert.equal(linesForGroup([line('9', '2026-11-01', 'starter', 'C', 2)], 'starter:C', 'pts').length, 1) // one player-game is still shown: no minimum
+})
+
+test('the group summary counts player-games, different players and the total', () => {
+  const lines = [line('1', '2026-11-01', 'bench', 'G', 12), line('1', '2026-11-05', 'bench', 'G', 12), line('2', '2026-11-03', 'bench', 'G', 30)]
+  assert.deepEqual(groupSummary(lines, 'pts'), { playerGames: 3, players: 2, total: 54 })
+  assert.deepEqual(groupSummary([], 'pts'), { playerGames: 0, players: 0, total: 0 })
 })
