@@ -6,10 +6,11 @@ import { GameLog } from './components/GameLog.tsx'
 import { MeetingsPanel } from './components/Meetings.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { oppFromHash, parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
+import { meetingGames, meetingsWindowLabel, sparkFromMeeting, statFromGames } from './lib/oppCards.ts'
 import { TeamTabs } from './components/TeamTabs.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
-import { CARD_STATS, LABELS, shortDate, teamLabel } from './lib/format.ts'
+import { CARD_STATS, LABELS, dateWithYear, shortDate, teamLabel } from './lib/format.ts'
 import { DEFAULT_VIEW, LOG_VIEWS, type LogView } from './lib/gamelog.ts'
 import { GAME_TYPE_OPTIONS, formNotices, gamesWord } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
@@ -44,6 +45,7 @@ export default function App() {
   const [logError, setLogError] = useState('')
   const [opp, setOpp] = useState(() => oppFromHash(window.location.hash)) // the opponent chosen in the meetings panel, or carried in the address
   const [meetings, setMeetings] = useState<Meetings | null>(null)
+  const [cardsMode, setCardsMode] = useState<'recent' | 'opp'>('opp') // which games the cards are made from, once an opponent is set
   const [meetingsError, setMeetingsError] = useState('')
   const [seasonError, setSeasonError] = useState('')
   const [error, setError] = useState('')
@@ -93,6 +95,7 @@ export default function App() {
   }
   function chooseOpp(code: string) {
     setOpp(code)
+    setCardsMode('opp')
     setMeetings(null)
     setMeetingsError('')
   }
@@ -207,6 +210,12 @@ export default function App() {
   const words = gamesWord(gameType)
   const chosenName = players?.find((pl) => pl.id === playerId)?.name ?? 'This player'
 
+  // With an opponent set and some meetings on record, the cards can be made from the last 10 meetings instead of his last 10 games.
+  const oppNow = opp && p && opp !== p.team ? opp : ''
+  const meetList = meetingGames(oppNow ? meetings : null)
+  const oppCards = !!oppNow && cardsMode === 'opp' && meetList.length > 0
+  const meetStats = (key: string) => (oppCards ? statFromGames(meetList.map((g) => g.stats[key as keyof typeof g.stats] ?? null), key, data?.stats[key]?.seasonMean ?? null) : null)
+
   // The chosen team lights the page like a spotlight and sets the accent colours; the theme owns everything else.
   const look = teamLook(team)
   // Selected buttons (the toggle, the chart's pickers) and tooltip bubbles take the team's bright colour.
@@ -320,7 +329,7 @@ export default function App() {
           <div key={`${playerId}-${gameType}`} className="stagger contents">
             <section className="flex flex-col gap-2">
               <div className="text-xs font-semibold tracking-widest text-(--accent) uppercase">
-                Player level · last {p.l10Games} {words}
+                {oppCards ? `Player level · last ${meetList.length} ${meetList.length === 1 ? 'meeting' : 'meetings'} vs ${oppNow}` : `Player level · last ${p.l10Games} ${words}`}
               </div>
               <div className="flex flex-wrap items-center gap-5">
                 <PlayerAvatar name={p.name} playerId={playerId} />
@@ -335,8 +344,9 @@ export default function App() {
                     </span>
                   </div>
                   <div className="text-[15px] text-(--muted)">
-                    Last {p.l10Games} {words} played · {shortDate(p.l10FirstDate)} to {shortDate(p.lastGameDate)} ·{' '}
-                    {p.totalGames} {words} in the data
+                    {oppCards
+                      ? `Last ${meetList.length} ${meetList.length === 1 ? 'meeting' : 'meetings'} vs ${oppNow} · ${dateWithYear(meetList[0].date)} to ${dateWithYear(meetList[meetList.length - 1].date)} · ${p.totalGames} ${words} in the data`
+                      : `Last ${p.l10Games} ${words} played · ${shortDate(p.l10FirstDate)} to ${shortDate(p.lastGameDate)} · ${p.totalGames} ${words} in the data`}
                   </div>
                 </div>
               </div>
@@ -358,12 +368,41 @@ export default function App() {
               ))}
             </div>
 
+            {view === 'cards' && oppNow && (
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Games the cards are made from">
+                <button type="button" aria-pressed={!oppCards} className={pillClass} style={pillStyle(!oppCards)} onClick={() => setCardsMode('recent')}>
+                  Recent form
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={oppCards}
+                  className={pillClass}
+                  style={pillStyle(oppCards)}
+                  disabled={!!meetings && meetList.length === 0}
+                  onClick={() => setCardsMode('opp')}
+                >
+                  vs {oppNow}
+                  {meetings ? ` · last ${meetList.length} ${meetList.length === 1 ? 'meeting' : 'meetings'}` : ' · loading'}
+                </button>
+                {meetings && meetList.length === 0 && <span className="text-xs text-(--muted)">No games against {oppNow} on record for {chosenName}, so the cards show his recent form.</span>}
+              </div>
+            )}
+
             {view === 'log' ? (
               <GameLog games={log} error={logError} gamesWord={words} />
             ) : (
               <div className="cards grid grid-cols-[repeat(auto-fit,minmax(min(340px,100%),1fr))] gap-4">
                 {CARD_STATS.map((key) => (
-                  <Scorecard key={key} label={LABELS[key]} stat={data.stats[key]} statKey={key} games={p.l10Games} seasonLabel={p.seasonLabel} recent={recent?.games ?? null} />
+                  <Scorecard
+                    key={`${key}-${oppCards ? 'opp' : 'recent'}`}
+                    label={LABELS[key]}
+                    stat={meetStats(key) ?? data.stats[key]}
+                    statKey={key}
+                    games={oppCards ? meetList.length : p.l10Games}
+                    seasonLabel={p.seasonLabel}
+                    recent={oppCards ? meetList.map(sparkFromMeeting) : (recent?.games ?? null)}
+                    windowLabel={oppCards ? meetingsWindowLabel(meetList.length, oppNow) : undefined}
+                  />
                 ))}
               </div>
             )}

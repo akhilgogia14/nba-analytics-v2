@@ -21,6 +21,12 @@ export function shortDate(iso: string): string {
   return `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}`
 }
 
+/** "Oct 25, 2024": the date with its year, for a span that can reach back over seasons. */
+export function dateWithYear(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  return m ? `${shortDate(iso)}, ${m[1]}` : iso
+}
+
 /** Whole days between an ISO date and today (UTC dates). */
 export function daysSince(iso: string, now: Date = new Date()): number {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
