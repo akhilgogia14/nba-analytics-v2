@@ -47,3 +47,14 @@ test('shareTips: one per piece, centred over its piece', () => {
   assert.equal(tips[3].title, '3+ made: 60% of games')
   assert.deepEqual(shareTips([]), [])
 })
+
+test('the range tooltip writes the lowest and highest single games with the single-game format, the rest with the average format', () => {
+  const g = { meanLeft: 40, medianLeft: 40, bandLeft: 20, bandWidth: 40, minLeft: 5, minWidth: 80 }
+  const d = { mean: 26.5, median: 25.5, p10: 19, p90: 33.5, min: 19, max: 38 }
+  const whole = (n) => String(Math.round(n))
+  const tips = markTips(d, g, 10, (n) => n.toFixed(1), whole)
+  assert.equal(tips[0].title, 'Average 26.5')
+  assert.equal(tips[2].title, 'Middle 80%: 19.0 to 33.5')
+  assert.equal(tips[3].title, 'Lowest 19, highest 38')
+  assert.equal(markTips(d, g, 10, (n) => n.toFixed(1))[3].title, 'Lowest 19.0, highest 38.0') // no single-game format given: as before
+})

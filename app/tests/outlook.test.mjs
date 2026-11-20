@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { hashFor, pageFromHash, parseHash, playerFromHash } from '../src/lib/pages.ts'
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, fromMeeting, fromRecent, behindTile, headlineTiles, seasonGames, summarize } from '../src/lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, fromMeeting, fromRecent, behindTile, fmtGame, headlineTiles, seasonGames, summarize } from '../src/lib/outlook.ts'
 
 const stats = (o = {}) => ({ pts: 20, reb: 5, ast: 4, fg3m: 2, blk: 0, stl: 1, ...o })
 const g = (id, date, o = {}, minutes = 30) => ({ id, date, opp: 'BOS', isHome: true, seasonLabel: '2026-27', values: { ...stats(o), minutes } })
 
-test('seven stats, small counts get two decimals, and three views in a fixed order', () => {
+test('seven stats, one decimal for every average, and three views in a fixed order', () => {
   assert.deepEqual(OUTLOOK_STATS.map((s) => s.key), ['pts', 'reb', 'ast', 'fg3m', 'blk', 'stl', 'minutes'])
-  assert.deepEqual(OUTLOOK_STATS.map((s) => s.digits), [1, 1, 1, 2, 2, 2, 1])
+  assert.deepEqual(OUTLOOK_STATS.map((s) => s.digits), [1, 1, 1, 1, 1, 1, 1])
   assert.deepEqual(VIEWS.map((v) => v.key), ['last10', 'season', 'opponent'])
 })
 
@@ -201,4 +201,9 @@ test('behind a tile: a gap shows as no value and is left out of the averages; no
   assert.equal(b.last10.avg, 2)
   const none = behindTile({ last10: [], season: [], opponent: [] }, 'pts')
   assert.deepEqual([none.rows, none.opponentRows, none.base, none.last10, none.season, none.opponent], [[], [], null, null, null, null])
+})
+
+test('a single game is written whole, an average with one decimal, whatever the stat', () => {
+  assert.deepEqual([fmtGame(5), fmtGame(39.0), fmtGame(13.8), fmtGame(0), fmtGame(-0.2), fmtGame(null)], ['5', '39', '14', '0', '0', '-'])
+  assert.deepEqual([fmtOutlook(2.83, 1), fmtOutlook(0.63, 1), fmtOutlook(20.708, 1), fmtOutlook(null, 1)], ['2.8', '0.6', '20.7', '-'])
 })

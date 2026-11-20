@@ -1,4 +1,4 @@
-import { complete, f1 } from '../lib/geom.ts'
+import { complete, f0, f1 } from '../lib/geom.ts'
 import { LABELS, TABLE_STATS } from '../lib/format.ts'
 import { panelStyle } from '../lib/styles.ts'
 import type { ApiStat } from '../types.ts'
@@ -34,7 +34,7 @@ export function CombosTable({ stats }: { stats: Record<string, ApiStat> }) {
               <span>{d ? f1(d.mean) : '–'}</span>
               <span>{d ? f1(d.median) : '–'}</span>
               <span>{d ? `${f1(d.p10)} to ${f1(d.p90)}` : '–'}</span>
-              <span>{d ? `${f1(d.min)} to ${f1(d.max)}` : '–'}</span>
+              <span>{d ? `${f0(d.min)} to ${f0(d.max)}` : '–'}</span>
               <span>{season !== null ? f1(season) : '–'}</span>
             </div>
           )

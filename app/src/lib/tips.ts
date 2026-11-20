@@ -21,7 +21,8 @@ export type Marks = {
 }
 
 /** The four tooltips of one bar: the average, the median, the middle 80% and the lowest-to-highest line. */
-export function markTips(d: Dist, g: Marks, games: number | null, fmt: (n: number) => string = f1): Tip[] {
+/** `one` writes a single game's number (the lowest and the highest); it defaults to `fmt`. */
+export function markTips(d: Dist, g: Marks, games: number | null, fmt: (n: number) => string = f1, one: (n: number) => string = fmt): Tip[] {
   const window = games ? `the last ${games} games` : 'the recent games'
   return [
     {
@@ -45,7 +46,7 @@ export function markTips(d: Dist, g: Marks, games: number | null, fmt: (n: numbe
     {
       key: 'range',
       left: clampAnchor(g.minLeft + g.minWidth / 2),
-      title: `Lowest ${fmt(d.min)}, highest ${fmt(d.max)}`,
+      title: `Lowest ${one(d.min)}, highest ${one(d.max)}`,
       text: `The worst and the best single game of ${window}.`,
     },
   ]

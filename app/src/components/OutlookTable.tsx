@@ -1,4 +1,4 @@
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type ViewKey, type Views } from '../lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baseline, fmtGame, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type ViewKey, type Views } from '../lib/outlook.ts'
 import { panelStyle } from '../lib/styles.ts'
 
 const cell = 'px-3 py-2 text-right text-[14px] tabular-nums whitespace-nowrap'
@@ -88,7 +88,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
                     }
                     return [sum.min, sum.avg, sum.max].map((x, i) => (
                       <td key={`${v.key}-${i}`} className={`${cell}${muted}${i === 1 ? ' font-semibold' : ''}${i === 0 ? ' border-l border-(--border)' : ''}`}>
-                        {fmtOutlook(x, s.digits)}
+                        {i === 1 ? fmtOutlook(x, s.digits) : fmtGame(x)}
                       </td>
                     ))
                   })}
