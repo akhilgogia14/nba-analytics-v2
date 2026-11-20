@@ -10,7 +10,7 @@ export const DEFENSE_STAT_LIST: { key: DefenseStat; label: string; digits: numbe
   { key: 'stl', label: 'Steals', digits: 2 },
 ]
 
-/** A group with fewer opposing player-games than this is shown muted and marked "few": the figure rests on a handful of games. (My choice, not tested.) */
+/** A group with fewer opposing player-games than this is a "small group": its figure rests on a handful of games, so the list tucks it away. (A plain choice, not tested.) */
 export const THIN_PLAYER_GAMES = 10
 
 export const roleLabel = (role: 'starter' | 'bench') => (role === 'starter' ? 'Starters' : 'Bench')
@@ -82,3 +82,34 @@ export const seasonSpan = (first: string | null, last: string | null): string =>
 
 /** How many of this team's defended games the rows count (the same for every group). */
 export const defendedGames = (d: TeamDefense): number => d.team.groups[0]?.games ?? 0
+
+export type DefenseTotals = { team: number | null; league: number | null; diff: number | null }
+
+/**
+ * What opposing players put up against the team in a whole game (all groups added together) beside the same total for the league.
+ * Each group's per-game figure is its combined total in a game, so the groups add up to the whole. Null when no group has a figure.
+ */
+export function defenseTotals(d: TeamDefense, stat: DefenseStat): DefenseTotals {
+  const sum = (groups: DefenseGroup[]): number | null => {
+    const v = groups.map((g) => g.stats[stat].perGame).filter((x): x is number => x !== null)
+    return v.length === 0 ? null : v.reduce((a, b) => a + b, 0)
+  }
+  const team = sum(d.team.groups)
+  const league = sum(d.league.groups)
+  return { team, league, diff: minus(team, league) }
+}
+
+/**
+ * The list under the headline: groups with enough opposing player-games, biggest "gives up more than the league" first, biggest
+ * "holds below the league" last. Everything else (small or empty groups, or no difference to show) goes to `small`, in the
+ * original order, so an empty group never shows a difference.
+ */
+export function listRows(rows: DefenseRow[]): { main: DefenseRow[]; small: DefenseRow[]; scale: number } {
+  const main = rows.filter((r) => !r.thin && r.diffPerGame !== null).sort((a, b) => (b.diffPerGame as number) - (a.diffPerGame as number))
+  const small = rows.filter((r) => r.thin || r.diffPerGame === null)
+  const scale = main.reduce((m, r) => Math.max(m, Math.abs(r.diffPerGame as number)), 0)
+  return { main, small, scale }
+}
+
+/** How far a bar reaches from the centre line, as a share (0 to 50) of the list's width; the biggest difference reaches the end. */
+export const barShare = (diff: number | null, scale: number): number => (diff === null || !(scale > 0) ? 0 : Math.min(50, (Math.abs(diff) / scale) * 50))
