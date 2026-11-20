@@ -50,11 +50,11 @@ function errorText(e: unknown): string {
 }
 
 /** One side of a game: the logo and name (a link to that team's page), its season averages, the score, and a Players button. */
-function Side({ code, name, pts, won, final, avg }: { code: string; name: string; pts: number | null; won: boolean; final: boolean; avg: SlateAverage | undefined }) {
+function Side({ code, opp, name, pts, won, final, avg }: { code: string; opp: string; name: string; pts: number | null; won: boolean; final: boolean; avg: SlateAverage | undefined }) {
   const avgLine = averagesText(avg)
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <a href={hashFor('teams', code)} className="flex min-w-0 flex-1 items-center gap-3 text-(--text) no-underline" aria-label={`Open the ${teamLabel(code)} page`}>
+      <a href={hashFor('teams', code, 'overview', '', opp)} className="flex min-w-0 flex-1 items-center gap-3 text-(--text) no-underline" aria-label={`Open the ${teamLabel(code)} page against ${teamLabel(opp)}`}>
         <TeamBadge abbrev={code} size={36} />
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-[17px] leading-tight font-semibold" style={{ fontFamily: 'var(--display)' }}>
@@ -72,8 +72,8 @@ function Side({ code, name, pts, won, final, avg }: { code: string; name: string
         </span>
       )}
       <span className="flex gap-1.5">
-        <a href={hashFor('players', code)} className={smallLink}>
-          Players
+        <a href={hashFor('teams', code, 'overview', '', opp, 'roster')} className={smallLink} title={`${teamLabel(code)} roster, with ${teamLabel(opp)} as the opponent`}>
+          Roster
         </a>
       </span>
     </div>
@@ -84,14 +84,14 @@ function GameCard({ g, averages }: { g: SlateGame; averages: Record<string, Slat
   const w = winner(g)
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
-      <Side code={g.away} name={g.awayName} pts={g.awayPts} won={w === 'away'} final={g.isFinal} avg={averages[g.away]} />
+      <Side code={g.away} opp={g.home} name={g.awayName} pts={g.awayPts} won={w === 'away'} final={g.isFinal} avg={averages[g.away]} />
       <Chips code={g.away} context={g.awayContext} isHome={false} />
       <div className="flex items-center gap-3 text-xs font-semibold tracking-widest text-(--muted) uppercase">
         <span>at</span>
         <span className="h-px flex-1 bg-(--border)" />
         <span className={g.isFinal ? 'text-(--accent)' : ''}>{gameStatus(g)}</span>
       </div>
-      <Side code={g.home} name={g.homeName} pts={g.homePts} won={w === 'home'} final={g.isFinal} avg={averages[g.home]} />
+      <Side code={g.home} opp={g.away} name={g.homeName} pts={g.homePts} won={w === 'home'} final={g.isFinal} avg={averages[g.home]} />
       <Chips code={g.home} context={g.homeContext} isHome />
     </section>
   )

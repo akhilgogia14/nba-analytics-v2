@@ -1,11 +1,11 @@
-import { hashFor, type Page } from '../lib/pages.ts'
+import { currentOpp, hashFor, type Page } from '../lib/pages.ts'
 import { pillClass, pillStyle } from '../lib/styles.ts'
 
 /** The four page buttons in the header. They are plain links that carry the chosen team ("#/players?team=BOS"), so the team stays chosen on the other page; being plain links, the back button and a bookmark work. */
-export function PageSwitch({ page, team }: { page: Page; team: string }) {
+export function PageSwitch({ page, team, opp = currentOpp() }: { page: Page; team: string; opp?: string }) {
   const link = (key: Page, label: string) => (
     <a
-      href={hashFor(key, team)}
+      href={hashFor(key, team, 'overview', '', opp)}
       aria-current={page === key ? 'page' : undefined}
       className={`${pillClass} inline-flex items-center no-underline`}
       style={pillStyle(page === key)}

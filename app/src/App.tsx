@@ -5,7 +5,7 @@ import { CombosTable } from './components/CombosTable.tsx'
 import { GameLog } from './components/GameLog.tsx'
 import { MeetingsPanel } from './components/Meetings.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
-import { parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
+import { oppFromHash, parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
 import { TeamTabs } from './components/TeamTabs.tsx'
 import { Scorecard } from './components/Scorecard.tsx'
 import { SeasonGrid } from './components/SeasonGrid.tsx'
@@ -42,7 +42,7 @@ export default function App() {
   const [view, setView] = useState<LogView>(DEFAULT_VIEW) // the six average cards (default) or the box scores
   const [log, setLog] = useState<LogGame[] | null>(null) // the last 15 games for the box-score table
   const [logError, setLogError] = useState('')
-  const [opp, setOpp] = useState('') // the opponent chosen in the meetings panel
+  const [opp, setOpp] = useState(() => oppFromHash(window.location.hash)) // the opponent chosen in the meetings panel, or carried in the address
   const [meetings, setMeetings] = useState<Meetings | null>(null)
   const [meetingsError, setMeetingsError] = useState('')
   const [seasonError, setSeasonError] = useState('')
@@ -121,7 +121,7 @@ export default function App() {
   }, [gameType, attempt])
 
   // The chosen team goes into the address, so the Teams link (and a bookmark) carry it.
-  useEffect(() => rememberTeam('players', team, 'overview', playerId), [team, playerId])
+  useEffect(() => rememberTeam('players', team, 'overview', playerId, opp === team ? '' : opp), [team, playerId, opp])
 
   // 2. The players on the chosen team, most minutes first. The current player stays if he is in the list; otherwise the
   // first one is picked. (Waits for the team list, so a team that is not in the new list is never asked for.)
@@ -236,10 +236,10 @@ export default function App() {
             </div>
             <div className="text-[13px] text-(--muted)">Recent games as a range, not a single number</div>
           </div>
-          <PageSwitch page="players" team={team} />
+          <PageSwitch page="players" team={team} opp={opp === team ? '' : opp} />
         </header>
 
-        <TeamTabs view="overview" page="players" team={team} player={playerId} />
+        <TeamTabs view="overview" page="players" team={team} player={playerId} opp={opp === team ? '' : opp} />
 
         <div className="flex flex-wrap items-end gap-4">
           <label className="flex max-w-80 min-w-56 flex-1 flex-col gap-1.5">

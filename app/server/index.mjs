@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
 import {
-  FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
+  FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapRoster, ROSTER_SQL, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validPlayerId, validTeam,
 } from './queries.mjs'
 import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
@@ -56,6 +56,21 @@ app.get('/api/teams', async (req, res) => {
     res.json(await cached(`teams:${type}`, FIVE_MINUTES, async () => mapTeams(await sql(teamsSqlFor(type)))))
   } catch (err) {
     fail(res, 'teams', err)
+  }
+})
+
+// The matchup roster: this season's players on one team with their last-10 averages and starts in those games (regular season).
+app.get('/api/teams/:team/roster', async (req, res) => {
+  const { team } = req.params
+  if (!validTeam(team)) return res.status(400).json({ ok: false, error: 'Team must be three capital letters.' })
+  try {
+    res.json(
+      await cached(`roster:${team}`, FIVE_MINUTES, async () => ({
+        players: mapRoster(await sql(ROSTER_SQL, [{ name: 'team', value: team, type: 'STRING' }])),
+      })),
+    )
+  } catch (err) {
+    fail(res, 'roster', err)
   }
 })
 
