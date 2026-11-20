@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  DEFENSE_STAT_LIST, THIN_PLAYER_GAMES, defendedGames, defenseRows, fmtDelta, fmtFigure, fmtRange, roleLabel, seasonSpan,
+  DEFENSE_STAT_LIST, THIN_PLAYER_GAMES, barShare, defendedGames, defenseTotals, listRows, defenseRows, fmtDelta, fmtFigure, fmtRange, roleLabel, seasonSpan,
 } from '../src/lib/defense.ts'
 
 const cell = (perGame, per36 = 17, low = 1, high = 30) => ({ perGame, low, high, per36 })
@@ -68,4 +68,35 @@ test('season span and the defended-games count', () => {
   assert.equal(defendedGames(defense), 13)
   assert.equal(defendedGames({ team: { groups: [], firstSeason: null, lastSeason: null }, league: defense.league }), 0)
   assert.deepEqual([roleLabel('starter'), roleLabel('bench')], ['Starters', 'Bench'])
+})
+
+test('totals add the groups together: the whole-game figure for the team and for the league, and their difference', () => {
+  const t = defenseTotals(defense, 'pts')
+  assert.ok(Math.abs(t.team - (31.4 + 4.9 + 0)) < 1e-9)
+  assert.ok(Math.abs(t.league - (29.6 + 6.0 + 2.6)) < 1e-9)
+  assert.ok(Math.abs(t.diff - (36.3 - 38.2)) < 1e-9)
+  const none = { team: { groups: [], firstSeason: null, lastSeason: null }, league: { groups: [], firstSeason: null, lastSeason: null } }
+  assert.deepEqual(defenseTotals(none, 'pts'), { team: null, league: null, diff: null })
+})
+
+test('the list puts the biggest "gives up more" first, the biggest "holds below" last, and keeps small or empty groups out', () => {
+  const more = group('bench', 'G', 39, cell(20.3, 14.0))
+  const less = group('starter', 'C', 12, cell(4.3, 10.9))
+  const d = {
+    team: { groups: [group('starter', 'G', 24, cell(30.4)), less, more, group('starter', 'F-G', 2, cell(5, 35.3)), group('bench', 'Not listed', 0, cell(0, null))], firstSeason: '2026-27', lastSeason: '2026-27' },
+    league: { groups: [group('starter', 'G', 5000, cell(29.6)), group('starter', 'C', 5000, cell(7.0)), group('bench', 'G', 5000, cell(14.7)), group('starter', 'F-G', 900, cell(3.6)), group('bench', 'Not listed', 900, cell(2.6))], firstSeason: '2021-22', lastSeason: '2026-27' },
+  }
+  const { main, small, scale } = listRows(defenseRows(d, 'pts'))
+  assert.deepEqual(main.map((r) => r.key), ['bench:G', 'starter:G', 'starter:C'])
+  assert.deepEqual(small.map((r) => r.key), ['starter:F-G', 'bench:Not listed']) // 2 and 0 opposing player-games
+  assert.ok(Math.abs(scale - 5.6) < 1e-9)
+  assert.ok(main.every((r) => r.playerGames >= THIN_PLAYER_GAMES))
+})
+
+test('a bar reaches from the centre: the biggest difference reaches the end, none or no scale gives no bar', () => {
+  assert.equal(barShare(5.6, 5.6), 50)
+  assert.equal(barShare(-2.8, 5.6), 25)
+  assert.equal(barShare(null, 5.6), 0)
+  assert.equal(barShare(3, 0), 0)
+  assert.equal(barShare(99, 5.6), 50) // never past the end
 })
