@@ -8,7 +8,7 @@ import { nextGameFacts } from './lib/context.ts'
 import { shortDate, teamLabel } from './lib/format.ts'
 import { chartPalette } from './lib/hex.ts'
 import { fromMeeting, fromRecent, seasonGames, type Views } from './lib/outlook.ts'
-import { parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
+import { oppFromHash, parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
 import { panelStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
@@ -36,6 +36,8 @@ export default function PredictionsPage() {
   const [playerId, setPlayerId] = useState(() => playerFromHash(window.location.hash))
   const [next, setNext] = useState<NextGame | null | undefined>(undefined) // undefined = still loading, null = no game scheduled
   const [views, setViews] = useState<Views | null>(null)
+  const [addrOpp] = useState(() => oppFromHash(window.location.hash)) // an opponent chosen on another page (the address), used for the vs-opponent row
+  const [oppUsed, setOppUsed] = useState<string | null>(null) // the opponent the third row is about: the address one, else his next opponent
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
 
@@ -94,12 +96,14 @@ export default function PredictionsPage() {
       const ctx = await fetchPlayerContext(playerId, GAME_TYPE)
       if (cancelled) return
       setNext(ctx.next)
+      const chosen = addrOpp && addrOpp !== team ? addrOpp : (ctx.next?.opp ?? null)
       const [recent, season, meetings] = await Promise.all([
         fetchRecent(playerId, GAME_TYPE),
         fetchSeason(playerId),
-        ctx.next ? fetchMeetings(playerId, GAME_TYPE, ctx.next.opp) : Promise.resolve(null),
+        chosen ? fetchMeetings(playerId, GAME_TYPE, chosen) : Promise.resolve(null),
       ])
       if (cancelled) return
+      setOppUsed(chosen)
       setViews({
         last10: [...recent.games].reverse().map(fromRecent), // the route gives oldest first; the page keeps newest first
         season: seasonGames(season, GAME_TYPE),
@@ -109,7 +113,7 @@ export default function PredictionsPage() {
     return () => {
       cancelled = true
     }
-  }, [playerId, listed, attempt])
+  }, [playerId, listed, attempt, addrOpp, team])
 
   const look = teamLook(team)
   const bright = chartPalette(team).top
@@ -196,13 +200,18 @@ export default function PredictionsPage() {
                       </li>
                     ))}
                   </ul>
+                  {oppUsed && next.opp !== oppUsed && (
+                    <div className="text-[13px] text-(--muted)">
+                      The last row is his last 10 against {oppUsed}, the opponent you chose. His next game is against {next.opp}.
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-[15px] text-(--muted)">No game on the schedule yet for this team, so there is no next matchup to look at.</div>
               )}
             </section>
-            <OutlookTable views={views} opp={next?.opp ?? null} />
-            <OutlookCharts views={views} opp={next?.opp ?? null} />
+            <OutlookTable views={views} opp={oppUsed} />
+            <OutlookCharts views={views} opp={oppUsed} />
           </div>
         )}
       </div>

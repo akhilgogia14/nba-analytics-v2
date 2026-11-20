@@ -28,7 +28,7 @@ function Bubble({ tip }: { tip: Tip }) {
 const hitClass = 'absolute block cursor-help rounded-sm bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-(--accent)'
 
 export function Scorecard({
-  label, stat, statKey, games, seasonLabel, recent, fmt = f1, pointFmt, names, lowerIsBetter = false, leagueAvg = null,
+  label, stat, statKey, games, seasonLabel, recent, fmt = f1, pointFmt, names, lowerIsBetter = false, leagueAvg = null, windowLabel,
 }: {
   label: string
   stat: ApiStat | undefined
@@ -47,6 +47,8 @@ export function Scorecard({
   lowerIsBetter?: boolean
   /** The league average of this stat (team page): shown as text and as a dotted line on the sparkline. */
   leagueAvg?: number | null
+  /** Replaces "avg of last N games" (the opponent view says "avg of last 8 meetings vs ATL"). */
+  windowLabel?: string
 }) {
   const d = complete(stat)
   const season = stat?.seasonMean ?? null
@@ -118,7 +120,7 @@ export function Scorecard({
           {fmt(d.mean)}
         </span>
         <span className="text-[13px] text-(--muted)">
-          {games ? `avg of last ${games} games` : 'avg of recent games'} · median {fmt(d.median)}
+          {windowLabel ?? (games ? `avg of last ${games} games` : 'avg of recent games')} · median {fmt(d.median)}
         </span>
         {change && (
           <span
