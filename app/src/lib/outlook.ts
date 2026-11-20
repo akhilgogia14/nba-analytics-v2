@@ -74,3 +74,41 @@ export function baseline(last10: Summary | null, season: Summary | null): number
 
 /** A figure to the stat's decimals, or a dash. */
 export const fmtOutlook = (v: number | null, digits: number): string => (v === null ? '-' : v.toFixed(digits))
+
+/**
+ * How far the baseline was from what actually happened, on average (mean absolute error), in the back-test of 2026-11-18, rerun
+ * 2026-11-19 with minutes bands (docs/predictions-backtest.md): every game of 2025-26 and 2026-27 so far, predicted only from earlier
+ * games, weights not tuned on those seasons. A band is the player's average minutes over his previous 10 games; `all` is everyone.
+ * Predictions are of the stat GIVEN that he plays. Each figure is an average over the players in the band, so a player who scores
+ * very little misses by less than his band's figure.
+ */
+export type MissBand = 'under10' | 'from10' | 'from20' | 'from30' | 'all'
+export const TYPICAL_MISS: Record<OutlookStat, Record<MissBand, number>> = {
+  pts: { under10: 2.918, from10: 3.875, from20: 4.893, from30: 5.892, all: 4.665 },
+  reb: { under10: 1.443, from10: 1.791, from20: 1.986, from30: 2.129, all: 1.917 },
+  ast: { under10: 0.814, from10: 1.080, from20: 1.430, from30: 1.805, all: 1.364 },
+  fg3m: { under10: 0.498, from10: 0.721, from20: 0.967, from30: 1.157, all: 0.901 },
+  blk: { under10: 0.276, from10: 0.449, from20: 0.552, from30: 0.610, all: 0.512 },
+  stl: { under10: 0.447, from10: 0.641, from20: 0.780, from30: 0.870, all: 0.733 },
+  minutes: { under10: 5.594, from10: 5.871, from20: 5.016, from30: 4.114, all: 5.097 },
+}
+
+/** The bands, lowest minutes first: `from` is the lowest average minutes in the band (the upper end is the next band's `from`). */
+export const MISS_BANDS: { key: Exclude<MissBand, 'all'>; from: number; text: string }[] = [
+  { key: 'under10', from: 0, text: 'players averaging under 10 minutes' },
+  { key: 'from10', from: 10, text: 'players averaging 10 to 20 minutes' },
+  { key: 'from20', from: 20, text: 'players averaging 20 to 30 minutes' },
+  { key: 'from30', from: 30, text: 'players averaging 30+ minutes' },
+]
+
+/** Which typical-miss band fits this player: by his average minutes over his last 10 games ('all' when we have none). */
+export function missBand(views: Views): MissBand {
+  const m = summarize(views.last10, 'minutes')
+  if (m === null) return 'all'
+  return [...MISS_BANDS].reverse().find((b) => m.avg >= b.from)?.key ?? 'under10'
+}
+
+/** The typical miss for one stat for this player's band. */
+export const typicalMiss = (stat: OutlookStat, band: MissBand): number => TYPICAL_MISS[stat][band]
+
+export const missBandText = (band: MissBand): string => MISS_BANDS.find((b) => b.key === band)?.text ?? 'all players'

@@ -1,4 +1,4 @@
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, summarize, type OutlookStat, type Views } from '../lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type OutlookStat, type Views } from '../lib/outlook.ts'
 import { CHART_PAD, ROW_HEIGHT, chartLayout } from '../lib/outlookChart.ts'
 import { panelStyle } from '../lib/styles.ts'
 
@@ -6,9 +6,10 @@ import { panelStyle } from '../lib/styles.ts'
 function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: OutlookStat; label: string; digits: number; opp: string | null }) {
   const layout = chartLayout(views, stat, digits)
   const base = baseline(summarize(views.last10, stat), summarize(views.season, stat))
+  const miss = typicalMiss(stat, missBand(views))
   const height = layout.rows.length * ROW_HEIGHT
   const rowName = (key: string) => (key === 'opponent' ? (opp ? `vs ${opp}` : 'vs opponent') : (VIEWS.find((v) => v.key === key)?.label.replace('Last 10 games', 'Last 10').replace('This season', 'Season') ?? key))
-  const summary = `${label}. Baseline ${fmtOutlook(base, digits)}. ${layout.rows
+  const summary = `${label}. Baseline ${fmtOutlook(base, digits)}, typical miss ${fmtOutlook(miss, digits)}. ${layout.rows
     .map((r) => {
       const s = summarize(views[r.key], stat)
       return s ? `${rowName(r.key)}: low ${fmtOutlook(s.min, digits)}, average ${fmtOutlook(s.avg, digits)}, high ${fmtOutlook(s.max, digits)} over ${r.games} games` : `${rowName(r.key)}: no games`
@@ -18,7 +19,9 @@ function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: Ou
     <div className="flex flex-col gap-2 rounded-[14px] border border-(--border) p-4" data-chart={stat}>
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="m-0 text-[16px] font-semibold">{label}</h3>
-        <span className="text-xs text-(--muted)">Baseline {fmtOutlook(base, digits)}</span>
+        <span className="text-xs text-(--muted)">
+          Baseline {fmtOutlook(base, digits)} · typical miss ±{fmtOutlook(miss, digits)}
+        </span>
       </div>
       <div className="flex gap-2">
         <div className="flex w-[72px] shrink-0 flex-col text-xs text-(--muted)" aria-hidden="true">
@@ -69,7 +72,7 @@ export function OutlookCharts({ views, opp }: { views: Views; opp: string | null
       </h2>
       <div className="text-[13px] text-(--muted)">
         Each dot is one game. The thick line runs from his lowest to his highest, the white tick is his average, and the dashed line is the baseline. All three rows share one scale
-        per stat.
+        per stat. The typical miss is for {missBandText(missBand(views))}.
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {OUTLOOK_STATS.map((s) => (

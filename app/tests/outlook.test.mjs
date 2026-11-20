@@ -76,7 +76,7 @@ test('the Predictions page has its own address and keeps the team and the player
 
 // ---- chart layout ----
 import { CHART_PAD, ROW_HEIGHT, chartLayout } from '../src/lib/outlookChart.ts'
-const mk = (id, pts, date = '2026-11-01', extra = {}) => ({ id, date, opp: 'BOS', isHome: true, seasonLabel: '2026-27', values: { pts, reb: 5, ast: 4, fg3m: 2, blk: 0, stl: 1, minutes: 30 }, ...extra })
+const mk = (id, pts, date = '2026-11-01', extra = {}, minutes = 30) => ({ id, date, opp: 'BOS', isHome: true, seasonLabel: '2026-27', values: { pts, reb: 5, ast: 4, fg3m: 2, blk: 0, stl: 1, minutes }, ...extra })
 const views = (last10, season, opponent) => ({ last10, season, opponent })
 
 test('chart: one shared scale, lowest value at the left edge and highest at the right, the same dot at the same place in every row', () => {
@@ -117,4 +117,34 @@ test('chart: nothing at all gives empty rows and no baseline', () => {
   const l = chartLayout(views([], [], []), 'pts', 1)
   assert.equal(l.baselineX, null)
   assert.ok(l.rows.every((r) => r.dots.length === 0 && r.minX === null))
+})
+
+// ---- typical miss ----
+import { MISS_BANDS, TYPICAL_MISS, missBand, missBandText, typicalMiss } from '../src/lib/outlook.ts'
+
+test('typical miss: one figure per stat and minutes band, from the back-test; higher-minute players miss by more on counts, by less on minutes', () => {
+  assert.deepEqual(Object.keys(TYPICAL_MISS), ['pts', 'reb', 'ast', 'fg3m', 'blk', 'stl', 'minutes'])
+  assert.deepEqual(TYPICAL_MISS.pts, { under10: 2.918, from10: 3.875, from20: 4.893, from30: 5.892, all: 4.665 }) // MAE of the 50/50 blend, docs/predictions-backtest.md
+  for (const s of ['pts', 'reb', 'ast', 'fg3m', 'blk', 'stl']) {
+    const m = TYPICAL_MISS[s]
+    assert.ok(m.under10 < m.from10 && m.from10 < m.from20 && m.from20 < m.from30, s) // more minutes, bigger numbers, bigger misses
+    assert.ok(m.under10 < m.all && m.all < m.from30, s)
+  }
+  assert.ok(TYPICAL_MISS.minutes.from30 < TYPICAL_MISS.minutes.from20 && TYPICAL_MISS.minutes.from20 < TYPICAL_MISS.minutes.from10) // minutes are steadier for starters
+})
+
+test('typical miss: the band follows his average minutes over his last 10 games, lower edge included', () => {
+  const withMinutes = (m) => views([mk('a', 10, '1', {}, m), mk('b', 10, '2', {}, m)], [], [])
+  assert.deepEqual(MISS_BANDS.map((b) => b.from), [0, 10, 20, 30])
+  assert.equal(missBand(withMinutes(34)), 'from30')
+  assert.equal(missBand(withMinutes(30)), 'from30')
+  assert.equal(missBand(withMinutes(29.9)), 'from20')
+  assert.equal(missBand(withMinutes(20)), 'from20')
+  assert.equal(missBand(withMinutes(14)), 'from10')
+  assert.equal(missBand(withMinutes(3)), 'under10')
+  assert.equal(missBand(withMinutes(0)), 'under10')
+  assert.equal(missBand(views([], [mk('a', 10)], [])), 'all') // no last-10 games: the all-players figure
+  assert.equal(typicalMiss('pts', 'from30'), 5.892)
+  assert.equal(missBandText('from30'), 'players averaging 30+ minutes')
+  assert.equal(missBandText('all'), 'all players')
 })

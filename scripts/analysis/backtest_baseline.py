@@ -110,6 +110,17 @@ def main(out_path=None):
         cR = bf.coverage([(r["stats"][s]["lo10"], r["stats"][s]["hi10"], r["stats"][s]["actual"]) for r in test if s in r["stats"] and rot(r)])
         res["coverage"][s] = {"last10": c10, "season": cS, "last10_rotation": cR}
         print(f"  {s:8s} last-10 range: inside {c10[0]*100:5.1f}% (width {c10[1]:5.1f}) | season range: {cS[0]*100:5.1f}% (width {cS[1]:5.1f}) | last-10 range, rotation: {cR[0]*100:5.1f}% (width {cR[1]:5.1f})")
+    print("\n7) TYPICAL MISS BY MINUTES BAND (his average minutes over the previous 10 games): MAE of the 50/50 blend on the test set")
+    bands = [("under 10", 0, 10), ("10 to 20", 10, 20), ("20 to 30", 20, 30), ("30 and up", 30, 1000)]
+    res["by_band"] = {}
+    for label, lo, hi in bands:
+        sub = lambda r, lo=lo, hi=hi: lo <= (r["prior_minutes"] or 0) < hi
+        line, res["by_band"][label] = [], {}
+        for s in bf.STATS:
+            ev = evaluate(test, {"b": lambda x: bf.blend(x["last10"], x["season"], 0.5)}, s, sub)["b"]
+            res["by_band"][label][s] = {"mae": ev["mae"], "n": ev["n"]}
+            line.append(f"{s} {ev['mae']:.3f}")
+        print(f"  {label:9s} (n {res['by_band'][label]['pts']['n']:6,d}): " + " | ".join(line))
     if out_path:
         Path(out_path).write_text(json.dumps(res, indent=1, default=str))
 

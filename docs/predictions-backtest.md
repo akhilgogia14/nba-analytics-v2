@@ -59,6 +59,21 @@ How often the actual game falls inside the range of his last 10 games (the page'
 
 For ten games, about 82% of new games should land inside the range by chance alone (nine in eleven); the figures are higher for counts because a tie with the min or max counts as inside. The ranges do their job (the answer is inside them 80 to 95% of the time) but they are wide: for points, a 17-point band while the typical miss of the blend is 4.7. They are a description of what has happened, not a tight interval; a model's ranges would have to be narrower at the same coverage to be worth having.
 
+## Result 5: the typical miss depends a lot on minutes (added 2026-11-19)
+The page now shows each player's typical miss (release 069). One figure for everyone would mislead, so the back-test was split by the player's average minutes over his previous 10 games. MAE of the 50/50 blend, held-out seasons:
+
+| Minutes band (games) | Points | Rebounds | Assists | 3-pointers | Blocks | Steals | Minutes |
+|---|---|---|---|---|---|---|---|
+| Under 10 (2,666) | 2.918 | 1.443 | 0.814 | 0.498 | 0.276 | 0.447 | 5.594 |
+| 10 to 20 (8,184) | 3.875 | 1.791 | 1.080 | 0.721 | 0.449 | 0.641 | 5.871 |
+| 20 to 30 (12,302) | 4.893 | 1.986 | 1.430 | 0.967 | 0.552 | 0.780 | 5.016 |
+| 30 and up (6,771) | 5.892 | 2.129 | 1.805 | 1.157 | 0.610 | 0.870 | 4.114 |
+| Everyone (29,923) | 4.665 | 1.917 | 1.364 | 0.901 | 0.512 | 0.733 | 5.097 |
+
+Players who play more put up bigger numbers and so miss by more in absolute terms (points: 2.9 for under 10 minutes, 5.9 for 30 and up); the one exception is minutes themselves, which are steadier for players who play a lot (4.1 against 5.6). Each figure is an average over the players in the band, so a player who scores very little misses by less than his band's number (a 3-minute player with a baseline of 0.0 cannot be 2.9 points below it); the page says so.
+
+The script was rerun on 2026-11-19, which added 100 games played since (29,923 held-out games instead of 29,823). No figure in Results 1 to 4 moved by more than 0.002 and the chosen weights are identical.
+
 ## What this means for the page and the modeling
 1. **Keep the baseline as is (50/50).** No weight change is supported.
 2. **Number to beat:** held-out MAE of 4.665 points, 1.916 rebounds, 1.364 assists, 0.900 3-pointers, 0.512 blocks, 0.733 steals, 5.097 minutes (all players). A model earns a place only below these on the same games, with ranges that are narrower at the same coverage (`docs/MODELING.md` validation gate).
