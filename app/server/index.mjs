@@ -11,7 +11,7 @@ import { LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_CONTEXT_GAMES_SQL, PLAYER_CONTEXT_SQL
 import { DEFENSE_PLAYERS_SQL, LEAGUE_DEFENSE_SQL, TEAM_DEFENSE_SQL, mapDefense, mapDefensePlayers } from './defenseQueries.mjs'
 import { SLATE_AVERAGES_SQL, SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
 import {
-  LEAGUE_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
+  LEAGUE_SQL, RANKING_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapRanking, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
 } from './teamQueries.mjs'
 
 const app = express()
@@ -336,6 +336,17 @@ teamRoute('/api/teams/:team/defense', 'team defense', async (_req, res, team, ty
 // The opposing player-games behind the grid above: who put up what against this team, one row per player per game.
 teamRoute('/api/teams/:team/defense/players', 'defense players', async (_req, res, team, type) => {
   res.json(await cached(`tdefp:${team}:${type}`, FIVE_MINUTES, async () => mapDefensePlayers(await sql(DEFENSE_PLAYERS_SQL, teamParams(team, type)))))
+})
+
+// Every team's season so far, per game, for one game type: what the Teams page ranks one team against.
+app.get('/api/league/team-ranking', async (req, res) => {
+  const type = req.query.type ?? 'regular-season'
+  if (!validGameType(type)) return res.status(400).json({ ok: false, error: 'Type must be regular-season or playoffs.' })
+  try {
+    res.json(await cached(`rank:${type}`, FIVE_MINUTES, async () => mapRanking(await sql(RANKING_SQL, [{ name: 'gt', value: type, type: 'STRING' }]))))
+  } catch (err) {
+    fail(res, 'team ranking', err)
+  }
 })
 
 // The league average of every team stat (per team game) for one game type, for the dotted line on the sparklines.

@@ -1,5 +1,5 @@
 import type {
-  FormResult, GameDetail, GameType, LogGame, Meetings, PlayerOption, Recent, LeagueAverages, Roster, DefenseLine, PlayerContext, PlayerContextGame, Season, Slate, Team, TeamContext, TeamContextGame, TeamDefense, TeamFormResult, TeamGame, TeamMeetings,
+  FormResult, GameDetail, GameType, LogGame, Meetings, PlayerOption, Recent, LeagueAverages, Roster, DefenseLine, PlayerContext, PlayerContextGame, Season, Slate, Team, TeamContext, TeamContextGame, TeamDefense, TeamFormResult, TeamGame, TeamMeetings, TeamRanking,
 } from './types.ts'
 
 async function getJson<T>(url: string): Promise<T> {
@@ -34,6 +34,7 @@ export const fetchTeamLog = (team: string, type: GameType) =>
 export const fetchTeamMeetings = (team: string, type: GameType, opp: string) =>
   getJson<TeamMeetings>(`/api/teams/${encodeURIComponent(team)}/meetings?type=${type}&opp=${encodeURIComponent(opp)}`)
 export const fetchRoster = (team: string) => getJson<Roster>(`/api/teams/${encodeURIComponent(team)}/roster`)
+export const fetchTeamRanking = (type: GameType) => getJson<TeamRanking>(`/api/league/team-ranking?type=${type}`)
 export const fetchLeagueAverages = (type: GameType) => getJson<LeagueAverages>(`/api/league/team-averages?type=${type}`)
 
 // ---- Today's games page ----

@@ -160,6 +160,10 @@ export type TeamMeetings = { scope: 'season' | 'filled' | 'earlier' | 'none'; cu
 /** The league average of each team stat, per team game, for one game type in the latest season that has games of it. */
 export type LeagueAverages = { seasonLabel: string | null; games: number; stats: Record<string, number | null> }
 
+/** Every team's season so far, per game (for ranking one team against the rest). `stats` keys: pts, allowed, margin, fg_pct, fg3m, ast, reb, tov, stl, blk. */
+export type RankedTeam = { team: string; games: number; wins: number; stats: Record<string, number | null> }
+export type TeamRanking = { seasonLabel: string | null; teams: RankedTeam[] }
+
 /** One team's rest facts going into a game (null when the data has no row for it). Days of rest and rest edge are null for a season opener. */
 export type SideContext = {
   daysRest: number | null

@@ -1,11 +1,12 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { fetchLeagueAverages, fetchRoster, fetchTeamForm, fetchTeamGames, fetchTeamLog, fetchTeamMeetings, fetchTeams } from './api.ts'
+import { fetchLeagueAverages, fetchRoster, fetchTeamDefense, fetchTeamForm, fetchTeamRanking, fetchTeamGames, fetchTeamLog, fetchTeamMeetings, fetchTeams } from './api.ts'
 import { TeamBadge } from './components/Avatar.tsx'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { TeamTabs } from './components/TeamTabs.tsx'
 import { focusRosterFromHash, oppFromHash, parseHash, rememberTeam } from './lib/pages.ts'
 import { Scorecard } from './components/Scorecard.tsx'
+import { TeamSummary } from './components/TeamSummary.tsx'
 import { TeamGameLog } from './components/TeamGameLog.tsx'
 import { TeamMeetingsPanel } from './components/TeamMeetings.tsx'
 import { TeamRoster } from './components/TeamRoster.tsx'
@@ -18,7 +19,7 @@ import { TEAM_IDS, readableOn } from './lib/teams.ts'
 import { TEAM_CARDS, cardFormat, leagueNote, pointFormat, teamNotices } from './lib/teamPage.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { GameType, LeagueAverages, RosterPlayer, Team, TeamFormResult, TeamGame, TeamMeetings } from './types.ts'
+import type { GameType, LeagueAverages, RosterPlayer, Team, TeamDefense, TeamFormResult, TeamGame, TeamMeetings, TeamRanking } from './types.ts'
 
 const ALL_TEAMS = Object.keys(TEAM_IDS).sort()
 
@@ -42,6 +43,8 @@ export default function TeamsPage() {
   const [form, setForm] = useState<TeamFormResult | null>(null)
   const [recent, setRecent] = useState<TeamGame[] | null>(null) // the games behind the lines under the scorecards
   const [league, setLeague] = useState<LeagueAverages | null>(null) // the league average of each stat, for the dotted line
+  const [ranking, setRanking] = useState<TeamRanking | null>(null) // every team's season, to rank this one (an extra: the card is left out if it fails)
+  const [defense, setDefense] = useState<TeamDefense | null>(null) // for the positions line of the summary card
   const [view, setView] = useState<LogView>(DEFAULT_VIEW)
   const [log, setLog] = useState<TeamGame[] | null>(null)
   const [logError, setLogError] = useState('')
@@ -64,6 +67,7 @@ export default function TeamsPage() {
     setMeetingsError('')
     setRoster(null)
     setRosterError('')
+    setDefense(null)
     setError('')
   }
   function chooseTeam(code: string) {
@@ -74,6 +78,7 @@ export default function TeamsPage() {
     if (t === gameType) return
     setGameType(t)
     setTeams(null)
+    setRanking(null)
     clearTeamData()
   }
   function chooseOpp(code: string) {
@@ -113,6 +118,28 @@ export default function TeamsPage() {
       cancelled = true
     }
   }, [gameType, attempt])
+
+  // 1c. The summary card's extras. Neither holds up the page: with no ranking the card is left out, with no defense it just has no positions line.
+  useEffect(() => {
+    let cancelled = false
+    fetchTeamRanking(gameType)
+      .then((r) => !cancelled && setRanking(r))
+      .catch(() => !cancelled && setRanking(null))
+    return () => {
+      cancelled = true
+    }
+  }, [gameType, attempt])
+  const listedTeam = !!team && !!teams?.some((x) => x.team === team)
+  useEffect(() => {
+    if (!listedTeam) return
+    let cancelled = false
+    fetchTeamDefense(team, gameType)
+      .then((d) => !cancelled && setDefense(d))
+      .catch(() => !cancelled && setDefense(null))
+    return () => {
+      cancelled = true
+    }
+  }, [team, listedTeam, gameType, attempt])
 
   // The chosen team goes into the address, so the Players link (and a bookmark) carry it.
   const oppNow = opp === team ? '' : opp // an opponent the same as the team is ignored
@@ -315,6 +342,8 @@ export default function TeamsPage() {
                 </div>
               ))}
             </section>
+
+            <TeamSummary team={team} name={t.name} gameType={gameType} ranking={ranking} defense={defense} />
 
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="View">
               {LOG_VIEWS.map((v) => (
