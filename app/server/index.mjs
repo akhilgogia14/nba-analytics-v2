@@ -3,8 +3,8 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
 import {
-  FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, UPCOMING_SQL, addUpcoming, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapRoster, ROSTER_SQL, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
-  validPlayerId, validTeam,
+  FORM_SQL, GAMELOG_SQL, GAME_DETAIL_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, UPCOMING_SQL, addUpcoming, mapForm, mapGameDetail, mapGameLog, mapGames, mapMeetings, mapPlayers, mapRoster, ROSTER_SQL, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
+  validGameId, validPlayerId, validTeam,
 } from './queries.mjs'
 import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
 import { LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_CONTEXT_SQL, PLAYER_TEAM_SQL, mapPlayerBuckets, mapPlayerTeam } from './playerContextQueries.mjs'
@@ -146,6 +146,23 @@ app.get('/api/players/:id/log', async (req, res) => {
     )
   } catch (err) {
     fail(res, 'log', err)
+  }
+})
+
+// One game of one player (the click on a hexagon): his full box score and the team's final score. A game he missed comes back with
+// played = false. Bad ids are refused (400); a game with no row for him is a 404.
+app.get('/api/players/:id/game/:gameId', async (req, res) => {
+  const { id, gameId } = req.params
+  if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
+  if (!validGameId(gameId)) return res.status(400).json({ ok: false, error: 'Game id must be digits.' })
+  try {
+    const detail = await cached(`pgame:${id}:${gameId}`, FIVE_MINUTES, async () =>
+      mapGameDetail(await sql(GAME_DETAIL_SQL, [{ name: 'id', value: id, type: 'BIGINT' }, { name: 'gid', value: gameId, type: 'STRING' }])),
+    )
+    if (!detail) return res.status(404).json({ ok: false, error: 'No such game for this player.' })
+    res.json(detail)
+  } catch (err) {
+    fail(res, 'game detail', err)
   }
 })
 
