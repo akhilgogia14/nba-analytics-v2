@@ -1,4 +1,5 @@
-import type { SideContext, SlateGame } from '../types.ts'
+import type { SideContext, SlateAverage, SlateGame } from '../types.ts'
+import { ordinal } from './context.ts'
 
 /** The schedule's dates are US dates, so "today" is today's date in US Eastern time, wherever the viewer is. Written YYYY-MM-DD. */
 export function easternDate(now: Date = new Date()): string {
@@ -65,10 +66,23 @@ export function chipsFor(c: SideContext | null, isHome: boolean): Chip[] {
   if (!c) return []
   const chips: Chip[] = []
   if (c.isB2b) chips.push({ key: 'b2b', label: 'Back-to-back', tone: 'warn' })
-  if (c.is3In4) chips.push({ key: 'crowded', label: '3 in 4 nights', tone: 'warn' })
-  else if (c.is4In6) chips.push({ key: 'crowded', label: '4 in 6 nights', tone: 'warn' })
+  // "3rd game in 4 nights": the count includes this game (the data's own count; the plain "3 in 4" if it is missing)
+  if (c.is3In4) chips.push({ key: 'crowded', label: c.gamesIn4 ? `${ordinal(c.gamesIn4)} game in 4 nights` : '3 in 4 nights', tone: 'warn' })
+  else if (c.is4In6) chips.push({ key: 'crowded', label: c.gamesIn6 ? `${ordinal(c.gamesIn6)} game in 6 nights` : '4 in 6 nights', tone: 'warn' })
   if (c.daysRest !== null && c.daysRest >= RESTED_DAYS) chips.push({ key: 'rested', label: `Rested · ${c.daysRest} days`, tone: 'good' })
   if (!isHome && c.stintGame !== null && c.stintGame >= ROAD_TRIP_GAME) chips.push({ key: 'trip', label: `Road trip · game ${c.stintGame}`, tone: 'info' })
   if (c.restEdge !== null && c.restEdge >= REST_EDGE_DAYS) chips.push({ key: 'edge', label: `Rest edge +${c.restEdge}`, tone: 'good' })
   return chips
+}
+
+/** The line under a team's name: its season averages, "scores 110.0 · allows 105.3". Null when there is no figure (no games yet). */
+export function averagesText(a: SlateAverage | undefined): string | null {
+  if (!a || a.pts === null || a.allowed === null) return null
+  return `scores ${a.pts.toFixed(1)} · allows ${a.allowed.toFixed(1)}`
+}
+
+/** The hover text for that line: which games it is made from. */
+export function averagesTitle(a: SlateAverage | undefined): string {
+  if (!a || a.games === 0) return 'No games yet'
+  return `Average points per game over ${a.games} game${a.games === 1 ? '' : 's'}${a.seasonLabel ? ` in ${a.seasonLabel}` : ''}`
 }

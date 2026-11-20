@@ -7,12 +7,12 @@ import { teamLabel } from './lib/format.ts'
 import { GAME_TYPE_OPTIONS } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { hashFor } from './lib/pages.ts'
-import { chipsFor, dateHeading, easternDate, emptyText, gameStatus, shiftDate, winner } from './lib/slate.ts'
+import { averagesText, averagesTitle, chipsFor, dateHeading, easternDate, emptyText, gameStatus, shiftDate, winner } from './lib/slate.ts'
 import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
 import { THEME } from './lib/themes.ts'
-import type { GameType, SideContext, SlateGame } from './types.ts'
+import type { GameType, SideContext, SlateAverage, SlateGame } from './types.ts'
 
 const labelClass = 'text-xs font-semibold tracking-wider text-(--muted) uppercase'
 const arrowClass =
@@ -49,8 +49,9 @@ function errorText(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong.'
 }
 
-/** One side of a game: the logo and name (a link to that team's page), the score, and Team / Players buttons for that team. */
-function Side({ code, name, pts, won, final }: { code: string; name: string; pts: number | null; won: boolean; final: boolean }) {
+/** One side of a game: the logo and name (a link to that team's page), its season averages, the score, and a Players button. */
+function Side({ code, name, pts, won, final, avg }: { code: string; name: string; pts: number | null; won: boolean; final: boolean; avg: SlateAverage | undefined }) {
+  const avgLine = averagesText(avg)
   return (
     <div className="flex flex-wrap items-center gap-3">
       <a href={hashFor('teams', code)} className="flex min-w-0 flex-1 items-center gap-3 text-(--text) no-underline" aria-label={`Open the ${teamLabel(code)} page`}>
@@ -59,7 +60,10 @@ function Side({ code, name, pts, won, final }: { code: string; name: string; pts
           <span className="truncate text-[17px] leading-tight font-semibold" style={{ fontFamily: 'var(--display)' }}>
             {name}
           </span>
-          <span className="text-xs text-(--muted)">{code}</span>
+          <span className="text-xs text-(--muted)" title={averagesTitle(avg)}>
+            {code}
+            {avgLine && ` · ${avgLine}`}
+          </span>
         </span>
       </a>
       {final && pts !== null && (
@@ -68,9 +72,6 @@ function Side({ code, name, pts, won, final }: { code: string; name: string; pts
         </span>
       )}
       <span className="flex gap-1.5">
-        <a href={hashFor('teams', code)} className={smallLink}>
-          Team
-        </a>
         <a href={hashFor('players', code)} className={smallLink}>
           Players
         </a>
@@ -79,18 +80,18 @@ function Side({ code, name, pts, won, final }: { code: string; name: string; pts
   )
 }
 
-function GameCard({ g }: { g: SlateGame }) {
+function GameCard({ g, averages }: { g: SlateGame; averages: Record<string, SlateAverage> }) {
   const w = winner(g)
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
-      <Side code={g.away} name={g.awayName} pts={g.awayPts} won={w === 'away'} final={g.isFinal} />
+      <Side code={g.away} name={g.awayName} pts={g.awayPts} won={w === 'away'} final={g.isFinal} avg={averages[g.away]} />
       <Chips code={g.away} context={g.awayContext} isHome={false} />
       <div className="flex items-center gap-3 text-xs font-semibold tracking-widest text-(--muted) uppercase">
         <span>at</span>
         <span className="h-px flex-1 bg-(--border)" />
         <span className={g.isFinal ? 'text-(--accent)' : ''}>{gameStatus(g)}</span>
       </div>
-      <Side code={g.home} name={g.homeName} pts={g.homePts} won={w === 'home'} final={g.isFinal} />
+      <Side code={g.home} name={g.homeName} pts={g.homePts} won={w === 'home'} final={g.isFinal} avg={averages[g.home]} />
       <Chips code={g.home} context={g.homeContext} isHome />
     </section>
   )
@@ -98,13 +99,14 @@ function GameCard({ g }: { g: SlateGame }) {
 
 /**
  * Today's games: the games on one date (today in US Eastern time to start), one game type at a time. Each game shows both
- * teams, the score once it is final, and a link to each team's page and player list. The arrows move one day at a time.
+ * teams with their season scoring averages, the score once it is final, and a link to each team's page (the name) and player list. The arrows move one day at a time.
  */
 export default function TodayPage() {
   const today = easternDate()
   const [date, setDate] = useState(today)
   const [gameType, setGameType] = useState<GameType>('regular-season')
   const [games, setGames] = useState<SlateGame[] | null>(null)
+  const [averages, setAverages] = useState<Record<string, SlateAverage>>({})
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0) // bumped by "Try again"
 
@@ -127,7 +129,11 @@ export default function TodayPage() {
   useEffect(() => {
     let cancelled = false
     fetchSlate(date, gameType)
-      .then((s) => !cancelled && setGames(s.games))
+      .then((s) => {
+        if (cancelled) return
+        setGames(s.games)
+        setAverages(s.averages ?? {})
+      })
       .catch((e) => !cancelled && setError(errorText(e)))
     return () => {
       cancelled = true
@@ -220,7 +226,7 @@ export default function TodayPage() {
         {games && games.length > 0 && (
           <div key={`${date}-${gameType}`} className="stagger grid gap-4 md:grid-cols-2">
             {games.map((g) => (
-              <GameCard key={g.id} g={g} />
+              <GameCard key={g.id} g={g} averages={averages} />
             ))}
           </div>
         )}
