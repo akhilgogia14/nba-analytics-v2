@@ -112,3 +112,15 @@ export function missBand(views: Views): MissBand {
 export const typicalMiss = (stat: OutlookStat, band: MissBand): number => TYPICAL_MISS[stat][band]
 
 export const missBandText = (band: MissBand): string => MISS_BANDS.find((b) => b.key === band)?.text ?? 'all players'
+
+/** One headline tile: the baseline, the typical miss, and his own lowest and highest over his last 10 games. Null figures when there are no games. */
+export type Tile = { key: OutlookStat; label: string; digits: number; base: number | null; miss: number; lo: number | null; hi: number | null; games: number }
+
+export function headlineTiles(views: Views): Tile[] {
+  const band = missBand(views)
+  return OUTLOOK_STATS.map((s) => {
+    const last10 = summarize(views.last10, s.key)
+    const base = baseline(last10, summarize(views.season, s.key))
+    return { key: s.key, label: s.label, digits: s.digits, base, miss: typicalMiss(s.key, band), lo: last10?.min ?? null, hi: last10?.max ?? null, games: last10?.n ?? 0 }
+  })
+}
