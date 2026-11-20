@@ -60,6 +60,17 @@ export const LEAGUE_SQL = `
   FROM ${LOG_TABLE}
   WHERE game_type = :gt AND season = (SELECT max(season) FROM ${LOG_TABLE} WHERE game_type = :gt)`
 
+// Every team's season so far, per game, for the latest season that has games of this type: the Teams page's "how this team stacks up"
+// card ranks one team against the rest. A team is found by its id (so a changed code is one team); its code is the one on its newest game.
+export const RANKING_STATS = ['pts', 'allowed', 'margin', 'fg_pct', 'fg3m', 'ast', 'reb', 'tov', 'stl', 'blk']
+export const RANKING_SQL = `
+  SELECT max_by(team_tricode, game_date) AS team, max(season_label) AS season_label, count(*) AS games, sum(CAST(won AS INT)) AS wins,
+         avg(pts), avg(opp_pts), avg(pts - opp_pts), try_divide(sum(fgm), sum(fga)) * 100, avg(fg3m), avg(ast), avg(reb), avg(tov), avg(stl), avg(blk)
+  FROM ${LOG_TABLE}
+  WHERE game_type = :gt AND season = (SELECT max(season) FROM ${LOG_TABLE} WHERE game_type = :gt)
+  GROUP BY team_id
+  ORDER BY team`
+
 // ---- row mapping (the warehouse returns every value as a string or null) ----
 const num = (v) => (v === null || v === undefined ? null : Number(v))
 const bool = (v) => v === true || v === 'true'
@@ -129,4 +140,15 @@ export function mapLeague(rows) {
     stats[k] = num(r[i + 2])
   })
   return { seasonLabel: r[1], games: num(r[0]), stats }
+}
+
+/** Rows (RANKING_SQL) -> { seasonLabel, teams: [{ team, games, wins, stats }] }, ordered by team code. No rows gives no teams. */
+export function mapRanking(rows) {
+  return {
+    seasonLabel: rows[0]?.[1] ?? null,
+    teams: rows.map((r) => ({
+      team: r[0], games: Number(r[2]), wins: Number(r[3] ?? 0),
+      stats: Object.fromEntries(RANKING_STATS.map((k, i) => [k, num(r[4 + i])])),
+    })),
+  }
 }
