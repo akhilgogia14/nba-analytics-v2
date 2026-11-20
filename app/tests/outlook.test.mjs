@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { hashFor, pageFromHash, parseHash, playerFromHash } from '../src/lib/pages.ts'
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, fromMeeting, fromRecent, headlineTiles, seasonGames, summarize } from '../src/lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, fromMeeting, fromRecent, behindTile, headlineTiles, seasonGames, summarize } from '../src/lib/outlook.ts'
 
 const stats = (o = {}) => ({ pts: 20, reb: 5, ast: 4, fg3m: 2, blk: 0, stl: 1, ...o })
 const g = (id, date, o = {}, minutes = 30) => ({ id, date, opp: 'BOS', isHome: true, seasonLabel: '2026-27', values: { ...stats(o), minutes } })
@@ -179,4 +179,26 @@ test('headline tiles: the baseline, the band\'s typical miss, and his lowest to 
 test('headline tiles with no games show no figures rather than zeros', () => {
   const t = headlineTiles({ last10: [], season: [], opponent: [] })[0]
   assert.deepEqual([t.base, t.lo, t.hi, t.games], [null, null, null, 0])
+})
+
+test('behind a tile: the same baseline as the tile, each game once, newest first, flagged by window', () => {
+  const season = [g('d', '2026-11-04', { pts: 30 }), g('c', '2026-11-03', { pts: 20 }), g('b', '2026-11-02', { pts: 10 }), g('a', '2026-11-01', { pts: 20 })]
+  const last10 = [g('d', '2026-11-04', { pts: 30 }), g('c', '2026-11-03', { pts: 20 }), g('z', '2025-04-01', { pts: 40 })] // z is from an earlier season
+  const views = { last10, season, opponent: [g('o1', '2026-10-20', { pts: 8 }), g('o2', '2026-10-25', { pts: 12 })] }
+  const b = behindTile(views, 'pts')
+  assert.equal(b.base, headlineTiles(views)[0].base) // the tile and the panel can never disagree
+  assert.ok(Math.abs(b.base - ((30 + 20 + 40) / 3 + (30 + 20 + 10 + 20) / 4) / 2) < 1e-9)
+  // newest first by date: d (Nov 4), c, b, a, then z (April 2025); each game once
+  assert.deepEqual(b.rows.map((r) => [r.game.id, r.inLast10, r.inSeason]), [['d', true, true], ['c', true, true], ['b', false, true], ['a', false, true], ['z', true, false]])
+  assert.deepEqual(b.opponentRows.map((r) => r.game.id), ['o2', 'o1']) // newest first, outside the baseline
+  assert.equal(b.opponent.avg, 10)
+  assert.deepEqual([b.label, b.digits], ['Points', 1])
+})
+
+test('behind a tile: a gap shows as no value and is left out of the averages; no games gives empty lists and no baseline', () => {
+  const b = behindTile({ last10: [g('a', '2026-11-01', { blk: null }), g('b', '2026-11-02', { blk: 2 })], season: [], opponent: [] }, 'blk')
+  assert.deepEqual(b.rows.map((r) => r.value), [2, null])
+  assert.equal(b.last10.avg, 2)
+  const none = behindTile({ last10: [], season: [], opponent: [] }, 'pts')
+  assert.deepEqual([none.rows, none.opponentRows, none.base, none.last10, none.season, none.opponent], [[], [], null, null, null, null])
 })
