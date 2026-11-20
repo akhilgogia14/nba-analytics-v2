@@ -1,34 +1,91 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import {
-  DEFENSE_STAT_LIST, barShare, defenseRows, defenseTotals, defendedGames, fmtDelta, fmtFigure, fmtRange, listRows, roleLabel, seasonSpan, THIN_PLAYER_GAMES, type DefenseRow,
+  DEFENSE_STAT_LIST, barShare, defenseRows, defenseTotals, defendedGames, fmtDelta, fmtFigure, fmtRange, groupSummary, linesForGroup, listRows, roleLabel, seasonSpan, THIN_PLAYER_GAMES, type DefenseRow,
 } from '../lib/defense.ts'
+import { fetchDefenseLines } from '../api.ts'
+import { shortDate } from '../lib/format.ts'
+import { hashFor } from '../lib/pages.ts'
 import { KpiTiles } from './KpiTiles.tsx'
 import { panelStyle, pillClass, pillStyle } from '../lib/styles.ts'
-import type { DefenseStat, TeamDefense } from '../types.ts'
+import type { DefenseLine, DefenseStat, GameType, TeamDefense } from '../types.ts'
 
 const cell = 'px-3 py-2 text-right text-[14px] tabular-nums whitespace-nowrap'
 const head = 'px-3 py-2 text-right text-xs font-semibold tracking-wider text-(--muted) uppercase whitespace-nowrap'
 
-/** One line of the list: the group, its per-game figure, and a bar from the league level (the centre line) to the right when the team gives up more, to the left when less. */
-function ListRow({ r, digits, scale }: { r: DefenseRow; digits: number; scale: number }) {
+/** The players behind one group: every opposing player-game that went into its figure, biggest in the chosen stat first. */
+function GroupPlayers({ lines, stat, label, team }: { lines: DefenseLine[] | null; stat: DefenseStat; label: string; team: string }) {
+  if (!lines) return <div className="py-2 text-[14px] text-(--muted)">Loading the players...</div>
+  const shown = linesForGroup(lines, label, stat)
+  if (shown.length === 0) return <div className="py-2 text-[14px] text-(--muted)">Nobody in this group has played against {team} yet.</div>
+  const sum = groupSummary(shown, stat)
+  const gameText = (l: DefenseLine) => `${shortDate(l.date)} · ${l.team} ${l.home ? 'vs' : '@'} ${team}`
+  return (
+    <div className="pb-3">
+      <p className="m-0 mb-1 text-[13px] text-(--muted)">
+        {sum.playerGames} player-{sum.playerGames === 1 ? 'game' : 'games'} from {sum.players} {sum.players === 1 ? 'player' : 'players'}, {fmtFigure(sum.total, 0)} {(DEFENSE_STAT_LIST.find((x) => x.key === stat)?.label ?? stat).toLowerCase()} in total.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className={`${head} text-left!`}>Player</th>
+              <th className={`${head} hidden text-left! md:table-cell`}>Game</th>
+              <th className={`${head} hidden md:table-cell`}>Min</th>
+              <th className={head}>{DEFENSE_STAT_LIST.find((s) => s.key === stat)?.label}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((l) => (
+              <tr key={`${l.id}:${l.gameId}`} className="border-t border-(--border)">
+                <th scope="row" className="px-1.5 py-1.5 text-left text-[14px] font-semibold md:px-3">
+                  <a href={hashFor('players', l.team, 'overview', l.id)} className="text-(--text) no-underline hover:underline" title={`Open ${l.name}`}>
+                    {l.name}
+                  </a>
+                  <div className="text-xs font-normal text-(--muted) md:hidden">
+                    {gameText(l)} · {l.minutes === null ? '-' : Math.round(l.minutes)} min
+                  </div>
+                </th>
+                <td className="hidden px-1.5 py-1.5 text-left text-[13px] whitespace-nowrap text-(--muted) md:table-cell md:px-3">{gameText(l)}</td>
+                <td className={`${cell} hidden px-1.5! text-(--muted) md:table-cell md:px-3!`}>{l.minutes === null ? '-' : Math.round(l.minutes)}</td>
+                <td className={`${cell} px-1.5! font-semibold md:px-3!`}>{fmtFigure(l.stats[stat], 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/** One line of the list: the group, its per-game figure, and a bar from the league level (the centre line) to the right when the team gives up more, to the left when less. Click it to see the players. */
+function ListRow({ r, digits, scale, open, onToggle, panel }: { r: DefenseRow; digits: number; scale: number; open: boolean; onToggle: () => void; panel: ReactNode }) {
   const w = barShare(r.diffPerGame, scale)
   const more = (r.diffPerGame ?? 0) > 0
   return (
-    <li className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 border-t border-(--border) py-2 first:border-t-0 md:grid-cols-[170px_160px_1fr_72px]">
-      <div className="text-[14px] font-semibold md:col-start-1 md:row-start-1">
-        {roleLabel(r.role)} · {r.label}
-      </div>
-      <div className="order-3 col-span-2 text-[13px] text-(--muted) tabular-nums md:order-none md:col-span-1 md:col-start-2 md:row-start-1">
-        {fmtFigure(r.perGame, digits)} <span className="text-xs">(league {fmtFigure(r.leaguePerGame, digits)})</span>
-      </div>
-      <div className="relative order-2 col-span-2 h-3 rounded-sm bg-(--track) md:order-none md:col-span-1 md:col-start-3 md:row-start-1" aria-hidden="true">
-        <div className="absolute inset-y-0 left-1/2 w-px bg-(--muted)" />
-        <div
-          className="absolute inset-y-0 rounded-sm"
-          style={{ width: `${w}%`, [more ? 'left' : 'right']: '50%', background: more ? 'var(--accent)' : 'var(--muted)', opacity: more ? 1 : 0.55 }}
-        />
-      </div>
-      <div className="text-right text-[14px] font-semibold tabular-nums md:col-start-4 md:row-start-1">{fmtDelta(r.diffPerGame, digits)}</div>
+    <li className="border-t border-(--border) first:border-t-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="grid min-h-11 w-full cursor-pointer grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 bg-transparent py-2 text-left text-(--text) md:grid-cols-[170px_160px_1fr_72px]"
+      >
+        <div className="text-[14px] font-semibold md:col-start-1 md:row-start-1">
+          <span aria-hidden="true" className="mr-1.5 text-(--muted)">{open ? '▾' : '▸'}</span>
+          {roleLabel(r.role)} · {r.label}
+        </div>
+        <div className="order-3 col-span-2 text-[13px] text-(--muted) tabular-nums md:order-none md:col-span-1 md:col-start-2 md:row-start-1">
+          {fmtFigure(r.perGame, digits)} <span className="text-xs">(league {fmtFigure(r.leaguePerGame, digits)})</span>
+        </div>
+        <div className="relative order-2 col-span-2 h-3 rounded-sm bg-(--track) md:order-none md:col-span-1 md:col-start-3 md:row-start-1" aria-hidden="true">
+          <div className="absolute inset-y-0 left-1/2 w-px bg-(--muted)" />
+          <div
+            className="absolute inset-y-0 rounded-sm"
+            style={{ width: `${w}%`, [more ? 'left' : 'right']: '50%', background: more ? 'var(--accent)' : 'var(--muted)', opacity: more ? 1 : 0.55 }}
+          />
+        </div>
+        <div className="text-right text-[14px] font-semibold tabular-nums md:col-start-4 md:row-start-1">{fmtDelta(r.diffPerGame, digits)}</div>
+      </button>
+      {open && panel}
     </li>
   )
 }
@@ -58,8 +115,30 @@ function Row({ r, digits }: { r: DefenseRow; digits: number }) {
  * lists for them. One stat at a time (the switch). The team's figures are its newest season; the league's are every team over every
  * season on record. Groups with only a few opposing player-games are tucked into a fold-out.
  */
-export function DefenseGrid({ defense, error, onRetry }: { defense: TeamDefense | null; error: string; onRetry: () => void }) {
+export function DefenseGrid({ defense, error, onRetry, team, gameType }: { defense: TeamDefense | null; error: string; onRetry: () => void; team: string; gameType: GameType }) {
   const [stat, setStat] = useState<DefenseStat>('pts')
+  const [openKey, setOpenKey] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState<{ id: string; lines: DefenseLine[] } | null>(null)
+  const [linesError, setLinesError] = useState('')
+  const linesId = `${team}:${gameType}`
+  const lines = loaded?.id === linesId ? loaded.lines : null
+  // The players load the first time a row is opened (one request for every group), then every row and stat reads from them.
+  useEffect(() => {
+    if (openKey === null || lines) return
+    let cancelled = false
+    fetchDefenseLines(team, gameType)
+      .then((d) => !cancelled && setLoaded({ id: linesId, lines: d.lines }))
+      .catch(() => !cancelled && setLinesError('Could not load the players. Close the row and open it again.'))
+    return () => {
+      cancelled = true
+    }
+  }, [openKey, lines, team, gameType, linesId])
+  const toggle = (key: string) => {
+    setLinesError('')
+    setOpenKey((k) => (k === key ? null : key))
+  }
+  const panelFor = (key: string) =>
+    linesError ? <div className="py-2 text-[14px] text-(--warnText)" role="alert">{linesError}</div> : <GroupPlayers lines={lines} stat={stat} label={key} team={team} />
   const spec = DEFENSE_STAT_LIST.find((s) => s.key === stat) ?? DEFENSE_STAT_LIST[0]
   const rows = defense ? defenseRows(defense, stat) : []
   const n = defense ? defendedGames(defense) : 0
@@ -114,7 +193,7 @@ export function DefenseGrid({ defense, error, onRetry }: { defense: TeamDefense 
             ) : (
               <ul className="m-0 flex list-none flex-col p-0">
                 {list.main.map((r) => (
-                  <ListRow key={r.key} r={r} digits={spec.digits} scale={list.scale} />
+                  <ListRow key={r.key} r={r} digits={spec.digits} scale={list.scale} open={openKey === r.key} onToggle={() => toggle(r.key)} panel={panelFor(r.key)} />
                 ))}
               </ul>
             )}
@@ -126,11 +205,20 @@ export function DefenseGrid({ defense, error, onRetry }: { defense: TeamDefense 
               </summary>
               <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0">
                 {list.small.map((r) => (
-                  <li key={r.key} className="flex flex-wrap justify-between gap-2 tabular-nums">
-                    <span>
-                      {roleLabel(r.role)} · {r.label}
-                    </span>
-                    <span>{r.playerGames === 0 ? 'no player-games' : `${r.playerGames} player-games · ${fmtFigure(r.perGame, spec.digits)} per game (league ${fmtFigure(r.leaguePerGame, spec.digits)})`}</span>
+                  <li key={r.key}>
+                    <button
+                      type="button"
+                      aria-expanded={openKey === r.key}
+                      onClick={() => toggle(r.key)}
+                      className="flex min-h-11 w-full cursor-pointer flex-wrap items-center justify-between gap-2 bg-transparent text-left text-[14px] text-(--muted) tabular-nums"
+                    >
+                      <span className="font-semibold text-(--text)">
+                        <span aria-hidden="true" className="mr-1.5 text-(--muted)">{openKey === r.key ? '▾' : '▸'}</span>
+                        {roleLabel(r.role)} · {r.label}
+                      </span>
+                      <span>{r.playerGames === 0 ? 'no player-games' : `${r.playerGames} player-games · ${fmtFigure(r.perGame, spec.digits)} per game (league ${fmtFigure(r.leaguePerGame, spec.digits)})`}</span>
+                    </button>
+                    {openKey === r.key && panelFor(r.key)}
                   </li>
                 ))}
               </ul>

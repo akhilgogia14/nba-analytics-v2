@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  DEFENSE_POSITIONS, DEFENSE_ROLES, DEFENSE_STATS, LEAGUE_DEFENSE_SQL, NOT_LISTED, TEAM_DEFENSE_SQL, mapDefense,
+  DEFENSE_POSITIONS, DEFENSE_ROLES, DEFENSE_STATS, DEFENSE_PLAYERS_SQL, LEAGUE_DEFENSE_SQL, NOT_LISTED, TEAM_DEFENSE_SQL, mapDefense, mapDefensePlayers,
 } from '../server/defenseQueries.mjs'
 
 test('defense SQL: named parameters only, three gold tables, one game type, no bronze or silver', () => {
@@ -61,4 +61,23 @@ test('mapDefense: the season span is the earliest first and latest last label ac
   const b = row('bench', 'G'); b[b.length - 2] = '2023-24'; b[b.length - 1] = '2025-26'
   const out = mapDefense([a, b])
   assert.deepEqual([out.firstSeason, out.lastSeason], ['2021-22', '2026-27'])
+})
+
+test('players SQL: the same defended games and labels as the grid, one game type, nothing cut off', () => {
+  assert.deepEqual([...new Set([...DEFENSE_PLAYERS_SQL.matchAll(/:\w+/g)].map((m) => m[0]))].sort(), [':gt', ':team'])
+  assert.deepEqual([...new Set([...DEFENSE_PLAYERS_SQL.matchAll(/workspace\.nba_v2_\w+\.\w+/g)].map((m) => m[0]))].sort(),
+    ['workspace.nba_v2_gold.player_season_games', 'workspace.nba_v2_gold.player_season_position', 'workspace.nba_v2_gold.team_game_log'])
+  assert.doesNotMatch(DEFENSE_PLAYERS_SQL, /nba_v2_(silver|bronze)|\$\{|LIMIT|HAVING/i) // no limit and no minimum on games or minutes
+  assert.match(DEFENSE_PLAYERS_SQL, /team_tricode = :team AND season = \(SELECT max\(season\) FROM workspace\.nba_v2_gold\.team_game_log WHERE game_type = :gt\)/)
+  assert.match(DEFENSE_PLAYERS_SQL, /JOIN defended d ON d\.def_id = p\.opponent_team_id AND d\.game_id = p\.game_id/) // only the opponent's players in this team's games
+  assert.match(DEFENSE_PLAYERS_SQL, /p\.played AND p\.game_type = :gt/)
+  assert.match(DEFENSE_PLAYERS_SQL, /IF\(p\.started, 'starter', 'bench'\) AS role, coalesce\(pos\.position, 'Not listed'\) AS label/) // exactly the grid's grouping
+})
+
+test('mapDefensePlayers turns rows into player-games with the six stats', () => {
+  const { lines } = mapDefensePlayers([['1627', 'Jane Roe', 'MIA', '0022600101', '2026-11-14', 'true', 'bench', 'G', '24.5', '20', '3', '5', '2', '0', '1']])
+  assert.deepEqual(lines, [{ id: '1627', name: 'Jane Roe', team: 'MIA', gameId: '0022600101', date: '2026-11-14', home: true, role: 'bench', label: 'G', minutes: 24.5,
+    stats: { pts: 20, reb: 3, ast: 5, fg3m: 2, blk: 0, stl: 1 } }])
+  assert.deepEqual(mapDefensePlayers([]), { lines: [] })
+  assert.equal(mapDefensePlayers([['1', 'A B', 'MIA', 'g', '2026-11-14', 'false', 'starter', 'C', null, null, '1', '1', '1', '1', '1']]).lines[0].minutes, null)
 })

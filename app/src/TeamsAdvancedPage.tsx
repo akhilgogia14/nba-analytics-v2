@@ -284,7 +284,7 @@ export default function TeamsAdvancedPage() {
                 {orderComparisons(highlighted).map((c) => (
                   <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} />
                 ))}
-                <DefenseGrid defense={defense} error={defError} onRetry={() => { setDefError(''); setDefAttempt((n) => n + 1) }} />
+                <DefenseGrid team={team} gameType={gameType} defense={defense} error={defError} onRetry={() => { setDefError(''); setDefAttempt((n) => n + 1) }} />
               </>
             )}
           </div>

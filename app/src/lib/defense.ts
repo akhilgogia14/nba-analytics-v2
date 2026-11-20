@@ -1,4 +1,4 @@
-import type { DefenseGroup, DefenseStat, TeamDefense } from '../types.ts'
+import type { DefenseGroup, DefenseLine, DefenseStat, TeamDefense } from '../types.ts'
 
 /** The six stats, in the order of the switch. `digits` is how many decimals a per-game figure needs (blocks and steals are small). */
 export const DEFENSE_STAT_LIST: { key: DefenseStat; label: string; digits: number }[] = [
@@ -113,3 +113,19 @@ export function listRows(rows: DefenseRow[]): { main: DefenseRow[]; small: Defen
 
 /** How far a bar reaches from the centre line, as a share (0 to 50) of the list's width; the biggest difference reaches the end. */
 export const barShare = (diff: number | null, scale: number): number => (diff === null || !(scale > 0) ? 0 : Math.min(50, (Math.abs(diff) / scale) * 50))
+
+/** The opposing player-games behind one grid row (key "starter:G"), biggest in the chosen stat first, then newest. Nothing is dropped. */
+export function linesForGroup(lines: DefenseLine[], key: string, stat: DefenseStat): DefenseLine[] {
+  return lines
+    .filter((l) => `${l.role}:${l.label}` === key)
+    .sort((a, b) => (b.stats[stat] ?? -1) - (a.stats[stat] ?? -1) || b.date.localeCompare(a.date))
+}
+
+/** How many player-games and different players a group's lines hold, and the chosen stat added up over all of them. */
+export function groupSummary(lines: DefenseLine[], stat: DefenseStat): { playerGames: number; players: number; total: number } {
+  return {
+    playerGames: lines.length,
+    players: new Set(lines.map((l) => l.id)).size,
+    total: lines.reduce((sum, l) => sum + (l.stats[stat] ?? 0), 0),
+  }
+}
