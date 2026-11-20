@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { sql } from './databricks.mjs'
 import {
-  FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapRoster, ROSTER_SQL, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
+  FORM_SQL, GAMELOG_SQL, GAMES_SQL, MEETINGS_SQL, SEASON_SQL, UPCOMING_SQL, addUpcoming, mapForm, mapGameLog, mapGames, mapMeetings, mapPlayers, mapRoster, ROSTER_SQL, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType,
   validPlayerId, validTeam,
 } from './queries.mjs'
 import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
@@ -175,13 +175,25 @@ app.get('/api/players/:id/meetings', async (req, res) => {
 })
 
 // One player's season grid (every game of his team or teams, played or not) for the latest season. No grids = empty list.
+// The games still to come (for the grid's outlines) for the grid's team; if that lookup fails the grid just has none.
+async function withUpcoming(season) {
+  const grid = season.grids.find((g) => g.gameType === 'regular-season')
+  if (!grid) return season
+  try {
+    const rows = await sql(UPCOMING_SQL, [{ name: 'label', value: grid.seasonLabel, type: 'STRING' }, { name: 'teams', value: grid.team, type: 'STRING' }])
+    return addUpcoming(season, rows)
+  } catch {
+    return addUpcoming(season, [])
+  }
+}
+
 app.get('/api/players/:id/season', async (req, res) => {
   const { id } = req.params
   if (!validPlayerId(id)) return res.status(400).json({ ok: false, error: 'Player id must be digits.' })
   try {
     res.json(
       await cached(`season:${id}`, FIVE_MINUTES, async () =>
-        mapSeason(await sql(SEASON_SQL, [{ name: 'id', value: id, type: 'BIGINT' }])),
+        await withUpcoming(mapSeason(await sql(SEASON_SQL, [{ name: 'id', value: id, type: 'BIGINT' }]))),
       ),
     )
   } catch (err) {

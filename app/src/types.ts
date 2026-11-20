@@ -51,6 +51,9 @@ export type SeasonGame = {
   stats: Record<GridStat, number | null>
 }
 
+/** A game still to come (regular season): the team's schedule, with the opponent. */
+export type UpcomingGame = { id: string; date: string; opp: string; isHome: boolean }
+
 /** All of one team's games of one game type in one season. A traded player has one grid per team. */
 export type SeasonGrid = {
   gameType: 'regular-season' | 'playoffs'
@@ -61,6 +64,8 @@ export type SeasonGrid = {
   otherTeams: string | null
   teamGames: number
   games: SeasonGame[]
+  /** Regular season, current team only: the games still to come, in date order (empty if none or the lookup failed). */
+  upcoming?: UpcomingGame[]
 }
 
 export type Season = { grids: SeasonGrid[] }

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   BINS, CARD_BASE, COLUMNS, LOW_VS_MISSED, MISSED, REGULAR_SEASON_GAMES, RING_CONTRAST, TOP_CONTRAST, binFor, buildCells, chartPalette, chroma, hexLayout, hexPoints, hexTip, hitMean,
-  lightenToContrast, playedSummary, seasonMean, valueRange,
+  isVsOpp, lightenToContrast, playedSummary, seasonMean, valueRange,
 } from '../src/lib/hex.ts'
 import { TEAM_STYLES, contrast, luminance } from '../src/lib/teams.ts'
 import { blend } from '../src/lib/teamTheme.ts'
@@ -180,4 +180,34 @@ test('hexTip: value and opponent on top, date, home or away and the mean underne
 
 test('playedSummary counts the games he played against the team games', () => {
   assert.deepEqual(playedSummary(grid()), { played: 4, total: 6 })
+})
+
+const FUTURE = [
+  { id: 'f1', date: '2026-11-20', opp: 'ATL', isHome: true },
+  { id: 'f2', date: '2026-11-22', opp: 'MIA', isHome: false },
+]
+test('scheduled games fill the empty slots in order, and the rest stay empty', () => {
+  const cells = buildCells(grid({ upcoming: FUTURE }), 'reb', [grid()])
+  assert.equal(cells.length, REGULAR_SEASON_GAMES)
+  assert.equal(cells[6].next.opp, 'ATL')
+  assert.equal(cells[7].next.opp, 'MIA')
+  assert.equal(cells[8].next, null)
+  assert.ok(cells.slice(6).every((c) => c.kind === 'upcoming'))
+  assert.equal(buildCells(grid(), 'reb', [grid()])[6].next, null) // no schedule: as before
+})
+
+test('vs the opponent: played, missed and scheduled games all count, other games and no opponent do not', () => {
+  const g = grid({ games: [game(1, true, 4, { opp: 'ATL' }), game(2, false, null, { opp: 'ATL' }), game(3, true, 8)], upcoming: FUTURE })
+  const cells = buildCells(g, 'reb', [g])
+  assert.deepEqual([0, 1, 2, 3, 4].map((i) => isVsOpp(cells[i], 'ATL')), [true, true, false, true, false])
+  assert.ok(cells.every((c) => !isVsOpp(c, '')))
+  assert.ok(!isVsOpp(cells[10], 'ATL')) // an empty slot with no schedule is never "vs"
+})
+
+test('the bubble over a scheduled game names the opponent, the date and home or away', () => {
+  const cells = buildCells(grid({ upcoming: FUTURE }), 'reb', [grid()])
+  const tip = hexTip(cells[7], 'reb', 5)
+  assert.equal(tip.title, '@ MIA · not played yet')
+  assert.equal(tip.detail, 'Nov 22 · away')
+  assert.equal(hexTip(cells[8], 'reb', 5), null) // an empty slot nobody knows has no bubble
 })

@@ -3,7 +3,7 @@ import { shortDate } from './format.ts'
 import { TEAM_STYLES, contrast, luminance } from './teams.ts'
 import { blend } from './teamTheme.ts'
 import { THEME } from './themes.ts'
-import type { GridStat, SeasonGame, SeasonGrid } from '../types.ts'
+import type { GridStat, SeasonGame, SeasonGrid, UpcomingGame } from '../types.ts'
 
 /** The stats the season chart can show, in picker order. */
 export const GRID_STATS: GridStat[] = ['pts', 'reb', 'ast', 'fg3m', 'blk', 'stl']
@@ -143,7 +143,13 @@ export function hitMean(value: number | null, mean: number | null): boolean {
 }
 
 export type CellKind = 'played' | 'missed' | 'upcoming' | 'gap'
-export type Cell = { kind: CellKind; game: SeasonGame | null; value: number | null; hit: boolean; bin: number }
+/** `next` is the scheduled game behind an empty (upcoming) slot, when the schedule knows it. */
+export type Cell = { kind: CellKind; game: SeasonGame | null; value: number | null; hit: boolean; bin: number; next?: UpcomingGame | null }
+
+/** Is this cell a game against the opponent: a game he played or missed, or a scheduled one? */
+export function isVsOpp(c: Cell, opp: string): boolean {
+  return !!opp && (c.game?.opp === opp || c.next?.opp === opp)
+}
 
 /**
  * One cell per slot: his games in date order, then (regular season only) empty slots up to 82. A played game with no
@@ -159,7 +165,9 @@ export function buildCells(grid: SeasonGrid, stat: GridStat, grids: SeasonGrid[]
     return { kind: 'played', game, value, hit: hitMean(value, mean), bin: binFor(value, range.min, range.max) }
   })
   if (grid.gameType === 'regular-season') {
-    for (let i = cells.length; i < REGULAR_SEASON_GAMES; i++) cells.push({ kind: 'upcoming', game: null, value: null, hit: false, bin: 0 })
+    const upcoming = grid.upcoming ?? []
+    const played = cells.length
+    for (let i = played; i < REGULAR_SEASON_GAMES; i++) cells.push({ kind: 'upcoming', game: null, value: null, hit: false, bin: 0, next: upcoming[i - played] ?? null })
   }
   return cells
 }
@@ -169,6 +177,12 @@ export type HexTip = { title: string; detail: string; label: string }
 /** The bubble over a hexagon: value and opponent on top, date and the mean underneath. */
 export function hexTip(cell: Cell, stat: GridStat, mean: number | null): HexTip | null {
   const g = cell.game
+  if (!g && cell.next) {
+    const n = cell.next
+    const title = `${n.isHome ? 'vs' : '@'} ${n.opp} · not played yet`
+    const detail = `${shortDate(n.date)} · ${n.isHome ? 'home' : 'away'}`
+    return { title, detail, label: `${title}. ${detail}.` }
+  }
   if (!g) return null
   const versus = `${g.isHome ? 'vs' : '@'} ${g.opp}`
   const where = `${shortDate(g.date)} · ${g.isHome ? 'home' : 'away'}`

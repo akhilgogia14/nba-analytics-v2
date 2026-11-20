@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  FORM_SQL, GAMELOG_SQL, GAMELOG_WINDOW, GAMES_SQL, GAMES_WINDOW, MEETINGS_COUNT, MEETINGS_SQL, GAME_TYPES, PLAYERS_SQL, PLAYOFF_PLAYERS_SQL, PLAYOFF_TEAMS_SQL, SEASON_SQL, TEAMS_SQL, mapForm,
+  FORM_SQL, GAMELOG_SQL, GAMELOG_WINDOW, GAMES_SQL, GAMES_WINDOW, MEETINGS_COUNT, MEETINGS_SQL, GAME_TYPES, PLAYERS_SQL, PLAYOFF_PLAYERS_SQL, PLAYOFF_TEAMS_SQL, SEASON_SQL, TEAMS_SQL, UPCOMING_SQL, addUpcoming, mapForm,
   mapGameLog, mapGames, mapMeetings, mapPlayers, previousSeasonLabel, mapSeason, mapTeams, playersSqlFor, teamsSqlFor, validGameType, validPlayerId, validTeam,
 } from '../server/queries.mjs'
 
@@ -337,4 +337,19 @@ test('mapGameLog: keeps newest first (the opposite of mapGames), converts values
   assert.deepEqual(games[1].box, { started: false, fgm: 8, fga: 17, fg3a: 4, ftm: 2, fta: 2, oreb: 0, dreb: 5, tov: null, pf: 2, plusMinus: 0 }) // a gap stays null; 0 is 0
   assert.equal(games[1].stats.stl, null)
   assert.deepEqual(mapGameLog([]), { games: [] })
+})
+
+test('addUpcoming gives the regular-season grid of his current team its scheduled games, with the opponent and home or away', () => {
+  const season = { grids: [{ gameType: 'regular-season', team: 'NYK' }, { gameType: 'regular-season', team: 'WAS' }, { gameType: 'playoffs', team: 'NYK' }] }
+  const rows = [['a', '2026-11-20', 'NYK', 'ATL'], ['b', '2026-11-22', 'MIA', 'NYK'], ['c', '2026-11-23', 'WAS', 'BOS']]
+  addUpcoming(season, rows)
+  assert.deepEqual(season.grids[0].upcoming, [{ id: 'a', date: '2026-11-20', opp: 'ATL', isHome: true }, { id: 'b', date: '2026-11-22', opp: 'MIA', isHome: false }])
+  assert.deepEqual(season.grids[1].upcoming, []) // an earlier team of a traded player
+  assert.equal(season.grids[2].upcoming, undefined) // playoffs: no schedule
+  assert.deepEqual(addUpcoming({ grids: [] }, rows), { grids: [] })
+})
+
+test('UPCOMING_SQL is fixed text, regular season, not final, and takes only the two named values', () => {
+  assert.match(UPCOMING_SQL, /game_type = 'regular-season' AND NOT is_final/)
+  assert.deepEqual([...UPCOMING_SQL.matchAll(/:(\w+)/g)].map((m) => m[1]).filter((v, i, a) => a.indexOf(v) === i).sort(), ['label', 'teams'])
 })
