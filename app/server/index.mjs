@@ -9,7 +9,7 @@ import {
 import { LEAGUE_CONTEXT_SQL, NEXT_GAME_SQL, TEAM_CONTEXT_SQL, mapBuckets, mapNextGame } from './contextQueries.mjs'
 import { LEAGUE_PLAYER_CONTEXT_SQL, PLAYER_CONTEXT_SQL, PLAYER_TEAM_SQL, mapPlayerBuckets, mapPlayerTeam } from './playerContextQueries.mjs'
 import { LEAGUE_DEFENSE_SQL, TEAM_DEFENSE_SQL, mapDefense } from './defenseQueries.mjs'
-import { SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
+import { SLATE_AVERAGES_SQL, SLATE_SQL, mapSlate, validDate } from './slateQueries.mjs'
 import {
   LEAGUE_SQL, TEAM_FORM_SQL, TEAM_GAMES_SQL, TEAM_LOG_SQL, TEAM_MEETINGS_SQL, mapLeague, mapTeamForm, mapTeamGames, mapTeamLog, mapTeamMeetings,
 } from './teamQueries.mjs'
@@ -286,7 +286,10 @@ app.get('/api/games', async (req, res) => {
   try {
     res.json(
       await cached(`slate:${date}:${type}`, FIVE_MINUTES, async () =>
-        mapSlate(await sql(SLATE_SQL, [{ name: 'date', value: date, type: 'STRING' }, { name: 'gt', value: type, type: 'STRING' }])),
+        mapSlate(
+          await sql(SLATE_SQL, [{ name: 'date', value: date, type: 'STRING' }, { name: 'gt', value: type, type: 'STRING' }]),
+          await sql(SLATE_AVERAGES_SQL, [{ name: 'gt', value: type, type: 'STRING' }]),
+        ),
       ),
     )
   } catch (err) {

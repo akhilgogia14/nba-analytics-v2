@@ -158,6 +158,9 @@ export type SideContext = {
   is4In6: boolean
   stintGame: number | null
   restEdge: number | null
+  /** This team's games in the 4 / 6 days ending on this game's date, this game included. */
+  gamesIn4: number | null
+  gamesIn6: number | null
 }
 
 /** One game on the Today's games page. Scores and the winner are null until the game is final. */
@@ -175,7 +178,9 @@ export type SlateGame = {
   homeContext: SideContext | null
   awayContext: SideContext | null
 }
-export type Slate = { games: SlateGame[] }
+/** A team's average points scored and allowed per game this season so far, however few games that is. */
+export type SlateAverage = { games: number; pts: number | null; allowed: number | null; seasonLabel: string | null }
+export type Slate = { games: SlateGame[]; averages: Record<string, SlateAverage> }
 
 /** Advanced stats (Teams): how games split by situation. A bucket is a group of games (all, home, away, back-to-back, ...). */
 export type ContextStat = 'pts' | 'allowed' | 'margin' | 'fg_pct' | 'fg3m' | 'tov'
