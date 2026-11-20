@@ -81,7 +81,7 @@ const views = (last10, season, opponent) => ({ last10, season, opponent })
 
 test('chart: one shared scale, lowest value at the left edge and highest at the right, the same dot at the same place in every row', () => {
   const v = views([mk('a', 10), mk('b', 30)], [mk('a', 10), mk('b', 30), mk('c', 20)], [mk('o', 20)])
-  const l = chartLayout(v, 'pts', 1)
+  const l = chartLayout(v, 'pts')
   assert.equal(l.lo, 10)
   assert.equal(l.hi, 30)
   assert.equal(l.rows.length, 3)
@@ -93,20 +93,20 @@ test('chart: one shared scale, lowest value at the left edge and highest at the 
 })
 
 test('chart: the baseline is on the scale, and widens it when it falls outside every game', () => {
-  const l = chartLayout(views([mk('a', 10), mk('b', 30)], [mk('a', 10), mk('b', 30)], []), 'pts', 1)
+  const l = chartLayout(views([mk('a', 10), mk('b', 30)], [mk('a', 10), mk('b', 30)], []), 'pts')
   assert.ok(Math.abs(l.baselineX - 50) < 1e-9) // blend of 20 and 20
   assert.deepEqual([l.rows[2].minX, l.rows[2].avgX, l.rows[2].maxX, l.rows[2].dots.length, l.rows[2].games], [null, null, null, 0, 0])
 })
 
 test('chart: dots carry a hover text with the date, home or away, the opponent and the number', () => {
-  const l = chartLayout(views([mk('a', 31.4, '2026-10-23', { opp: 'MIN', isHome: false })], [], []), 'pts', 1)
-  assert.equal(l.rows[0].dots[0].title, 'Oct 23 at MIN: 31.4')
-  const h = chartLayout(views([mk('a', 12)], [], []), 'pts', 0)
-  assert.equal(h.rows[0].dots[0].title, 'Nov 1 vs BOS: 12')
+  const l = chartLayout(views([mk('a', 31.4, '2026-10-23', { opp: 'MIN', isHome: false })], [], []), 'pts')
+  assert.deepEqual([l.rows[0].dots[0].label, l.rows[0].dots[0].value], ['Oct 23 at MIN', 31.4])
+  const h = chartLayout(views([mk('a', 12)], [], []), 'pts')
+  assert.equal(h.rows[0].dots[0].label, 'Nov 1 vs BOS')
 })
 
 test('chart: a gap is not drawn, and identical values do not divide by zero', () => {
-  const l = chartLayout(views([mk('a', null), mk('b', 7)], [mk('b', 7)], [mk('b', 7)]), 'pts', 1)
+  const l = chartLayout(views([mk('a', null), mk('b', 7)], [mk('b', 7)], [mk('b', 7)]), 'pts')
   assert.equal(l.rows[0].dots.length, 1)
   assert.equal(l.rows[0].games, 2)
   assert.deepEqual([l.lo, l.hi], [6, 8])
@@ -114,7 +114,7 @@ test('chart: a gap is not drawn, and identical values do not divide by zero', ()
 })
 
 test('chart: nothing at all gives empty rows and no baseline', () => {
-  const l = chartLayout(views([], [], []), 'pts', 1)
+  const l = chartLayout(views([], [], []), 'pts')
   assert.equal(l.baselineX, null)
   assert.ok(l.rows.every((r) => r.dots.length === 0 && r.minX === null))
 })
@@ -147,4 +147,18 @@ test('typical miss: the band follows his average minutes over his last 10 games,
   assert.equal(typicalMiss('pts', 'from30'), 5.892)
   assert.equal(missBandText('from30'), 'players averaging 30+ minutes')
   assert.equal(missBandText('all'), 'all players')
+})
+
+import { dotGroups, tipGames, TIP_MAX_GAMES } from '../src/lib/outlookChart.ts'
+
+test('tooltip: games with the same number share one tooltip, newest first, and a long list is cut with a count', () => {
+  const l = chartLayout(views([mk('a', 20, '2026-11-03'), mk('b', 12, '2026-11-02'), mk('c', 20, '2026-11-01')], [], []), 'pts')
+  const g = dotGroups(l.rows[0].dots)
+  assert.equal(g.length, 2)
+  assert.deepEqual(g.map((x) => x.value), [12, 20]) // left to right
+  assert.deepEqual(g[1].games, ['Nov 3 vs BOS', 'Nov 1 vs BOS'])
+  const many = Array.from({ length: TIP_MAX_GAMES + 3 }, (_, k) => `g${k}`)
+  assert.equal(tipGames(many).length, TIP_MAX_GAMES + 1)
+  assert.equal(tipGames(many).at(-1), 'and 3 more')
+  assert.deepEqual(tipGames(['x']), ['x'])
 })
