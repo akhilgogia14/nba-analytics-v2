@@ -8,6 +8,7 @@ One-off studies behind the stability notes. They only read from Databricks and w
 | `player_stability.py` | The same for players (stat effects and availability). | `docs/players-advanced-stability.md` |
 | `adjusted_stability.py` | Do both survive removing home/away and opponent strength? | `docs/adjusted-stability.md` |
 | `backtest_baseline.py` (with `backtest_features.py`) | How good is the Predictions baseline (50/50 last-10 and season) against what happened? | `docs/predictions-backtest.md` |
+| `defense_stability.py` | Does a team's defense against a position group repeat (shown, adjusted, position-specific)? | `docs/defense-stability.md` |
 
 ## How to run
 - They need Databricks Connect, which is **not** in `requirements.txt` (it is a separate environment, see CLAUDE.md "Tools"). Use a venv with `databricks-connect` 16.4.x, `numpy` and `pyarrow<20`, logged in as profile `DEFAULT`.
