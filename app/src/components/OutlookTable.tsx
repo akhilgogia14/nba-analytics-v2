@@ -13,32 +13,33 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
   const band = missBand(views)
   const label = (k: ViewKey) => (k === 'opponent' ? (opp ? `Last 10 vs ${opp}` : 'Last 10 vs opponent') : (VIEWS.find((v) => v.key === k)?.label ?? k))
   return (
-    <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
-      <h2 className="m-0 text-[20px] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
-        What his past games say
-      </h2>
+    <details className="group rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3">
+        <span className="text-[20px] font-semibold tracking-tight" style={{ fontFamily: 'var(--display)' }}>
+          All the numbers
+        </span>
+        <span className="text-[13px] text-(--muted) group-open:hidden">Show the full table</span>
+        <span className="hidden text-[13px] text-(--muted) group-open:inline">Hide</span>
+      </summary>
+      <div className="mt-3 flex flex-col gap-3">
       <section className="flex max-w-3xl flex-col gap-2 text-[14px] leading-relaxed text-(--muted)">
         <strong className="text-(--text)">How to read this</strong>
         <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
           <li>
-            <strong className="text-(--text)">Baseline:</strong> half his last-10 average, half his season average. It is a plain starting point, not a model, and the weights are my choice.
+            <strong className="text-(--text)">Baseline:</strong> half his last-10 average, half his season average, a plain 50/50 split. It is a starting point, not a model.
           </li>
           <li>
-            <strong className="text-(--text)">Typical miss:</strong> how far the baseline was from what happened, on average, when we tested it on 2025-26 and 2026-27 games (for {missBandText(band)}). It is
+            <strong className="text-(--text)">Typical miss:</strong> how far the baseline was from what happened, on average, when tested on 2025-26 and 2026-27 games (for {missBandText(band)}). It is
             an average over those players, so for someone who scores very little the real miss is smaller. Some games miss by more, some by less.
           </li>
           <li>
             <strong className="text-(--text)">Min, Avg, Max:</strong> the lowest, average and highest he has had in each set of games he played. Min and max are single games, so with few games they
-            are wide and lumpy.
+            are wide and lumpy. The last 10 games and this season overlap early in a season.
           </li>
           <li>
-            <strong className="text-(--text)">Last 10 games and this season:</strong> the same games overlap early in a season.
-          </li>
-          <li>
-            <strong className="text-(--text)">Vs the opponent</strong> (muted): his last 10 meetings, from any season. In our earlier back-test, opponent history added almost nothing over the plain
+            <strong className="text-(--text)">Vs the opponent</strong> (muted): his last 10 meetings, from any season. In the back-test, opponent history added almost nothing over the plain
             blend, so read it as context.
           </li>
-          <li>Past games only. Injuries, minutes changes and who else plays are not in these numbers.</li>
         </ul>
       </section>
       <div className="overflow-x-auto">
@@ -97,6 +98,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
           </tbody>
         </table>
       </div>
-    </section>
+      </div>
+    </details>
   )
 }

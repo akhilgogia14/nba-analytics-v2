@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { hashFor, pageFromHash, parseHash, playerFromHash } from '../src/lib/pages.ts'
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, fromMeeting, fromRecent, seasonGames, summarize } from '../src/lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, fromMeeting, fromRecent, headlineTiles, seasonGames, summarize } from '../src/lib/outlook.ts'
 
 const stats = (o = {}) => ({ pts: 20, reb: 5, ast: 4, fg3m: 2, blk: 0, stl: 1, ...o })
 const g = (id, date, o = {}, minutes = 30) => ({ id, date, opp: 'BOS', isHome: true, seasonLabel: '2026-27', values: { ...stats(o), minutes } })
@@ -161,4 +161,22 @@ test('tooltip: games with the same number share one tooltip, newest first, and a
   assert.equal(tipGames(many).length, TIP_MAX_GAMES + 1)
   assert.equal(tipGames(many).at(-1), 'and 3 more')
   assert.deepEqual(tipGames(['x']), ['x'])
+})
+
+test('headline tiles: the baseline, the band\'s typical miss, and his lowest to highest over the last 10 games', () => {
+  const last10 = [g('a', '1', { pts: 10 }), g('b', '2', { pts: 30 })]
+  const season = [g('a', '1', { pts: 10 }), g('b', '2', { pts: 30 }), g('c', '3', { pts: 20 }), g('d', '4', { pts: 20 })]
+  const tiles = headlineTiles({ last10, season, opponent: [] })
+  assert.deepEqual(tiles.map((t) => t.key), OUTLOOK_STATS.map((s) => s.key))
+  const pts = tiles[0]
+  assert.equal(pts.base, 20) // half the last-10 average (20), half the season average (20)
+  assert.deepEqual([pts.lo, pts.hi, pts.games], [10, 30, 2])
+  assert.equal(pts.miss, typicalMiss('pts', 'from30')) // 30 minutes a game is the 30+ band
+  // the tile's baseline is the same number the table shows
+  assert.equal(pts.base, baseline(summarize(last10, 'pts'), summarize(season, 'pts')))
+})
+
+test('headline tiles with no games show no figures rather than zeros', () => {
+  const t = headlineTiles({ last10: [], season: [], opponent: [] })[0]
+  assert.deepEqual([t.base, t.lo, t.hi, t.games], [null, null, null, 0])
 })
