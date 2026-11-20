@@ -5,7 +5,7 @@ import type { ContextStat, NextGame } from '../types.ts'
  * so a team's figures show from its first game in a situation; the page prints the game count above every table and in each team
  * column heading, so a figure from one game reads as one game. (It was 8 at first: a small sample is mostly noise.)
  */
-export const MIN_TEAM_GAMES = 1
+export const MIN_TEAM_GAMES = 5
 
 export const CONTEXT_STAT_LIST: { key: ContextStat; label: string; lowerIsBetter: boolean }[] = [
   { key: 'pts', label: 'Points scored', lowerIsBetter: false },
@@ -100,3 +100,15 @@ export function applicableComparisons(g: NextGame | null): Set<ComparisonKey> {
   if (g.restEdge !== null && g.restEdge !== 0) s.add('edge')
   return s
 }
+
+/** The panels with the one that applies to the next game first (the rest keep their order). */
+export function orderComparisons(highlighted: Set<ComparisonKey>): (typeof COMPARISONS)[number][] {
+  return [...COMPARISONS].sort((x, y) => Number(highlighted.has(y.key)) - Number(highlighted.has(x.key)))
+}
+
+/** Can the team's (or player's) own two groups be compared? Each needs at least MIN_TEAM_GAMES games. */
+export const enoughGames = (nA: number, nB: number): boolean => nA >= MIN_TEAM_GAMES && nB >= MIN_TEAM_GAMES
+
+/** What replaces a comparison that has too few games on one side. */
+export const tooFewText = (aLabel: string, nA: number, bLabel: string, nB: number): string =>
+  `Too few games to compare: ${aLabel} ${nA}, ${bLabel} ${nB}. It needs at least ${MIN_TEAM_GAMES} on each side.`

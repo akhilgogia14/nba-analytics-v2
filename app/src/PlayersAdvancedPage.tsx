@@ -3,12 +3,13 @@ import { fetchPlayerContext, fetchPlayers, fetchTeams } from './api.ts'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { PageSwitch } from './components/PageSwitch.tsx'
 import { TeamTabs } from './components/TeamTabs.tsx'
-import { COMPARISONS, MIN_TEAM_GAMES, applicableComparisons, difference, fmtDiff, fmtValue, nextGameFacts } from './lib/context.ts'
+import { COMPARISONS, MIN_TEAM_GAMES, applicableComparisons, difference, enoughGames, fmtDiff, fmtValue, nextGameFacts, orderComparisons, tooFewText } from './lib/context.ts'
+import { KpiTiles } from './components/KpiTiles.tsx'
 import { shortDate, teamLabel } from './lib/format.ts'
 import { GAME_TYPE_OPTIONS } from './lib/gameType.ts'
 import { chartPalette } from './lib/hex.ts'
 import { parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
-import { PLAYER_STAT_LIST, availabilityText, b2bAvailabilityLine, fmtLeague, fmtShare, fmtShareDiff, playedShare } from './lib/playerContext.ts'
+import { PLAYER_STAT_LIST, availabilityText, b2bAvailabilityLine, fmtLeague, fmtShareDiff, playedShare } from './lib/playerContext.ts'
 import { panelStyle, pillClass, pillStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
@@ -18,8 +19,8 @@ import type { GameType, PlayerContext, PlayerOption, PlayerSplit, Team } from '.
 const selectClass =
   'h-12 rounded-xl border border-(--pillBorder) bg-(--inputBg) px-3.5 text-[15px] font-semibold text-(--text) disabled:opacity-50'
 const labelClass = 'text-xs font-semibold tracking-wider text-(--muted) uppercase'
-const cell = 'px-3 py-2 text-right text-[14px] tabular-nums whitespace-nowrap'
-const head = 'px-3 py-2 text-right text-xs font-semibold tracking-wider text-(--muted) uppercase whitespace-nowrap'
+const cell = 'px-1.5 py-2 text-right text-[13px] md:px-3 md:text-[14px] tabular-nums whitespace-nowrap'
+const head = 'px-1.5 py-2 text-right text-[10px] font-semibold tracking-normal md:px-3 md:text-xs md:tracking-wider text-(--muted) uppercase whitespace-nowrap'
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong.'
@@ -27,14 +28,21 @@ function errorText(e: unknown): string {
 const games = (n: number) => n.toLocaleString('en-US')
 const seasons = (s: PlayerSplit) => (s.firstSeason && s.lastSeason ? (s.firstSeason === s.lastSeason ? s.firstSeason : `${s.firstSeason} to ${s.lastSeason}`) : '')
 
-/** One comparison: the league effect (each player against his own season average) beside this player's own figures this season. */
+/** One comparison: the league effect as small tiles, then how often he played in each situation, then his own averages (only when he played enough games on each side). */
 function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[number]; ctx: PlayerContext; highlighted: boolean }) {
   const lA = ctx.league.buckets[c.a]
   const lB = ctx.league.buckets[c.b]
   const pA = ctx.player.buckets[c.a]
   const pB = ctx.player.buckets[c.b]
-  const leagueShare = [playedShare(lA), playedShare(lB)] as const
-  const playerShare = [playedShare(pA), playedShare(pB)] as const
+  const share = fmtShareDiff(playedShare(lA), playedShare(lB))
+  const tiles = [
+    ...PLAYER_STAT_LIST.map((s) => {
+      const l = difference(ctx.league, c.a, c.b, s.key, 1)
+      return { label: s.label, value: l ? fmtLeague(l.diff) : '-' }
+    }),
+    { label: 'Share of games played', value: share },
+  ]
+  const own = enoughGames(pA?.n ?? 0, pB?.n ?? 0)
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
       <div className="flex flex-wrap items-center gap-3">
@@ -47,58 +55,50 @@ function ComparisonPanel({ c, ctx, highlighted }: { c: (typeof COMPARISONS)[numb
           </span>
         )}
       </div>
-      <div className="text-[13px] text-(--muted)">
-        League ({seasons(ctx.league)}), player games: {c.aLabel} {games(lA?.n ?? 0)}, {c.bLabel} {games(lB?.n ?? 0)}. This player ({seasons(ctx.player) || 'this season'}):{' '}
-        {c.aLabel} {availabilityText(pA)}, {c.bLabel} {availabilityText(pB)}.
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] border-collapse">
-          <thead>
-            <tr>
-              <th className={`${head} text-left`}>Stat</th>
-              <th className={head}>League {c.aLabel}</th>
-              <th className={head}>League {c.bLabel}</th>
-              <th className={head}>League difference</th>
-              <th className={head}>
-                Player {c.aLabel} ({pA?.n ?? 0})
-              </th>
-              <th className={head}>
-                Player {c.bLabel} ({pB?.n ?? 0})
-              </th>
-              <th className={head}>Player difference</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PLAYER_STAT_LIST.map((s) => {
-              const l = difference(ctx.league, c.a, c.b, s.key, 1)
-              const p = difference(ctx.player, c.a, c.b, s.key, MIN_TEAM_GAMES)
-              return (
-                <tr key={s.key} className="border-t border-(--border)">
-                  <th scope="row" className="px-3 py-2 text-left text-[14px] font-semibold whitespace-nowrap">
-                    {s.label}
+      <KpiTiles
+        tiles={tiles}
+        caption={`League pattern: ${c.aLabel} minus ${c.bLabel}, against a player's own season average (${seasons(ctx.league)}; ${games(lA?.n ?? 0)} and ${games(lB?.n ?? 0)} player games)`}
+      />
+      <div className="flex flex-col gap-2">
+        <div className="text-xs font-semibold tracking-wider text-(--muted) uppercase">This player, {seasons(ctx.player) || 'this season'}</div>
+        <div className="text-[14px] text-(--muted)">
+          {c.aLabel}: {availabilityText(pA)} · {c.bLabel}: {availabilityText(pB)}
+        </div>
+        {own ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={`${head} text-left!`}>Stat</th>
+                  <th className={head}>
+                    {c.aLabel} ({pA?.n ?? 0})
                   </th>
-                  <td className={cell}>{l ? fmtLeague(l.a) : '-'}</td>
-                  <td className={cell}>{l ? fmtLeague(l.b) : '-'}</td>
-                  <td className={`${cell} font-semibold`}>{l ? fmtLeague(l.diff) : '-'}</td>
-                  <td className={`${cell} text-(--muted)`}>{p ? fmtValue('pts', p.a) : '-'}</td>
-                  <td className={`${cell} text-(--muted)`}>{p ? fmtValue('pts', p.b) : '-'}</td>
-                  <td className={`${cell} text-(--muted)`}>{p ? fmtDiff('pts', p.diff) : 'no games yet'}</td>
+                  <th className={head}>
+                    {c.bLabel} ({pB?.n ?? 0})
+                  </th>
+                  <th className={head}>Diff</th>
                 </tr>
-              )
-            })}
-            <tr className="border-t border-(--border)">
-              <th scope="row" className="px-3 py-2 text-left text-[14px] font-semibold whitespace-nowrap">
-                Share of team games played
-              </th>
-              <td className={cell}>{fmtShare(leagueShare[0])}</td>
-              <td className={cell}>{fmtShare(leagueShare[1])}</td>
-              <td className={`${cell} font-semibold`}>{fmtShareDiff(leagueShare[0], leagueShare[1])}</td>
-              <td className={`${cell} text-(--muted)`}>{pA ? `${pA.n} of ${pA.scheduled}` : '-'}</td>
-              <td className={`${cell} text-(--muted)`}>{pB ? `${pB.n} of ${pB.scheduled}` : '-'}</td>
-              <td className={`${cell} text-(--muted)`}>{fmtShareDiff(playerShare[0], playerShare[1])}</td>
-            </tr>
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {PLAYER_STAT_LIST.map((s) => {
+                  const p = difference(ctx.player, c.a, c.b, s.key, MIN_TEAM_GAMES)
+                  return (
+                    <tr key={s.key} className="border-t border-(--border)">
+                      <th scope="row" className="px-1.5 py-2 text-left text-[13px] font-semibold md:px-3 md:text-[14px]">
+                        {s.label}
+                      </th>
+                      <td className={cell}>{p ? fmtValue('pts', p.a) : '-'}</td>
+                      <td className={cell}>{p ? fmtValue('pts', p.b) : '-'}</td>
+                      <td className={`${cell} font-semibold`}>{p ? fmtDiff('pts', p.diff) : '-'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-[14px] text-(--muted)">{tooFewText(c.aLabel, pA?.n ?? 0, c.bLabel, pB?.n ?? 0)}</div>
+        )}
       </div>
     </section>
   )
@@ -297,28 +297,24 @@ export default function PlayersAdvancedPage() {
               <div className="text-[15px] text-(--muted)">This player has no {gameType === 'playoffs' ? 'playoff ' : ''}games on record this season, so there is nothing to split.</div>
             ) : (
               <>
-                <section className="flex max-w-3xl flex-col gap-2 text-[14px] leading-relaxed text-(--muted)">
-                  <strong className="text-(--text)">How to read this</strong>
-                  <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
+                <p className="m-0 max-w-3xl text-[14px] leading-relaxed text-(--muted)">
+                  In five seasons of data, a player's own split in one half of a season did not predict the other half. Treat his numbers as context, not a trait and not a forecast.
+                </p>
+                <details className="max-w-3xl text-[14px] leading-relaxed text-(--muted)">
+                  <summary className="min-h-11 cursor-pointer font-semibold text-(--text)">How to read this</summary>
+                  <ul className="m-0 mt-1 flex list-disc flex-col gap-1.5 pl-5">
                     <li>
-                      <strong className="text-(--text)">League columns:</strong> how far a stat moves from a player's own season average in that situation, across every player and
+                      <strong className="text-(--text)">League pattern (tiles):</strong> how far a stat moves from a player's own season average in that situation, across every player and
                       season on record (20+ games in a season). The effects are small, usually well under one point or one minute.
                     </li>
                     <li>
-                      <strong className="text-(--text)">Player columns:</strong> his own averages this season. The number in each heading is how many games he played; one or two
-                      games is a single result, not a pattern.
-                    </li>
-                    <li>
-                      <strong className="text-(--text)">Last row:</strong> how many of his team's games he played in that situation. Games missed to injury, rest or a trade count.
-                    </li>
-                    <li>
-                      <strong className="text-(--text)">Tested:</strong> over five seasons, a player's own split in one half of a season did not predict the other half. Treat the player
-                      columns as context, not a trait and not a forecast.
+                      <strong className="text-(--text)">This player (line and table):</strong> how many of his team's games he played in each situation (games missed to injury, rest or a
+                      trade count), then his own averages. A comparison needs at least {MIN_TEAM_GAMES} games he played on each side.
                     </li>
                     <li>Games are compared as played, so opponents and home or away mix in with rest.</li>
                   </ul>
-                </section>
-                {COMPARISONS.map((c) => (
+                </details>
+                {orderComparisons(highlighted).map((c) => (
                   <ComparisonPanel key={c.key} c={c} ctx={ctx} highlighted={highlighted.has(c.key)} />
                 ))}
               </>
