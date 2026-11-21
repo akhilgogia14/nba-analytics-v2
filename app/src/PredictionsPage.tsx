@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { fetchMeetings, fetchPlayerContext, fetchPlayers, fetchRecent, fetchSeason, fetchTeams } from './api.ts'
+import { AddPick } from './components/AddPick.tsx'
 import { CourtBackground } from './components/CourtBackground.tsx'
 import { OutlookCharts } from './components/OutlookCharts.tsx'
 import { OutlookHeadline } from './components/OutlookHeadline.tsx'
@@ -10,6 +11,7 @@ import { shortDate, teamLabel } from './lib/format.ts'
 import { chartPalette } from './lib/hex.ts'
 import { fromMeeting, fromRecent, seasonGames, type Views } from './lib/outlook.ts'
 import { oppFromHash, parseHash, playerFromHash, rememberTeam } from './lib/pages.ts'
+import { PICK_STATS } from './lib/picks.ts'
 import { panelStyle } from './lib/styles.ts'
 import { readableOn } from './lib/teams.ts'
 import { teamLook } from './lib/teamTheme.ts'
@@ -211,7 +213,18 @@ export default function PredictionsPage() {
                 <div className="text-[15px] text-(--muted)">No game on the schedule yet for this team, so there is no next matchup to look at.</div>
               )}
             </section>
-            <OutlookHeadline views={views} opp={oppUsed} />
+            <OutlookHeadline
+              views={views}
+              opp={oppUsed}
+              pickFor={
+                next
+                  ? (stat, base) => {
+                      const k = PICK_STATS.find((x) => x.key === stat)?.key
+                      return k ? <AddPick key={`${playerId}-${k}`} stat={k} base={base} next={next} playerId={playerId} playerName={playerName} team={team} /> : null
+                    }
+                  : undefined
+              }
+            />
             <OutlookTable views={views} opp={oppUsed} />
             <OutlookCharts views={views} opp={oppUsed} />
           </div>
