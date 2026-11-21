@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { CourtBackground } from './components/CourtBackground.tsx'
+import { DocsArchitecture } from './components/docs/DocsArchitecture.tsx'
 import { DocsDictionary } from './components/docs/DocsDictionary.tsx'
 import { DocsHome } from './components/docs/DocsHome.tsx'
 import { DocsModel } from './components/docs/DocsModel.tsx'
@@ -72,6 +73,7 @@ export default function DocsPage() {
         {topic === 'model' && <DocsModel />}
         {topic === 'dictionary' && <DocsDictionary hash={hash} />}
         {topic === 'workflow' && <DocsWorkflow />}
+        {topic === 'architecture' && <DocsArchitecture />}
       </div>
     </div>
   )

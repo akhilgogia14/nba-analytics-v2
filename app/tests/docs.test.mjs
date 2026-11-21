@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { DOCS_TOPICS, FAQ, TABLES, WORKFLOW, docsTopicFromHash, searchTables, tablesIn } from '../src/lib/docs.ts'
+import { COMPONENTS, DECISIONS, DOCS_TOPICS, FAQ, PATHS, REQUEST_STEPS, TABLES, WORKFLOW, docsTopicFromHash, searchTables, tablesIn } from '../src/lib/docs.ts'
 import { parseHash } from '../src/lib/pages.ts'
 
 test('docs addresses: the page and each sub-page', () => {
@@ -13,6 +13,7 @@ test('docs addresses: the page and each sub-page', () => {
   assert.equal(docsTopicFromHash('#/docs/model'), 'model')
   assert.equal(docsTopicFromHash('#/docs/dictionary?q=rest'), 'dictionary')
   assert.equal(docsTopicFromHash('#/docs/workflow'), 'workflow')
+  assert.equal(docsTopicFromHash('#/docs/architecture'), 'architecture')
   assert.equal(docsTopicFromHash('#/docs/nothing'), 'home')
   for (const t of DOCS_TOPICS) assert.equal(docsTopicFromHash(t.path), t.key) // every nav link opens its own topic
 })
@@ -63,4 +64,13 @@ test('workflow steps are numbered in order and the start page has questions', ()
   assert.deepEqual(WORKFLOW.map((s) => s.n), WORKFLOW.map((_, i) => i + 1))
   for (const s of WORKFLOW) assert.ok(s.title && s.where && s.what && s.check)
   assert.ok(FAQ.length >= 5 && FAQ.every((f) => f.q.endsWith('?') && f.a.length > 20))
+})
+
+test('architecture: three paths, every piece explained, and the pieces named in the paths are all described', () => {
+  assert.deepEqual(PATHS.map((p) => p.name), ['Data path', 'Request path', 'Release path'])
+  for (const p of PATHS) assert.ok(p.nodes.length >= 3 && p.nodes.every((n) => n.title && n.sub))
+  for (const c of COMPONENTS) assert.ok(c.name && c.role && c.why)
+  assert.ok(REQUEST_STEPS.length === 5 && DECISIONS.length >= 6)
+  const names = COMPONENTS.map((c) => c.name).join(' | ')
+  for (const must of ['GitHub Actions', 'Cloudflare R2', 'Databricks Apps', 'SQL warehouse', 'Slack']) assert.ok(names.includes(must), `${must} is described`)
 })
