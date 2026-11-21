@@ -2,6 +2,7 @@ import { shortDate } from '../lib/format.ts'
 import { LOG_COLUMNS, SPLITS, averageRow, logNote, madeAtt, signed, splitValue } from '../lib/gamelog.ts'
 import { panelStyle } from '../lib/styles.ts'
 import type { LogGame } from '../types.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 const num = (v: number | null) => (v === null ? '–' : String(v))
 const mins = (v: number | null) => (v === null ? '–' : String(Math.round(v)))
@@ -39,7 +40,7 @@ export function GameLog({ games, error, gamesWord }: { games: LogGame[] | null; 
         <div className="text-xs text-(--muted)">{logNote(games, gamesWord)} S marks a game he started.</div>
       </div>
       {games.length > 0 && (
-        <div className="overflow-x-auto">
+        <ScrollX>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="text-xs text-(--muted)">
@@ -98,7 +99,7 @@ export function GameLog({ games, error, gamesWord }: { games: LogGame[] | null; 
               </tr>
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       )}
     </section>
   )

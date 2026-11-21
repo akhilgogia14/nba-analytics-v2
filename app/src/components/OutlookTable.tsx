@@ -1,5 +1,6 @@
 import { OUTLOOK_STATS, VIEWS, baseline, fmtGame, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type ViewKey, type Views } from '../lib/outlook.ts'
 import { panelStyle } from '../lib/styles.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 const cell = 'px-3 py-2 text-right text-[14px] tabular-nums whitespace-nowrap'
 const head = 'px-3 py-2 text-right text-xs font-semibold tracking-wider text-(--muted) uppercase whitespace-nowrap'
@@ -42,7 +43,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
           </li>
         </ul>
       </section>
-      <div className="overflow-x-auto">
+      <ScrollX>
         <table className="w-full min-w-[860px] border-collapse">
           <thead>
             <tr>
@@ -97,7 +98,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
       </div>
     </details>
   )

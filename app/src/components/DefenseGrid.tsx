@@ -8,6 +8,7 @@ import { hashFor } from '../lib/pages.ts'
 import { KpiTiles } from './KpiTiles.tsx'
 import { panelStyle, pillClass, pillStyle } from '../lib/styles.ts'
 import type { DefenseLine, DefenseStat, GameType, TeamDefense } from '../types.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 const cell = 'px-3 py-2 text-right text-[14px] tabular-nums whitespace-nowrap'
 const head = 'px-3 py-2 text-right text-xs font-semibold tracking-wider text-(--muted) uppercase whitespace-nowrap'
@@ -24,7 +25,7 @@ function GroupPlayers({ lines, stat, label, team }: { lines: DefenseLine[] | nul
       <p className="m-0 mb-1 text-[13px] text-(--muted)">
         {sum.playerGames} player-{sum.playerGames === 1 ? 'game' : 'games'} from {sum.players} {sum.players === 1 ? 'player' : 'players'}, {fmtFigure(sum.total, 0)} {(DEFENSE_STAT_LIST.find((x) => x.key === stat)?.label ?? stat).toLowerCase()} in total.
       </p>
-      <div className="overflow-x-auto">
+      <ScrollX>
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -52,7 +53,7 @@ function GroupPlayers({ lines, stat, label, team }: { lines: DefenseLine[] | nul
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
     </div>
   )
 }
@@ -248,7 +249,7 @@ export function DefenseGrid({ defense, error, onRetry, team, gameType }: { defen
                 </li>
               </ul>
             </section>
-            <div className="mt-2 overflow-x-auto">
+            <ScrollX className="mt-2">
               <table className="w-full min-w-[860px] border-collapse">
                 <thead>
                   <tr>
@@ -278,7 +279,7 @@ export function DefenseGrid({ defense, error, onRetry, team, gameType }: { defen
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollX>
           </details>
         </>
       )}

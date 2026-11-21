@@ -3,6 +3,7 @@ import { hashFor } from '../lib/pages.ts'
 import { panelStyle } from '../lib/styles.ts'
 import { ROSTER_COLUMNS, rosterNote, startsText, statText } from '../lib/roster.ts'
 import type { RosterPlayer } from '../types.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 /**
  * A team's roster under its cards: each player's last-10 averages and how many of those games he started, starters first. A name
@@ -42,7 +43,7 @@ export function TeamRoster({
       {players && players.length > 0 && (
         <>
           <div className="text-xs text-(--muted) md:hidden">Swipe the table sideways for the other columns.</div>
-          <div className="overflow-x-auto">
+          <ScrollX>
             <table className="w-full min-w-[420px] border-collapse text-[13px] md:min-w-[640px] md:text-sm">
               <thead>
                 <tr className="text-left text-xs tracking-wider text-(--muted) uppercase">
@@ -73,7 +74,7 @@ export function TeamRoster({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollX>
         </>
       )}
       {players && players.length === 0 && !error && <div className="text-sm text-(--muted)">No players on record for this team this season.</div>}

@@ -2,6 +2,7 @@ import { shortDate } from '../lib/format.ts'
 import { meetingsNote, seasonTag } from '../lib/meetings.ts'
 import { panelStyle } from '../lib/styles.ts'
 import type { GameType, Meetings } from '../types.ts'
+import { ScrollX } from './ScrollX.tsx'
 
 const COLUMNS = [
   ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['fg3m', '3PM'], ['blk', 'BLK'], ['stl', 'STL'],
@@ -47,7 +48,7 @@ export function MeetingsPanel({
         <>
           <div className="text-[13px] text-(--muted)">{meetingsNote(meetings, opp, gamesWord)}</div>
           {meetings.games.length > 0 && (
-            <div className="overflow-x-auto">
+            <ScrollX>
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="text-left text-xs text-(--muted)">
@@ -89,7 +90,7 @@ export function MeetingsPanel({
                   })}
                 </tbody>
               </table>
-            </div>
+            </ScrollX>
           )}
         </>
       )}

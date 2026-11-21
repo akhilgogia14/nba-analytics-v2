@@ -1,3 +1,4 @@
+import { ScrollX } from './ScrollX.tsx'
 import { complete, f0, f1 } from '../lib/geom.ts'
 import { LABELS, TABLE_STATS } from '../lib/format.ts'
 import { panelStyle } from '../lib/styles.ts'
@@ -7,8 +8,9 @@ const COLUMNS = '2fr repeat(5, 1fr)'
 
 export function CombosTable({ stats }: { stats: Record<string, ApiStat> }) {
   return (
-    <div className="overflow-x-auto rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
+    <div className="rounded-[18px] border border-(--border) bg-(--panel) p-5" style={panelStyle}>
       <div className="mb-2 text-sm font-semibold">Combined stats and minutes</div>
+      <ScrollX>
       <div className="min-w-[560px]">
         <div
           className="grid gap-2 border-b border-(--border) pb-1.5 text-xs text-(--muted)"
@@ -40,6 +42,7 @@ export function CombosTable({ stats }: { stats: Record<string, ApiStat> }) {
           )
         })}
       </div>
+      </ScrollX>
     </div>
   )
 }
