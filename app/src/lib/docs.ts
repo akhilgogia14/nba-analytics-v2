@@ -601,77 +601,95 @@ export const FAQ: Faq[] = [
 
 // ---- System design / architecture --------------------------------------------------------------------------------------------------------
 
-export type Node = { title: string; sub: string }
-export type Path = { name: string; when: string; nodes: Node[] }
-export const PATHS: Path[] = [
-  {
-    name: 'Data path',
-    when: 'Runs on a schedule, no one clicks anything',
-    nodes: [
-      { title: 'Source', sub: 'sportsdataverse files on GitHub' },
-      { title: 'Sync', sub: 'GitHub Actions workflow' },
-      { title: 'Raw storage', sub: 'Cloudflare R2, files untouched' },
-      { title: 'Databricks', sub: 'bronze, silver, gold tables' },
-    ],
-  },
-  {
-    name: 'Request path',
-    when: 'Runs each time you open or click something',
-    nodes: [
-      { title: 'Your browser', sub: 'React app (the pages)' },
-      { title: 'App server', sub: 'Express, on Databricks Apps' },
-      { title: 'SQL warehouse', sub: 'Databricks, read-only' },
-      { title: 'Gold tables', sub: 'Unity Catalog, schema nba_v2_gold' },
-    ],
-  },
-  {
-    name: 'Release path',
-    when: 'Runs when a change is merged, and every 6 hours',
-    nodes: [
-      { title: 'Pull request', sub: 'you review and merge on GitHub' },
-      { title: 'deploy-app workflow', sub: 'type check, lint, tests, build' },
-      { title: 'Databricks Apps', sub: 'upload, restart if stopped, deploy' },
-    ],
-  },
+import type { LogoKey } from './logos.ts'
+
+export const ARCH_SUMMARY = 'Data arrives once a day, is cleaned in three checked layers, and reaches the pages through a login that can only read.'
+
+export const METRICS: { value: string; label: string }[] = [
+  { value: 'Daily', label: 'Refresh, because the source publishes once a day' },
+  { value: '3', label: 'Data layers: bronze, silver, gold' },
+  { value: '5 min', label: 'How long the server remembers an answer' },
+  { value: '6 hours', label: 'Between automatic app restarts and deploys' },
+  { value: 'Read-only', label: 'All the app can do to the data' },
 ]
 
-export type Component = { name: string; role: string; why: string }
+export type Tile = { logo: LogoKey; title: string; sub: string }
+export type Stage = { n: number; name: string; tiles: Tile[] }
+/** The system on a page: five stages from the source to the screen. */
+export const STAGES: Stage[] = [
+  { n: 1, name: 'Source', tiles: [{ logo: 'github', title: 'sportsdataverse', sub: 'Public box scores, schedules and rosters, published as files once a day' }] },
+  {
+    n: 2,
+    name: 'Ingest',
+    tiles: [
+      { logo: 'githubactions', title: 'GitHub Actions', sub: 'Hourly poll copies only new or changed files' },
+      { logo: 'cloudflare', title: 'Cloudflare R2', sub: 'Keeps every file exactly as published' },
+    ],
+  },
+  {
+    n: 3,
+    name: 'Process',
+    tiles: [
+      { logo: 'databricks', title: 'Databricks', sub: 'Bronze, silver and gold tables in Unity Catalog' },
+      { logo: 'apachespark', title: 'PySpark and SQL job', sub: 'Defined in the repo; gates and warnings on every table' },
+    ],
+  },
+  {
+    n: 4,
+    name: 'Serve',
+    tiles: [
+      { logo: 'nodedotjs', title: 'App server', sub: 'Node and Express on Databricks Apps; fixed queries, 5-minute memory' },
+      { logo: 'databricks', title: 'SQL warehouse', sub: 'Answers the queries on the gold tables, read-only' },
+    ],
+  },
+  { n: 5, name: 'Experience', tiles: [{ logo: 'react', title: 'The pages', sub: 'React, TypeScript and Tailwind; every page is an address like #/players' }] },
+]
+
+/** What runs underneath all five stages. */
+export const CROSS: Tile[] = [
+  { logo: 'github', title: 'Delivery', sub: 'A pull request you merge, then the deploy workflow checks and ships' },
+  { logo: 'check', title: 'Quality', sub: 'Gates stop a bad build; warnings and a build log leave a trail' },
+  { logo: 'chat', title: 'Alerts', sub: 'Slack gets one message per sync run, headed OK or FAILED' },
+  { logo: 'lock', title: 'Access', sub: 'Secrets in GitHub and Databricks; the app login can only read' },
+]
+
+export type Component = { logo: LogoKey; name: string; role: string; why: string }
 export const COMPONENTS: Component[] = [
-  { name: 'GitHub repository', role: 'Holds all the code, the SQL, the tests and these notes. Every change is a pull request that you merge.', why: 'One place for history and review; merging is the approval to deploy.' },
-  { name: 'GitHub Actions', role: 'Runs the hourly sync and the deploys, and posts the result to Slack.', why: 'Free for this size, and close to the code. The daily file copy is its job; the heavy work is left to Databricks.' },
-  { name: 'Cloudflare R2', role: 'Keeps the source files exactly as published, with a manifest per run.', why: 'A cheap S3-compatible store with a free tier, so we can always rebuild from the originals.' },
-  { name: 'Databricks (Delta tables, Unity Catalog)', role: 'Holds bronze, silver and gold, and runs the PySpark and SQL that builds them.', why: 'The owner knows it, the Free Edition costs nothing, and it is the centrepiece for the later modelling work.' },
-  { name: 'Databricks Job (a bundle in the repo)', role: 'Builds silver then gold after each sync, with the gates and warnings.', why: 'The job is defined as code in databricks.yml, so it always runs the repo\'s version of the scripts.' },
-  { name: 'Databricks SQL warehouse', role: 'Answers the app\'s queries on the gold tables.', why: 'Already part of the workspace. The Free Edition has one small warehouse, so the app caches answers.' },
-  { name: 'Databricks Apps', role: 'Hosts the app: one small Node server that serves the pages and the /api answers.', why: 'Sits next to the data and logs in as itself, with no password stored in the app.' },
-  { name: 'React app (Vite, TypeScript, Tailwind)', role: 'The pages you click through. Each page is an address like #/players, so the back button and bookmarks work.', why: 'A static bundle with no page reloads. The server only has to send data.' },
-  { name: 'Slack', role: 'Gets one message per sync run, headed OK or FAILED, with a summary of what was copied, loaded and built.', why: 'A failure should not wait for someone to look.' },
+  { logo: 'github', name: 'GitHub repository', role: 'Holds all the code, the SQL, the tests and these notes. Every change is a pull request that you merge.', why: 'One place for history and review; merging is the approval to deploy.' },
+  { logo: 'githubactions', name: 'GitHub Actions', role: 'Runs the hourly sync and the deploys, and posts the result to Slack.', why: 'Free for this size, and close to the code. The daily file copy is its job; the heavy work is left to Databricks.' },
+  { logo: 'cloudflare', name: 'Cloudflare R2', role: 'Keeps the source files exactly as published, with a manifest per run.', why: 'A cheap S3-compatible store with a free tier, so we can always rebuild from the originals.' },
+  { logo: 'databricks', name: 'Databricks tables (Delta, Unity Catalog)', role: 'Holds bronze, silver and gold, and runs the PySpark and SQL that builds them.', why: 'The owner knows it, the Free Edition costs nothing, and it is the centrepiece for the later modelling work.' },
+  { logo: 'apachespark', name: 'Databricks job (a bundle in the repo)', role: 'Builds silver then gold after each sync, with the gates and warnings.', why: "The job is defined as code in databricks.yml, so it always runs the repo's version of the scripts." },
+  { logo: 'databricks', name: 'Databricks SQL warehouse', role: "Answers the app's queries on the gold tables.", why: 'Already part of the workspace. The Free Edition has one small warehouse, so the app caches answers.' },
+  { logo: 'nodedotjs', name: 'Databricks Apps (Node server)', role: 'Hosts the app: one small Node server that serves the pages and the /api answers.', why: 'Sits next to the data and logs in as itself, with no password stored in the app.' },
+  { logo: 'react', name: 'React app (Vite, TypeScript, Tailwind)', role: 'The pages you click through. Each page is an address like #/players, so the back button and bookmarks work.', why: 'A static bundle with no page reloads. The server only has to send data.' },
+  { logo: 'chat', name: 'Slack', role: 'Gets one message per sync run, headed OK or FAILED, with a summary of what was copied, loaded and built.', why: 'A failure should not wait for someone to look.' },
 ]
 
 export type RequestStep = { title: string; text: string }
 export const REQUEST_STEPS: RequestStep[] = [
-  { title: 'You click', text: 'The page asks the server for one thing, for example a player\'s last-10 form, with the player and game type in the address.' },
+  { title: 'You click', text: "The page asks the server for one thing, for example a player's last-10 form, with the player and game type in the address." },
   { title: 'The server checks its memory', text: 'If it answered the same question in the last five minutes, it sends that answer back at once. This keeps the single small warehouse from being asked the same thing over and over.' },
   { title: 'Otherwise it asks Databricks', text: 'It runs a fixed query (written ahead of time, never built from text typed on the page) on the SQL warehouse, passing your choices as named values.' },
   { title: 'It logs in as itself', text: 'The app has its own identity in Databricks and gets a short-lived token. The browser never sees a token, and the identity can only read.' },
   { title: 'Rows come back as JSON', text: 'The server shapes the rows, keeps the answer for five minutes and sends it to the browser, which draws the charts and tables.' },
 ]
 
-export type Decision = { title: string; text: string }
+export type Decision = { title: string; choice: string; cost: string }
 export const DECISIONS: Decision[] = [
-  { title: 'Daily batches, not streaming', text: 'The source publishes once a day, so nothing here is live. Streaming tools would add cost and complexity with no benefit; they are parked until there is a live feed to use.' },
-  { title: 'Raw files stay untouched', text: 'Every cleaning step reads from a copy, never from the original. A bug in a transform can be fixed and the tables rebuilt without fetching anything again.' },
-  { title: 'Three layers with checks between them', text: 'A gate that fails stops the line before the next table is built, so the pages keep the last good data instead of a half-built one. This came from the first version, where silent data problems cost the most time.' },
-  { title: 'The app reads only gold, and only reads', text: 'The pages never touch bronze or silver. The app\'s identity has read access and nothing else, so a bug in the app cannot change data.' },
-  { title: 'Compute where the data is', text: 'The heavy work (windows, percentiles, rest and back-to-back context) is done once in Databricks. The app only picks rows and draws them.' },
-  { title: 'One reader today, a serving store later', text: 'Today the app queries the Databricks SQL warehouse directly. If traffic or cost ever demands it, the gold tables can be copied to a small serving database and the app pointed at that; the pages would not change.' },
-  { title: 'Built for a free tier, on purpose', text: 'Databricks Free Edition stops an app on its own, so a deploy runs every 6 hours to restart it. GitHub scheduled runs are best effort, so the sync polls hourly and has two daily backstops.' },
-  { title: 'Picks live in your browser', text: 'The paper-picks tracker keeps its data in the browser, with a download for backup. A Databricks table for picks is a later step and needs a writable table and a permission change.' },
+  { title: 'Daily batches, not streaming', choice: 'The source publishes once a day, so one scheduled pipeline is enough. Streaming tools stay parked until there is a live feed.', cost: 'Nothing is live: no in-game updates.' },
+  { title: 'Raw files stay untouched', choice: 'Every cleaning step reads from a copy, never from the original, so a bug can be fixed and the tables rebuilt without fetching anything again.', cost: 'A second copy of the files to store.' },
+  { title: 'Checks between the layers', choice: 'A gate that fails stops the line before the next table is built, so the pages keep the last good data. This came from the first version, where silent data problems cost the most time.', cost: 'A failed gate pauses updates until someone looks.' },
+  { title: 'The app reads only gold, and only reads', choice: "The pages never touch bronze or silver, and the app's identity has read access and nothing else, so a bug in the app cannot change data.", cost: 'Saving anything (like picks) needs its own writable place.' },
+  { title: 'Compute where the data is', choice: 'The heavy work (windows, percentiles, rest and back-to-back context) is done once in Databricks. The app only picks rows and draws them.', cost: 'The app depends on Databricks being available.' },
+  { title: 'One reader today, a serving store later', choice: 'Today the app queries the Databricks SQL warehouse directly. If traffic or cost demands it, gold can be copied to a small serving database and the app pointed at that; the pages would not change.', cost: 'All traffic meets one small warehouse, which is why answers are cached.' },
+  { title: 'Built for a free tier, on purpose', choice: 'A deploy every 6 hours restarts the app, which the free tier stops on its own. The sync polls hourly and has two daily backstops.', cost: 'Scheduled runs are best effort and can arrive late.' },
+  { title: 'Picks live in your browser', choice: 'The paper-picks tracker keeps its data in the browser, with a download for backup. A Databricks table for picks is a later step.', cost: 'Picks do not follow you to another device.' },
 ]
 
 export const SECURITY_LINES: string[] = [
   'No secret is in the code or in a page. Keys live in GitHub Actions secrets, the Databricks workspace and a local file that is never committed.',
-  'The R2 key can only reach one bucket. The app\'s Databricks identity can only read.',
+  "The R2 key can only reach one bucket. The app's Databricks identity can only read.",
   'Queries use named values, never text pasted in from the page, so a typed value cannot change what a query does.',
   'The browser talks only to the app server, never to Databricks, R2 or GitHub.',
 ]

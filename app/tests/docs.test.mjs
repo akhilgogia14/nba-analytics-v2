@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { COMPONENTS, DECISIONS, DOCS_TOPICS, FAQ, PATHS, REQUEST_STEPS, TABLES, WORKFLOW, docsTopicFromHash, searchTables, tablesIn } from '../src/lib/docs.ts'
+import { COMPONENTS, DECISIONS, DOCS_TOPICS, FAQ, REQUEST_STEPS, TABLES, WORKFLOW, docsTopicFromHash, searchTables, tablesIn } from '../src/lib/docs.ts'
 import { parseHash } from '../src/lib/pages.ts'
 
 test('docs addresses: the page and each sub-page', () => {
@@ -66,11 +66,14 @@ test('workflow steps are numbered in order and the start page has questions', ()
   assert.ok(FAQ.length >= 5 && FAQ.every((f) => f.q.endsWith('?') && f.a.length > 20))
 })
 
-test('architecture: three paths, every piece explained, and the pieces named in the paths are all described', () => {
-  assert.deepEqual(PATHS.map((p) => p.name), ['Data path', 'Request path', 'Release path'])
-  for (const p of PATHS) assert.ok(p.nodes.length >= 3 && p.nodes.every((n) => n.title && n.sub))
+test('architecture: five stages, every piece and decision explained, and every logo exists', async () => {
+  const { STAGES, CROSS } = await import('../src/lib/docs.ts')
+  const { LOGOS } = await import('../src/lib/logos.ts')
+  assert.deepEqual(STAGES.map((s) => s.n), [1, 2, 3, 4, 5])
+  for (const t of [...STAGES.flatMap((s) => s.tiles), ...CROSS, ...COMPONENTS]) assert.ok(LOGOS[t.logo] && LOGOS[t.logo].length > 20, `logo ${t.logo} exists`)
   for (const c of COMPONENTS) assert.ok(c.name && c.role && c.why)
-  assert.ok(REQUEST_STEPS.length === 5 && DECISIONS.length >= 6)
+  for (const d of DECISIONS) assert.ok(d.title && d.choice && d.cost)
+  assert.ok(REQUEST_STEPS.length === 5 && DECISIONS.length === 8)
   const names = COMPONENTS.map((c) => c.name).join(' | ')
   for (const must of ['GitHub Actions', 'Cloudflare R2', 'Databricks Apps', 'SQL warehouse', 'Slack']) assert.ok(names.includes(must), `${must} is described`)
 })
