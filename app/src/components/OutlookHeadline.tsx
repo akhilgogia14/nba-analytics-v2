@@ -53,7 +53,10 @@ function BehindPanel({ b, band, opp, onClose, pick }: { b: Behind; band: ReturnT
           {b.season && <span className="text-(--muted)"> over {b.season.n} {b.season.n === 1 ? 'game' : 'games'}</span>}
         </li>
         <li>
-          <strong>Baseline:</strong> half of each, {fmtOutlook(b.base, d)}.
+          <strong>Baseline:</strong>{' '}
+          {b.smoothed
+            ? `a weighted average of his last 10 games (or this season's, if more), newest counting most and each game further back 25% less, ${fmtOutlook(b.base, d)}.`
+            : `half of each, ${fmtOutlook(b.base, d)}.`}
         </li>
         <li className="text-(--muted)">
           Typical miss ±{fmtOutlook(miss, d)}: how far this baseline was from what happened, on average, in a back-test of every game in 2025-26 and 2026-27, for {missBandText(band)}.
@@ -105,7 +108,7 @@ export function OutlookHeadline({ views, opp = null, pickFor }: { views: Views; 
       </h2>
       <p className="m-0 max-w-3xl text-[14px] leading-relaxed text-(--muted)">
         Baseline: half his last-10 average, half his season average. It is a plain starting point, not a model, and it uses past games only (injuries and
-        minutes changes are not in it). Typical miss is for {missBandText(band)}. Click a tile to see the games behind it.
+        minutes changes are not in it). Minutes use a weighted average instead, with the newest games counting most. Typical miss is for {missBandText(band)}. Click a tile to see the games behind it.
       </p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(128px,100%),1fr))] gap-3">
         {tiles.map((t) => (

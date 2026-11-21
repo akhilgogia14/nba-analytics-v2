@@ -8,6 +8,7 @@ One-off studies behind the stability notes. They only read from Databricks and w
 | `player_stability.py` | The same for players (stat effects and availability). | `docs/players-advanced-stability.md` |
 | `adjusted_stability.py` | Do both survive removing home/away and opponent strength? | `docs/adjusted-stability.md` |
 | `backtest_baseline.py` (with `backtest_features.py`) | How good is the Predictions baseline (50/50 last-10 and season) against what happened? | `docs/predictions-backtest.md` |
+| `backtest_minutes.py` | Does a recency-weighted average beat the 50/50 blend for minutes (the smoother the page uses), and what is the typical miss by minutes band? | `docs/predictions-backtest.md` (Result 6) |
 | `defense_stability.py` | Does a team's defense against a position group repeat (shown, adjusted, position-specific)? | `docs/defense-stability.md` |
 
 ## How to run

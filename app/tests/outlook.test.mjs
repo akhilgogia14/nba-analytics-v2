@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { hashFor, pageFromHash, parseHash, playerFromHash } from '../src/lib/pages.ts'
-import { OUTLOOK_STATS, VIEWS, baseline, fmtOutlook, fromMeeting, fromRecent, behindTile, fmtGame, headlineTiles, seasonGames, summarize } from '../src/lib/outlook.ts'
+import { MINUTES_DECAY, OUTLOOK_STATS, VIEWS, baseline, baselineFor, usesSmoother, weightedRecent, fmtOutlook, fromMeeting, fromRecent, behindTile, fmtGame, headlineTiles, seasonGames, summarize } from '../src/lib/outlook.ts'
 
 const stats = (o = {}) => ({ pts: 20, reb: 5, ast: 4, fg3m: 2, blk: 0, stl: 1, ...o })
 const g = (id, date, o = {}, minutes = 30) => ({ id, date, opp: 'BOS', isHome: true, seasonLabel: '2026-27', values: { ...stats(o), minutes } })
@@ -206,4 +206,41 @@ test('behind a tile: a gap shows as no value and is left out of the averages; no
 test('a single game is written whole, an average with one decimal, whatever the stat', () => {
   assert.deepEqual([fmtGame(5), fmtGame(39.0), fmtGame(13.8), fmtGame(0), fmtGame(-0.2), fmtGame(null)], ['5', '39', '14', '0', '0', '-'])
   assert.deepEqual([fmtOutlook(2.83, 1), fmtOutlook(0.63, 1), fmtOutlook(20.708, 1), fmtOutlook(null, 1)], ['2.8', '0.6', '20.7', '-'])
+})
+
+const mg = (id, date, minutes) => ({ id, date, opp: 'ATL', isHome: true, seasonLabel: '2026-27', values: { pts: 20, reb: 5, ast: 5, fg3m: 2, blk: 1, stl: 1, minutes } })
+const games = (mins) => mins.map((m, i) => mg(String(100 - i), `2026-11-${String(30 - i).padStart(2, '0')}`, m)) // newest first
+
+test('the weighted average counts the newest game most: each game back counts a quarter less', () => {
+  assert.equal(MINUTES_DECAY, 0.25)
+  assert.equal(weightedRecent([]), null)
+  assert.equal(weightedRecent([30]), 30)
+  assert.ok(Math.abs(weightedRecent([40, 20]) - (40 + 20 * 0.75) / 1.75) < 1e-9)
+  assert.ok(weightedRecent([40, 20, 20, 20]) > 25) // the newest 40 pulls it above the plain mean (25)
+})
+
+test('minutes: before 5 games this season the old blend, from 5 on the weighted average of the games; other stats never change', () => {
+  const few = { last10: games([30, 30, 30, 30, 30, 30, 20, 20, 20, 20]), season: games([30, 30, 30, 30]), opponent: [] }
+  assert.equal(usesSmoother(few, 'minutes'), false)
+  assert.equal(baselineFor(few, 'minutes'), baseline(summarize(few.last10, 'minutes'), summarize(few.season, 'minutes')))
+  const enough = { last10: games([40, 30, 30, 30, 30, 30, 20, 20, 20, 20]), season: games([40, 30, 30, 30, 30]), opponent: [] }
+  assert.equal(usesSmoother(enough, 'minutes'), true)
+  assert.ok(Math.abs(baselineFor(enough, 'minutes') - weightedRecent([40, 30, 30, 30, 30, 30, 20, 20, 20, 20])) < 1e-9) // fewer than 10 season games: his last 10
+  assert.equal(baselineFor(enough, 'pts'), 20)
+  assert.equal(usesSmoother(enough, 'pts'), false)
+})
+
+test('minutes: with more than 10 games this season, the weighted average runs over all of them', () => {
+  const season = games([36, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 10]) // 12 games, the oldest is a 10-minute game
+  const v = { last10: season.slice(0, 10), season, opponent: [] }
+  assert.ok(Math.abs(baselineFor(v, 'minutes') - weightedRecent([36, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 10])) < 1e-9)
+})
+
+test('minutes: a game with no minutes figure is skipped, not counted as zero', () => {
+  const v = { last10: games([30, null, 30, 30, 30, 30]), season: games([30, null, 30, 30, 30, 30]), opponent: [] }
+  assert.equal(baselineFor(v, 'minutes'), 30)
+})
+
+test('the minutes typical miss is the smoother\'s back-test, one figure per band', () => {
+  assert.deepEqual(TYPICAL_MISS.minutes, { under10: 5.404, from10: 5.555, from20: 4.823, from30: 4.118, all: 4.915 })
 })

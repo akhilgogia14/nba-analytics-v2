@@ -74,9 +74,33 @@ Players who play more put up bigger numbers and so miss by more in absolute term
 
 The script was rerun on 2026-11-19, which added 100 games played since (29,923 held-out games instead of 29,823). No figure in Results 1 to 4 moved by more than 0.002 and the chosen weights are identical.
 
+## Result 6: a smoother for minutes beats the blend by 3.6% (added 2026-11-20)
+Result 2 found a weighted mean about 1.6% better for minutes (on all games, from his last 10 only). The page's own version was tested on the same games and the same honest split (`scripts/analysis/backtest_minutes.py`): once a player has played at least 5 games this season, an exponentially weighted mean over the games the page shows (his last 10, or all of this season's if more), each game further back counting (1 - alpha) times the one after it; before 5 games, the old 50/50 blend. The decay rate was chosen on the training seasons only (to 2024-25): alpha 0.25 (0.20 to 0.30 are all within 0.015 minutes of it on train).
+
+Held-out seasons (2025-26 and 2026-27 so far), MAE in minutes, blend vs smoother:
+
+| Group | Games | 50/50 blend | Smoother | Change |
+|---|---|---|---|---|
+| All players | 29,923 | 5.097 | 4.915 | -3.6% |
+| Rotation (prior 10-game average at least 20 minutes) | 19,073 | 4.696 | 4.573 | -2.6% |
+| 2025-26 | 25,655 | 5.095 | 4.893 | -4.0% |
+| 2026-27 so far | 4,268 | 5.108 | 5.051 | -1.1% |
+
+On average the smoother is 0.18 minutes better per game (standard error 0.011), so the gain is not noise. It also removes the blend's lean (prediction minus actual: blend -0.16 minutes, smoother +0.04). By minutes band (the typical-miss figures the page shows for minutes, replacing Result 5's last column):
+
+| Band | Games | 50/50 blend | Smoother |
+|---|---|---|---|
+| Under 10 | 2,666 | 5.594 | **5.404** |
+| 10 to 20 | 8,184 | 5.871 | **5.555** |
+| 20 to 30 | 12,302 | 5.016 | **4.823** |
+| 30 and up | 6,771 | **4.114** | 4.118 |
+| Everyone | 29,923 | 5.097 | **4.915** |
+
+Caveats: the gain is concentrated in players who play under 30 minutes (role changes show up in recent games); for players averaging 30+ minutes it is a tie. The 2026-27 gain so far is smaller (1.1%) on 4,268 games, and early in a season the blend is used until a player has 5 games. The back-test does not cover who starts or who is injured; minutes after an injury return or a role change are still the main miss. Used on the page from release 087.
+
 ## What this means for the page and the modeling
 1. **Keep the baseline as is (50/50).** No weight change is supported.
 2. **Number to beat:** held-out MAE of 4.665 points, 1.916 rebounds, 1.364 assists, 0.900 3-pointers, 0.512 blocks, 0.733 steals, 5.097 minutes (all players). A model earns a place only below these on the same games, with ranges that are narrower at the same coverage (`docs/MODELING.md` validation gate).
-3. **Small things worth trying first:** a weighted-mean smoother for minutes (about 1.6% better); a "typical miss" figure next to the baseline on the page (for example "this baseline misses points by about 4.7 on average"), which tells a reader how much to lean on it.
+3. **Small things worth trying first:** a weighted-mean smoother for minutes (done, Result 6: 3.6% better); a "typical miss" figure next to the baseline on the page (for example "this baseline misses points by about 4.7 on average"), which tells a reader how much to lean on it.
 4. **Where a real gain is plausible:** minutes and role (who starts, who is out), then who the opponent's defense gives up the most to (defense grid), rest and home/away only through minutes. The earlier stability work says player-specific rest effects do not repeat; league effects are tiny. Expect modest gains.
 5. Not covered: playoffs, availability (whether he plays), games with fewer than 10 prior games (rookies, returns), injuries or trades, and models beyond smoothers (Poisson/negative binomial counts, quantile regression).

@@ -1,4 +1,4 @@
-import { OUTLOOK_STATS, VIEWS, baseline, fmtGame, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type ViewKey, type Views } from '../lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baselineFor, fmtGame, fmtOutlook, missBand, missBandText, summarize, typicalMiss, type ViewKey, type Views } from '../lib/outlook.ts'
 import { panelStyle } from '../lib/styles.ts'
 import { ScrollX } from './ScrollX.tsx'
 
@@ -27,7 +27,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
         <strong className="text-(--text)">How to read this</strong>
         <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
           <li>
-            <strong className="text-(--text)">Baseline:</strong> half his last-10 average, half his season average, a plain 50/50 split. It is a starting point, not a model.
+            <strong className="text-(--text)">Baseline:</strong> half his last-10 average, half his season average, a plain 50/50 split (minutes use a weighted average that counts the newest games most). It is a starting point, not a model.
           </li>
           <li>
             <strong className="text-(--text)">Typical miss:</strong> how far the baseline was from what happened, on average, when tested on 2025-26 and 2026-27 games (for {missBandText(band)}). It is
@@ -69,7 +69,7 @@ export function OutlookTable({ views, opp }: { views: Views; opp: string | null 
           <tbody>
             {OUTLOOK_STATS.map((s) => {
               const sums = Object.fromEntries(VIEWS.map((v) => [v.key, summarize(views[v.key], s.key)])) as Record<ViewKey, ReturnType<typeof summarize>>
-              const base = baseline(sums.last10, sums.season)
+              const base = baselineFor(views, s.key)
               return (
                 <tr key={s.key} className="border-t border-(--border)">
                   <th scope="row" className="px-3 py-2 text-left text-[14px] font-semibold whitespace-nowrap">
