@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { dateWithYear, shortDate } from '../lib/format.ts'
 import { behindTile, fmtGame, fmtOutlook, headlineTiles, missBand, missBandText, typicalMiss, type Behind, type BehindRow, type OutlookStat, type Views } from '../lib/outlook.ts'
 import { panelStyle } from '../lib/styles.ts'
@@ -28,7 +28,7 @@ function GameRows({ rows, newestSeason, showWindows }: { rows: BehindRow[]; newe
 }
 
 /** What opens when a tile is clicked: where the big number comes from, the typical miss in words, and every game behind it. */
-function BehindPanel({ b, band, opp, onClose }: { b: Behind; band: ReturnType<typeof missBand>; opp: string | null; onClose: () => void }) {
+function BehindPanel({ b, band, opp, onClose, pick }: { b: Behind; band: ReturnType<typeof missBand>; opp: string | null; onClose: () => void; pick?: ReactNode }) {
   const d = b.digits
   const newestSeason = b.rows[0]?.game.seasonLabel ?? ''
   const miss = typicalMiss(b.stat, band)
@@ -42,6 +42,7 @@ function BehindPanel({ b, band, opp, onClose }: { b: Behind; band: ReturnType<ty
           Close
         </button>
       </div>
+      {pick}
       <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px] leading-relaxed">
         <li>
           <strong>Last 10 games:</strong> average {fmtOutlook(b.last10?.avg ?? null, d)}
@@ -88,7 +89,7 @@ function BehindPanel({ b, band, opp, onClose }: { b: Behind; band: ReturnType<ty
  * lowest to highest of his last 10 games. The figures are the same ones the full table and the charts show further down. Click a
  * tile to see the games behind it.
  */
-export function OutlookHeadline({ views, opp = null }: { views: Views; opp?: string | null }) {
+export function OutlookHeadline({ views, opp = null, pickFor }: { views: Views; opp?: string | null; pickFor?: (stat: OutlookStat, base: number | null) => ReactNode }) {
   const tiles = headlineTiles(views)
   const [open, setOpen] = useState<OutlookStat | null>(null)
   const band = missBand(views)
@@ -129,7 +130,7 @@ export function OutlookHeadline({ views, opp = null }: { views: Views; opp?: str
       </div>
       {open && (
         <div ref={panel} className="scroll-mt-4">
-          <BehindPanel b={behindTile(views, open)} band={band} opp={opp} onClose={() => setOpen(null)} />
+          <BehindPanel b={behindTile(views, open)} band={band} opp={opp} onClose={() => setOpen(null)} pick={pickFor?.(open, tiles.find((t) => t.key === open)?.base ?? null)} />
         </div>
       )}
     </section>

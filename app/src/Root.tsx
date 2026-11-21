@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import App from './App.tsx'
 import { isAdvancedHash, pageFromHash } from './lib/pages.ts'
+import PicksPage from './PicksPage.tsx'
 import PlayersAdvancedPage from './PlayersAdvancedPage.tsx'
 import PredictionsPage from './PredictionsPage.tsx'
 import TeamsAdvancedPage from './TeamsAdvancedPage.tsx'
@@ -17,6 +18,7 @@ export default function Root() {
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
   if (route.page === 'today') return <TodayPage />
+  if (route.page === 'picks') return <PicksPage />
   if (route.page === 'predictions') return <PredictionsPage />
   if (route.page === 'teams') return route.advanced ? <TeamsAdvancedPage /> : <TeamsPage />
   return route.advanced ? <PlayersAdvancedPage /> : <App />
