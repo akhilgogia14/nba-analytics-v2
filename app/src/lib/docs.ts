@@ -18,18 +18,19 @@ export type DocTable = {
   columns: Col[]
 }
 
-export type DocsTopic = 'home' | 'model' | 'dictionary' | 'workflow'
+export type DocsTopic = 'home' | 'model' | 'dictionary' | 'workflow' | 'architecture'
 export const DOCS_TOPICS: { key: DocsTopic; label: string; path: string; blurb: string }[] = [
   { key: 'home', label: 'Start here', path: '#/docs', blurb: 'The short version, and answers to common questions.' },
   { key: 'model', label: 'Data model', path: '#/docs/model', blurb: 'The tables in three layers and how they connect.' },
   { key: 'dictionary', label: 'Data dictionary', path: '#/docs/dictionary', blurb: 'Every table and column, in plain words. Searchable.' },
   { key: 'workflow', label: 'Data workflow', path: '#/docs/workflow', blurb: 'How a game becomes a number on a page, step by step.' },
+  { key: 'architecture', label: 'Architecture', path: '#/docs/architecture', blurb: 'The pieces of the system, how they connect, and why.' },
 ]
 
 /** "#/docs", "#/docs/model", "#/docs/dictionary", "#/docs/workflow" (anything else under docs opens the start page). */
 export function docsTopicFromHash(hash: string): DocsTopic {
   const path = hash.replace(/^#/, '').split('?')[0]
-  return path === '/docs/model' ? 'model' : path === '/docs/dictionary' ? 'dictionary' : path === '/docs/workflow' ? 'workflow' : 'home'
+  return path === '/docs/model' ? 'model' : path === '/docs/dictionary' ? 'dictionary' : path === '/docs/workflow' ? 'workflow' : path === '/docs/architecture' ? 'architecture' : 'home'
 }
 
 // ---- Shared column wording -------------------------------------------------------------------------------------------------------------
@@ -544,7 +545,7 @@ export const WORKFLOW: Step[] = [
     n: 7,
     title: 'Redeploy',
     where: 'GitHub Actions · deploy-app',
-    what: 'After a build the app is redeployed so it starts with fresh data. A change merged into the code redeploys it as well, and a scheduled run every 6 hours keeps the free hosting from stopping the app.',
+    what: 'When a sync changed something, the app is redeployed so it starts with fresh data. A change merged into the code redeploys it as well, and a scheduled run every 6 hours keeps the free hosting from stopping the app.',
     check: 'The deploy run is checked against the merge before anything is called live.',
   },
 ]
@@ -596,4 +597,81 @@ export const FAQ: Faq[] = [
     q: 'Where are my paper picks kept?',
     a: 'Only in your browser. A different device or cleared browser starts empty, so use "Download my picks" on the Picks page for a backup.',
   },
+]
+
+// ---- System design / architecture --------------------------------------------------------------------------------------------------------
+
+export type Node = { title: string; sub: string }
+export type Path = { name: string; when: string; nodes: Node[] }
+export const PATHS: Path[] = [
+  {
+    name: 'Data path',
+    when: 'Runs on a schedule, no one clicks anything',
+    nodes: [
+      { title: 'Source', sub: 'sportsdataverse files on GitHub' },
+      { title: 'Sync', sub: 'GitHub Actions workflow' },
+      { title: 'Raw storage', sub: 'Cloudflare R2, files untouched' },
+      { title: 'Databricks', sub: 'bronze, silver, gold tables' },
+    ],
+  },
+  {
+    name: 'Request path',
+    when: 'Runs each time you open or click something',
+    nodes: [
+      { title: 'Your browser', sub: 'React app (the pages)' },
+      { title: 'App server', sub: 'Express, on Databricks Apps' },
+      { title: 'SQL warehouse', sub: 'Databricks, read-only' },
+      { title: 'Gold tables', sub: 'Unity Catalog, schema nba_v2_gold' },
+    ],
+  },
+  {
+    name: 'Release path',
+    when: 'Runs when a change is merged, and every 6 hours',
+    nodes: [
+      { title: 'Pull request', sub: 'you review and merge on GitHub' },
+      { title: 'deploy-app workflow', sub: 'type check, lint, tests, build' },
+      { title: 'Databricks Apps', sub: 'upload, restart if stopped, deploy' },
+    ],
+  },
+]
+
+export type Component = { name: string; role: string; why: string }
+export const COMPONENTS: Component[] = [
+  { name: 'GitHub repository', role: 'Holds all the code, the SQL, the tests and these notes. Every change is a pull request that you merge.', why: 'One place for history and review; merging is the approval to deploy.' },
+  { name: 'GitHub Actions', role: 'Runs the hourly sync and the deploys, and posts the result to Slack.', why: 'Free for this size, and close to the code. The daily file copy is its job; the heavy work is left to Databricks.' },
+  { name: 'Cloudflare R2', role: 'Keeps the source files exactly as published, with a manifest per run.', why: 'A cheap S3-compatible store with a free tier, so we can always rebuild from the originals.' },
+  { name: 'Databricks (Delta tables, Unity Catalog)', role: 'Holds bronze, silver and gold, and runs the PySpark and SQL that builds them.', why: 'The owner knows it, the Free Edition costs nothing, and it is the centrepiece for the later modelling work.' },
+  { name: 'Databricks Job (a bundle in the repo)', role: 'Builds silver then gold after each sync, with the gates and warnings.', why: 'The job is defined as code in databricks.yml, so it always runs the repo\'s version of the scripts.' },
+  { name: 'Databricks SQL warehouse', role: 'Answers the app\'s queries on the gold tables.', why: 'Already part of the workspace. The Free Edition has one small warehouse, so the app caches answers.' },
+  { name: 'Databricks Apps', role: 'Hosts the app: one small Node server that serves the pages and the /api answers.', why: 'Sits next to the data and logs in as itself, with no password stored in the app.' },
+  { name: 'React app (Vite, TypeScript, Tailwind)', role: 'The pages you click through. Each page is an address like #/players, so the back button and bookmarks work.', why: 'A static bundle with no page reloads. The server only has to send data.' },
+  { name: 'Slack', role: 'Gets one message per sync run, headed OK or FAILED, with a summary of what was copied, loaded and built.', why: 'A failure should not wait for someone to look.' },
+]
+
+export type RequestStep = { title: string; text: string }
+export const REQUEST_STEPS: RequestStep[] = [
+  { title: 'You click', text: 'The page asks the server for one thing, for example a player\'s last-10 form, with the player and game type in the address.' },
+  { title: 'The server checks its memory', text: 'If it answered the same question in the last five minutes, it sends that answer back at once. This keeps the single small warehouse from being asked the same thing over and over.' },
+  { title: 'Otherwise it asks Databricks', text: 'It runs a fixed query (written ahead of time, never built from text typed on the page) on the SQL warehouse, passing your choices as named values.' },
+  { title: 'It logs in as itself', text: 'The app has its own identity in Databricks and gets a short-lived token. The browser never sees a token, and the identity can only read.' },
+  { title: 'Rows come back as JSON', text: 'The server shapes the rows, keeps the answer for five minutes and sends it to the browser, which draws the charts and tables.' },
+]
+
+export type Decision = { title: string; text: string }
+export const DECISIONS: Decision[] = [
+  { title: 'Daily batches, not streaming', text: 'The source publishes once a day, so nothing here is live. Streaming tools would add cost and complexity with no benefit; they are parked until there is a live feed to use.' },
+  { title: 'Raw files stay untouched', text: 'Every cleaning step reads from a copy, never from the original. A bug in a transform can be fixed and the tables rebuilt without fetching anything again.' },
+  { title: 'Three layers with checks between them', text: 'A gate that fails stops the line before the next table is built, so the pages keep the last good data instead of a half-built one. This came from the first version, where silent data problems cost the most time.' },
+  { title: 'The app reads only gold, and only reads', text: 'The pages never touch bronze or silver. The app\'s identity has read access and nothing else, so a bug in the app cannot change data.' },
+  { title: 'Compute where the data is', text: 'The heavy work (windows, percentiles, rest and back-to-back context) is done once in Databricks. The app only picks rows and draws them.' },
+  { title: 'One reader today, a serving store later', text: 'Today the app queries the Databricks SQL warehouse directly. If traffic or cost ever demands it, the gold tables can be copied to a small serving database and the app pointed at that; the pages would not change.' },
+  { title: 'Built for a free tier, on purpose', text: 'Databricks Free Edition stops an app on its own, so a deploy runs every 6 hours to restart it. GitHub scheduled runs are best effort, so the sync polls hourly and has two daily backstops.' },
+  { title: 'Picks live in your browser', text: 'The paper-picks tracker keeps its data in the browser, with a download for backup. A Databricks table for picks is a later step and needs a writable table and a permission change.' },
+]
+
+export const SECURITY_LINES: string[] = [
+  'No secret is in the code or in a page. Keys live in GitHub Actions secrets, the Databricks workspace and a local file that is never committed.',
+  'The R2 key can only reach one bucket. The app\'s Databricks identity can only read.',
+  'Queries use named values, never text pasted in from the page, so a typed value cannot change what a query does.',
+  'The browser talks only to the app server, never to Databricks, R2 or GitHub.',
 ]
