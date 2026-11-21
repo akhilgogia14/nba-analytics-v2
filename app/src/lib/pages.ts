@@ -1,4 +1,4 @@
-export type Page = 'players' | 'teams' | 'today' | 'predictions' | 'picks'
+export type Page = 'players' | 'teams' | 'today' | 'predictions' | 'picks' | 'docs'
 export type Route = { page: Page; team: string }
 
 /**
@@ -10,7 +10,7 @@ export function parseHash(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   const team = new URLSearchParams(query).get('team') ?? ''
   const page: Page =
-    path === '/players' || path === '/players/advanced' ? 'players' : path === '/teams' || path === '/teams/advanced' ? 'teams' : path === '/predictions' ? 'predictions' : path === '/picks' ? 'picks' : 'today'
+    path === '/players' || path === '/players/advanced' ? 'players' : path === '/teams' || path === '/teams/advanced' ? 'teams' : path === '/predictions' ? 'predictions' : path === '/picks' ? 'picks' : path === '/docs' || path.startsWith('/docs/') ? 'docs' : 'today'
   return { page, team: /^[A-Z]{3}$/.test(team) ? team : '' }
 }
 
