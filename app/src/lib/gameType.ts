@@ -32,3 +32,11 @@ export function formNotices(p: PlayerInfo, gameType: GameType, now: Date = new D
   if (idle > 7) out.push(`${p.name} last played on ${shortDate(p.lastGameDate)}, ${idle} days ago.`)
   return out
 }
+
+/**
+ * Early in a season the league's schedule lists 80 of the 82 regular-season games per team: the last 2 are set once the NBA Cup group stage
+ * is decided. While the total is exactly 80 the chart says so, so the 80 is not read as a bug. Null for anything else.
+ */
+export function seasonTotalNote(total: number, gameType: GameType): string | null {
+  return gameType === 'regular-season' && total === 80 ? 'The last 2 games of the 82 are added to the schedule once the NBA Cup is decided.' : null
+}

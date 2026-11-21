@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { fetchGameDetail } from '../api.ts'
 import { shortDate } from '../lib/format.ts'
 import { f1 } from '../lib/geom.ts'
+import { seasonTotalNote } from '../lib/gameType.ts'
 import { againstAverage, detailTiles, resultText } from '../lib/gameDetail.ts'
 import { hashFor } from '../lib/pages.ts'
 import {
@@ -161,6 +162,7 @@ export function SeasonGrid({ season, team, gameType, playerId, opp = '' }: { sea
         </div>
         <div className="text-xs text-(--muted)">
           {grid.team}: played {played} of {total} team games{total < 82 && gameType === 'regular-season' ? ' so far' : ''}
+          {seasonTotalNote(total, gameType) && <> · {seasonTotalNote(total, gameType)}</>}
           {mean !== null && <> · season average {f1(mean)} {STAT_NAMES[stat].toLowerCase()}</>}
         </div>
       </div>

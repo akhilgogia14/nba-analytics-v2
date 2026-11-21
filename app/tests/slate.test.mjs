@@ -67,7 +67,7 @@ test('rested starts at 3 days off; rest edge starts at +2 and only shows on the 
 
 test('road trip shows for the away team only, from its 3rd game of the trip', () => {
   assert.deepEqual(labels(ctx({ stintGame: 2 }), false), [])
-  assert.deepEqual(labels(ctx({ stintGame: 3 }), false), ['Road trip · game 3'])
+  assert.deepEqual(labels(ctx({ stintGame: 3 }), false), ['3rd straight road game'])
   assert.deepEqual(labels(ctx({ stintGame: 5 }), true), []) // a homestand is not a road trip
 })
 
