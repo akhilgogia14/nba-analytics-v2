@@ -20,6 +20,9 @@ export function PageSwitch({ page, team, opp = currentOpp() }: { page: Page; tea
       {link('players', 'Players')}
       {link('predictions', 'Predictions')}
       {link('picks', 'Picks')}
+      <a href="#/docs" aria-current={page === 'docs' ? 'page' : undefined} className={`${pillClass} inline-flex items-center no-underline`} style={pillStyle(page === 'docs')}>
+        Documentation
+      </a>
     </nav>
   )
 }
