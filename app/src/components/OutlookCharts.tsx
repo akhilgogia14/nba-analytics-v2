@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { OUTLOOK_STATS, VIEWS, baseline, fmtGame, fmtOutlook, missBand, summarize, typicalMiss, type OutlookStat, type Views } from '../lib/outlook.ts'
+import { OUTLOOK_STATS, VIEWS, baselineFor, fmtGame, fmtOutlook, missBand, summarize, typicalMiss, type OutlookStat, type Views } from '../lib/outlook.ts'
 import { CHART_PAD, ROW_HEIGHT, chartLayout, dotGroups, tipGames } from '../lib/outlookChart.ts'
 import { panelStyle } from '../lib/styles.ts'
 
@@ -15,7 +15,7 @@ function StatChart({ views, stat, label, digits, opp }: { views: Views; stat: Ou
     document.addEventListener('pointerdown', away)
     return () => document.removeEventListener('pointerdown', away)
   }, [active])
-  const base = baseline(summarize(views.last10, stat), summarize(views.season, stat))
+  const base = baselineFor(views, stat)
   const miss = typicalMiss(stat, missBand(views))
   const height = layout.rows.length * ROW_HEIGHT
   const rowName = (key: string) => (key === 'opponent' ? (opp ? `vs ${opp}` : 'vs opponent') : (VIEWS.find((v) => v.key === key)?.label.replace('Last 10 games', 'Last 10').replace('This season', 'Season') ?? key))

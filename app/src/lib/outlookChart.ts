@@ -1,5 +1,5 @@
 import { shortDate } from './format.ts'
-import { VIEWS, baseline, summarize, type OutlookGame, type OutlookStat, type ViewKey, type Views } from './outlook.ts'
+import { VIEWS, baselineFor, summarize, type OutlookGame, type OutlookStat, type ViewKey, type Views } from './outlook.ts'
 
 /** Positions are percentages of the chart's width (so dots stay round at any width): x runs from PAD to 100 - PAD percent, so dots at the extremes are not cut off. */
 export const CHART_PAD = 3
@@ -28,7 +28,7 @@ const gameLabel = (g: OutlookGame): string => `${shortDate(g.date)} ${g.isHome ?
  */
 export function chartLayout(views: Views, stat: OutlookStat, pad = CHART_PAD): ChartLayout {
   const sums = Object.fromEntries(VIEWS.map((v) => [v.key, summarize(views[v.key], stat)])) as Record<ViewKey, ReturnType<typeof summarize>>
-  const base = baseline(sums.last10, sums.season)
+  const base = baselineFor(views, stat)
   const all = VIEWS.flatMap((v) => views[v.key].map((g) => g.values[stat]).filter((x): x is number => x !== null))
   if (base !== null) all.push(base)
   if (all.length === 0) return { lo: 0, hi: 0, baselineX: null, rows: VIEWS.map((v) => ({ key: v.key, games: views[v.key].length, minX: null, avgX: null, maxX: null, dots: [] })) }

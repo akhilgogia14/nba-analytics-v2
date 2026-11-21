@@ -72,6 +72,43 @@ export function baseline(last10: Summary | null, season: Summary | null): number
   return last10?.avg ?? season?.avg ?? null
 }
 
+/**
+ * MINUTES use a different baseline (back-test: scripts/analysis/backtest_minutes.py, docs/predictions-backtest.md Result 6). Once he has
+ * played MINUTES_MIN_SEASON_GAMES games this season it is a weighted average of his games, newest counting most: each game further back
+ * counts 25% less (MINUTES_DECAY). The games are the ones the page already shows: his last 10, or this season's if that is more.
+ * Before that, and for every other stat, it is the plain half-and-half blend.
+ */
+export const MINUTES_DECAY = 0.25
+export const MINUTES_MIN_SEASON_GAMES = 5
+
+/** The weighted average of numbers given newest first: the newest has weight 1, the next 1 - decay, then (1 - decay) squared, and so on. */
+export function weightedRecent(newestFirst: number[], decay = MINUTES_DECAY): number | null {
+  if (newestFirst.length === 0) return null
+  let sum = 0
+  let weights = 0
+  newestFirst.forEach((v, k) => {
+    const w = (1 - decay) ** k
+    sum += v * w
+    weights += w
+  })
+  return sum / weights
+}
+
+/** The baseline for one stat from the three views: the minutes smoother for minutes once there are enough games this season, else the blend. */
+export function baselineFor(views: Views, stat: OutlookStat): number | null {
+  const last10 = summarize(views.last10, stat)
+  const season = summarize(views.season, stat)
+  if (stat === 'minutes' && season !== null && season.n >= MINUTES_MIN_SEASON_GAMES) {
+    const games = views.season.length >= 10 ? views.season : views.last10
+    const smoothed = weightedRecent(games.map((g) => g.values.minutes).filter((x): x is number => x !== null))
+    if (smoothed !== null) return smoothed
+  }
+  return baseline(last10, season)
+}
+
+/** True when this stat's baseline is the minutes smoother for these games (so the page can say how it was made). */
+export const usesSmoother = (views: Views, stat: OutlookStat): boolean => stat === 'minutes' && (summarize(views.season, stat)?.n ?? 0) >= MINUTES_MIN_SEASON_GAMES
+
 /** An average, baseline or typical miss to the stat's decimals, or a dash. */
 export const fmtOutlook = (v: number | null, digits: number): string => (v === null ? '-' : v.toFixed(digits))
 
@@ -80,7 +117,7 @@ export const fmtGame = (v: number | null): string => (v === null ? '-' : String(
 
 /**
  * How far the baseline was from what actually happened, on average (mean absolute error), in the back-test of 2026-11-18, rerun
- * 2026-11-19 with minutes bands (docs/predictions-backtest.md): every game of 2025-26 and 2026-27 so far, predicted only from earlier
+ * 2026-11-19 with minutes bands (docs/predictions-backtest.md; the minutes row is from the smoother's back-test of 2026-11-20): every game of 2025-26 and 2026-27 so far, predicted only from earlier
  * games, weights not tuned on those seasons. A band is the player's average minutes over his previous 10 games; `all` is everyone.
  * Predictions are of the stat GIVEN that he plays. Each figure is an average over the players in the band, so a player who scores
  * very little misses by less than his band's figure.
@@ -93,7 +130,7 @@ export const TYPICAL_MISS: Record<OutlookStat, Record<MissBand, number>> = {
   fg3m: { under10: 0.498, from10: 0.721, from20: 0.967, from30: 1.157, all: 0.901 },
   blk: { under10: 0.276, from10: 0.449, from20: 0.552, from30: 0.610, all: 0.512 },
   stl: { under10: 0.447, from10: 0.641, from20: 0.780, from30: 0.870, all: 0.733 },
-  minutes: { under10: 5.594, from10: 5.871, from20: 5.016, from30: 4.114, all: 5.097 },
+  minutes: { under10: 5.404, from10: 5.555, from20: 4.823, from30: 4.118, all: 4.915 }, // the minutes smoother's own back-test (backtest_minutes.py), not the blend's
 }
 
 /** The bands, lowest minutes first: `from` is the lowest average minutes in the band (the upper end is the next band's `from`). */
@@ -123,7 +160,7 @@ export function headlineTiles(views: Views): Tile[] {
   const band = missBand(views)
   return OUTLOOK_STATS.map((s) => {
     const last10 = summarize(views.last10, s.key)
-    const base = baseline(last10, summarize(views.season, s.key))
+    const base = baselineFor(views, s.key)
     return { key: s.key, label: s.label, digits: s.digits, base, miss: typicalMiss(s.key, band), lo: last10?.min ?? null, hi: last10?.max ?? null, games: last10?.n ?? 0 }
   })
 }
@@ -143,6 +180,8 @@ export type Behind = {
   rows: BehindRow[]
   /** His last meetings with the chosen opponent (not part of the baseline), newest first. */
   opponentRows: BehindRow[]
+  /** True when the baseline is the minutes smoother (weighted, newest games count most) rather than the half-and-half blend. */
+  smoothed: boolean
 }
 
 const newestFirst = (a: OutlookGame, b: OutlookGame) => (a.date === b.date ? (a.id < b.id ? 1 : -1) : a.date < b.date ? 1 : -1)
@@ -158,5 +197,5 @@ export function behindTile(views: Views, stat: OutlookStat): Behind {
   for (const g of [...views.last10, ...views.season]) all.set(g.id, g)
   const rows = [...all.values()].sort(newestFirst).map((game) => ({ game, value: game.values[stat], inLast10: ids10.has(game.id), inSeason: idsSeason.has(game.id) }))
   const opponentRows = [...views.opponent].sort(newestFirst).map((game) => ({ game, value: game.values[stat], inLast10: false, inSeason: false }))
-  return { stat, label: spec.label, digits: spec.digits, base: baseline(last10, season), last10, season, opponent: summarize(views.opponent, stat), rows, opponentRows }
+  return { stat, label: spec.label, digits: spec.digits, base: baselineFor(views, stat), last10, season, opponent: summarize(views.opponent, stat), rows, opponentRows, smoothed: usesSmoother(views, stat) }
 }
