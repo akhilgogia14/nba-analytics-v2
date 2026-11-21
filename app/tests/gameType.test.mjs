@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { GAME_TYPE_OPTIONS, formNotices, gamesWord } from '../src/lib/gameType.ts'
+import { GAME_TYPE_OPTIONS, formNotices, gamesWord, seasonTotalNote } from '../src/lib/gameType.ts'
 import { TEAM_NAMES } from '../src/lib/format.ts'
 import { TEAM_STYLES } from '../src/lib/teams.ts'
 import { chartPalette } from '../src/lib/hex.ts'
@@ -50,4 +50,10 @@ test('all 30 teams: every team can be listed (a name), lit (a style) and charted
     assert.equal(p.ramp.length, 5)
     assert.notEqual(p.top, '#5eead4', `${t} must not fall back to the theme teal`) // the old fallback for 12 teams
   }
+})
+
+test('season total note: only while the regular season lists exactly 80 games', () => {
+  assert.match(seasonTotalNote(80, 'regular-season'), /last 2 games of the 82/)
+  assert.equal(seasonTotalNote(82, 'regular-season'), null)
+  assert.equal(seasonTotalNote(80, 'playoffs'), null)
 })

@@ -76,7 +76,7 @@ export function nextGameFacts(g: NextGame): string[] {
   const out: string[] = []
   out.push(g.isHome ? `At home vs ${g.opp}` : `Away at ${g.opp}`)
   const nth = g.stintGame
-  if (nth > 1) out.push(g.isHome ? `game ${nth} of a homestand` : `game ${nth} of a road trip`)
+  if (nth > 1) out.push(g.isHome ? `game ${nth} of a homestand` : `${ordinal(nth)} straight road game`)
   out.push(restWords(g.daysRest))
   if (g.is4In6) out.push(`${ordinal(g.gamesIn6)} game in 6 nights`)
   else if (g.is3In4) out.push(`${ordinal(g.gamesIn4)} game in 4 nights`)

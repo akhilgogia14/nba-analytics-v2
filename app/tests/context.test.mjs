@@ -96,7 +96,7 @@ test('rest and ordinals are written in plain words', () => {
 test('the next game reads as a list of plain facts', () => {
   const base = { id: 'g', date: '2026-11-16', opp: 'NYK', isHome: false, daysRest: 0, isB2b: true, gamesIn4: 3, gamesIn6: 3, is3In4: true, is4In6: false, stintGame: 3, oppDaysRest: 2, restEdge: -2, seasonLabel: '2026-27' }
   assert.deepEqual(nextGameFacts(base), [
-    'Away at NYK', 'game 3 of a road trip', 'second night of a back-to-back', '3rd game in 4 nights', 'NYK has 2 days of rest', 'less rested than NYK by 2 days',
+    'Away at NYK', '3rd straight road game', 'second night of a back-to-back', '3rd game in 4 nights', 'NYK has 2 days of rest', 'less rested than NYK by 2 days',
   ])
   const home = nextGameFacts({ ...base, isHome: true, stintGame: 1, daysRest: 2, isB2b: false, is3In4: false, oppDaysRest: 0, restEdge: 2 })
   assert.deepEqual(home, ['At home vs NYK', '2 days of rest', 'NYK has played the night before', 'more rested than NYK by 2 days'])

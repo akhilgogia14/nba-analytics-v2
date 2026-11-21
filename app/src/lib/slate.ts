@@ -59,7 +59,7 @@ export const ROAD_TRIP_GAME = 3
 
 /**
  * The chips for one team: back-to-back, the stronger crowded stretch (3 in 4 nights, else 4 in 6), rested (3+ days off),
- * road trip (away team only, 3rd game or later), and rest edge (only on the MORE rested team, 2+ days more than the opponent).
+ * road stretch (away team only, 3rd straight road game or later), and rest edge (only on the MORE rested team, 2+ days more than the opponent).
  * Facts only, no claim about who will win. A team with nothing unusual gets none, and no context at all gets none.
  */
 export function chipsFor(c: SideContext | null, isHome: boolean): Chip[] {
@@ -70,7 +70,7 @@ export function chipsFor(c: SideContext | null, isHome: boolean): Chip[] {
   if (c.is3In4) chips.push({ key: 'crowded', label: c.gamesIn4 ? `${ordinal(c.gamesIn4)} game in 4 nights` : '3 in 4 nights', tone: 'warn' })
   else if (c.is4In6) chips.push({ key: 'crowded', label: c.gamesIn6 ? `${ordinal(c.gamesIn6)} game in 6 nights` : '4 in 6 nights', tone: 'warn' })
   if (c.daysRest !== null && c.daysRest >= RESTED_DAYS) chips.push({ key: 'rested', label: `Rested · ${c.daysRest} days`, tone: 'good' })
-  if (!isHome && c.stintGame !== null && c.stintGame >= ROAD_TRIP_GAME) chips.push({ key: 'trip', label: `Road trip · game ${c.stintGame}`, tone: 'info' })
+  if (!isHome && c.stintGame !== null && c.stintGame >= ROAD_TRIP_GAME) chips.push({ key: 'trip', label: `${ordinal(c.stintGame)} straight road game`, tone: 'info' })
   if (c.restEdge !== null && c.restEdge >= REST_EDGE_DAYS) chips.push({ key: 'edge', label: `Rest edge +${c.restEdge}`, tone: 'good' })
   return chips
 }
