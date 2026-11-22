@@ -7,6 +7,7 @@ Author: (Claude Code)
 ## What changed
 - **A new document, `docs/ml-contract.md`:** the written promise made before any model is trained. It says what a prediction is (one player, one upcoming regular-season game, given that he plays, made before tip-off), which stats come first (points, rebounds, assists, minutes), what output each gets (a number and a 10th to 90th percentile range), which players are covered (all, with rotation players also reported alone), and what the baseline to beat is (with the average misses we measured).
 - **The promotion gate, in writing:** a model replaces the baseline only if it is at least 1% better with a confidence interval that excludes zero, no group of players is more than 1% worse, its ranges contain the actual result 77% to 83% of the time, and the run is reproducible with the leakage test passing. If nothing passes, the baseline stays.
+- **A second document, `docs/ml-roadmap.md`:** the ten steps from the contract to predictions in production, each with what I do, what you do, how you verify it, and when it is done, plus a status table updated at the end of every step.
 - No code, no tables and no app change. Docs only.
 - Step 1 of the ML plan from the conversation on 2026-11-22. The next steps (prediction log starting with the baseline, then the feature table, frozen datasets, the experiment harness, first models) each come as their own pull request.
 
